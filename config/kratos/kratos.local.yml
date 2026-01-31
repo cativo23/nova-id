@@ -1,0 +1,153 @@
+version: v0.13.0
+
+# DSN for local development (memory or postgres)
+# Use memory for quick testing, postgres for persistence
+dsn: memory
+
+serve:
+  public:
+    # Must include /auth/ so verification email link is http://auth.ory.localhost/auth/self-service/verification?code=...&flow=...
+    base_url: http://auth.ory.localhost/auth/
+    cors:
+      enabled: true
+      allowed_origins:
+        - http://auth.ory.localhost
+        - http://admin.ory.localhost
+        - http://api.ory.localhost
+        - http://app.ory.localhost
+        - http://localhost:5173
+        - http://localhost:5174
+        - http://localhost:5175
+      allowed_methods:
+        - GET
+        - POST
+        - PUT
+        - DELETE
+        - PATCH
+        - OPTIONS
+      allowed_headers:
+        - "*"
+      exposed_headers:
+        - Content-Type
+        - X-Kratos-Request-Id
+      allow_credentials: true
+      max_age: 3600
+  admin:
+    base_url: http://localhost:4434/
+
+selfservice:
+  default_browser_return_url: http://admin.ory.localhost/dashboard
+  allowed_return_urls:
+    - http://auth.ory.localhost
+    - http://auth.ory.localhost/auth/hydra-callback
+    - http://admin.ory.localhost
+    - http://admin.ory.localhost/dashboard
+    - http://api.ory.localhost
+    - http://app.ory.localhost
+    - http://app.ory.localhost/
+    - http://localhost:4433
+    - http://localhost:5173
+    - http://localhost:5174
+    - http://localhost:5175
+    - http://localhost:4455/admin
+    - http://localhost:4455/admin/dashboard
+
+  methods:
+    password:
+      enabled: true
+      config:
+        # Disable for local dev/testing so simple passwords work
+        haveibeenpwned_enabled: false
+
+  flows:
+    error:
+      ui_url: http://auth.ory.localhost/auth/error
+
+    settings:
+      ui_url: http://auth.ory.localhost/auth/settings
+      privileged_session_max_age: 15m
+      required_aal: highest_available
+
+    recovery:
+      enabled: true
+      ui_url: http://auth.ory.localhost/auth/recovery
+      use: code
+
+    verification:
+      enabled: true
+      ui_url: http://auth.ory.localhost/auth/verification
+      use: code
+      after:
+        default_browser_return_url: http://admin.ory.localhost/dashboard
+
+    logout:
+      after:
+        default_browser_return_url: http://admin.ory.localhost/
+
+    login:
+      ui_url: http://auth.ory.localhost/auth/login
+      lifespan: 10m
+      after:
+        hooks:
+          - hook: require_verified_address
+
+    registration:
+      lifespan: 10m
+      ui_url: http://auth.ory.localhost/auth/registration
+      enable_legacy_one_step: true
+      after:
+        password:
+          hooks:
+            # No session until verified: user must complete verification, then log in
+            - hook: show_verification_ui
+
+log:
+  level: debug
+  format: json
+  leak_sensitive_values: true
+
+secrets:
+  cookie:
+    - PLEASE-CHANGE-ME-I-AM-VERY-INSECURE
+  cipher:
+    - 32-LONG-SECRET-NOT-SECURE-AT-ALL
+
+ciphers:
+  algorithm: xchacha20-poly1305
+
+hashers:
+  algorithm: bcrypt
+  bcrypt:
+    cost: 8
+
+identity:
+  default_schema_id: default
+  schemas:
+    - id: default
+      url: file:///etc/config/kratos/identity.schema.json
+
+courier:
+  template_override_path: /etc/config/kratos/courier-templates
+  smtp:
+    # Local dev: Mailpit. Values here so Kratos validates config; env vars are not expanded in YAML.
+    connection_uri: smtp://mailpit:1025/?disable_starttls=true
+    from_address: noreply@cativo.dev
+
+cookies:
+  # Use 'ory.localhost' to share cookies across subdomains
+  # localhost is a special domain that browsers handle better than .local
+  domain: ory.localhost
+  path: /
+  # In --dev mode, Kratos should handle Secure flag automatically
+
+session:
+  lifespan: 720h
+  cookie:
+    domain: ory.localhost
+    path: /
+    # In --dev mode, Kratos should handle Secure flag automatically
+  whoami:
+    required_aal: highest_available
+
+feature_flags:
+  use_continue_with_transitions: true

@@ -1,0 +1,93 @@
+version: v2.2.0
+
+# DSN for production (PostgreSQL)
+# Set via environment variable: DSN=postgres://hydra_user:${HYDRA_DB_PASSWORD}@postgres:5432/hydra?sslmode=disable&max_conns=20&max_idle_conns=4
+dsn: postgres://hydra_user:${HYDRA_DB_PASSWORD}@postgres:5432/hydra?sslmode=disable&max_conns=20&max_idle_conns=4
+
+serve:
+  public:
+    port: 4444
+    cors:
+      enabled: true
+      allowed_origins:
+        - https://auth.cativo.dev
+        - https://admin.cativo.dev
+        - https://api.cativo.dev
+      allowed_methods:
+        - POST
+        - GET
+        - PUT
+        - PATCH
+        - DELETE
+        - OPTIONS
+      allowed_headers:
+        - Authorization
+        - Content-Type
+        - X-Requested-With
+      exposed_headers:
+        - Content-Type
+        - X-Hydra-Request-Id
+      allow_credentials: true
+      max_age: 3600
+  admin:
+    port: 4445
+    cors:
+      enabled: true
+      allowed_origins:
+        - https://auth.cativo.dev
+        - https://admin.cativo.dev
+        - https://api.cativo.dev
+      allowed_methods:
+        - POST
+        - GET
+        - PUT
+        - PATCH
+        - DELETE
+        - OPTIONS
+      allowed_headers:
+        - Authorization
+        - Content-Type
+        - X-Requested-With
+      exposed_headers:
+        - Content-Type
+        - X-Hydra-Request-Id
+      allow_credentials: true
+      max_age: 3600
+  cookies:
+    domain: cativo.dev
+    same_site_mode: Lax
+    secure: true
+
+urls:
+  self:
+    issuer: https://api.cativo.dev
+  consent: https://api.cativo.dev/consent
+  login: https://api.cativo.dev/login
+  logout: https://api.cativo.dev/logout
+  error: https://api.cativo.dev/error
+  post_logout_redirect: https://api.cativo.dev
+
+strategies:
+  access_token: jwt
+  scope: exact
+
+ttl:
+  access_token: 1h
+  refresh_token: 720h
+  id_token: 1h
+  auth_code: 10m
+
+oauth2:
+  expose_internal_errors: false
+  hashers:
+    algorithm: bcrypt
+    bcrypt:
+      cost: 12
+
+log:
+  level: info
+  format: json
+
+secrets:
+  system:
+    - ${HYDRA_SYSTEM_SECRET}

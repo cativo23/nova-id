@@ -1,0 +1,121 @@
+version: v0.13.0
+
+# DSN is set via environment variable in docker-compose.yml
+# If not set, will use PostgreSQL connection string from env
+# dsn: postgres://kratos_user:${KRATOS_DB_PASSWORD}@postgres:5432/kratos?sslmode=disable&max_conns=20&max_idle_conns=4
+
+serve:
+  public:
+    base_url: http://localhost:4433/
+    # CORS disabled - Oathkeeper handles all CORS (Zero Trust architecture)
+    # All frontend requests go through Oathkeeper, which adds CORS headers
+    # Kratos is only accessible through Oathkeeper, so CORS is handled at the gateway level
+    cors:
+      enabled: false
+  admin:
+    base_url: http://localhost:4434/
+    # Note: Admin API does not support CORS - use Oathkeeper gateway instead
+
+selfservice:
+  default_browser_return_url: http://localhost:5174/dashboard
+  allowed_return_urls:
+    - http://localhost:4433
+    - http://localhost:5173
+    - http://localhost:5174
+    - http://localhost:5174/dashboard
+    - http://localhost:5175
+    - http://localhost:4455/admin
+    - http://localhost:4455/admin/dashboard
+
+  methods:
+    password:
+      enabled: true
+      config:
+        # Disable for local dev/testing so simple passwords (e.g. test scripts) work.
+        # Re-enable in production.
+        haveibeenpwned_enabled: false
+
+  flows:
+    error:
+      ui_url: http://localhost:5173/error
+
+    settings:
+      ui_url: http://localhost:5173/settings
+      privileged_session_max_age: 15m
+      required_aal: highest_available
+
+    recovery:
+      enabled: true
+      ui_url: http://localhost:5173/auth/recovery
+      use: code
+
+    verification:
+      enabled: true
+      ui_url: http://localhost:5173/verification
+      use: code
+      after:
+        default_browser_return_url: http://localhost:5173/dashboard
+
+    logout:
+      after:
+        default_browser_return_url: http://localhost:5174/  # Admin frontend home (default)
+
+    login:
+      ui_url: http://localhost:4455/auth/login  # Route through Oathkeeper to frontend-auth
+      lifespan: 10m
+
+    registration:
+      lifespan: 10m
+      ui_url: http://localhost:5173/registration
+      enable_legacy_one_step: true # Use single-step registration (all fields in one form)
+      after:
+        password:
+          hooks:
+            - hook: session
+            - hook: show_verification_ui
+
+log:
+  level: debug
+  format: json
+  leak_sensitive_values: true
+
+secrets:
+  cookie:
+    - PLEASE-CHANGE-ME-I-AM-VERY-INSECURE
+  cipher:
+    - 32-LONG-SECRET-NOT-SECURE-AT-ALL
+
+ciphers:
+  algorithm: xchacha20-poly1305
+
+hashers:
+  algorithm: bcrypt
+  bcrypt:
+    cost: 8
+
+identity:
+  default_schema_id: default
+  schemas:
+    - id: default
+      url: file:///etc/config/kratos/identity.schema.json
+
+courier:
+  template_override_path: /etc/config/kratos/courier-templates
+  smtp:
+    # Using Mailpit for local SMTP testing (cleartext; no STARTTLS)
+    connection_uri: smtp://mailpit:1025/?disable_starttls=true
+    from_address: noreply@cativo.dev
+
+cookies:
+  # domain: cativo.dev  # Commented out for local development (localhost)
+  # Set domain only in production for cross-subdomain SSO
+  path: /
+  same_site: Lax
+
+session:
+  lifespan: 720h
+  whoami:
+    required_aal: highest_available
+
+feature_flags:
+  use_continue_with_transitions: true

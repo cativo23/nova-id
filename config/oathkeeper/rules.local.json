@@ -1,0 +1,577 @@
+[
+  {
+    "id": "oathkeeper-health",
+    "upstream": {
+      "preserve_host": false,
+      "url": "http://oathkeeper:4456"
+    },
+    "match": {
+      "url": "<(http|https)://(localhost(:[0-9]+)?|api\\.ory\\.localhost)/health/.*>",
+      "methods": ["GET"]
+    },
+    "authenticators": [
+      {
+        "handler": "noop"
+      }
+    ],
+    "authorizer": {
+      "handler": "allow"
+    },
+    "mutators": [
+      {
+        "handler": "noop"
+      }
+    ]
+  },
+  {
+    "id": "kratos-public",
+    "upstream": {
+      "preserve_host": false,
+      "strip_path": "/api",
+      "url": "http://kratos:4433"
+    },
+    "match": {
+      "url": "<(http|https)://(api\\.ory\\.localhost|admin\\.ory\\.localhost|auth\\.ory\\.localhost|app\\.ory\\.localhost|localhost(:[0-9]+)?|oathkeeper(:[0-9]+)?)/api/(self-service|sessions|schemas).*>",
+      "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
+    },
+    "authenticators": [
+      {
+        "handler": "noop"
+      }
+    ],
+    "authorizer": {
+      "handler": "allow"
+    },
+    "mutators": [
+      {
+        "handler": "noop"
+      }
+    ]
+  },
+  {
+    "id": "kratos-admin-recovery-link",
+    "upstream": {
+      "preserve_host": false,
+      "strip_path": "/api",
+      "url": "http://kratos:4434"
+    },
+    "match": {
+      "url": "<(http|https)://(api\\.ory\\.localhost|admin\\.ory\\.localhost|auth\\.ory\\.localhost|app\\.ory\\.localhost|localhost(:[0-9]+)?|oathkeeper(:[0-9]+)?)/api/admin/recovery/link>",
+      "methods": ["POST"]
+    },
+    "authenticators": [{ "handler": "cookie_session" }],
+    "authorizer": {
+      "handler": "remote_json",
+      "config": {
+        "remote": "http://keto:4466/relation-tuples/check",
+        "payload": "{\"namespace\":\"users\",\"object\":\"management\",\"relation\":\"view_users\",\"subject_id\":\"user:{{ print .Subject }}\"}",
+        "forward_response_headers_to_upstream": ["Content-Type"]
+      }
+    },
+    "mutators": [
+      {
+        "handler": "header",
+        "config": {
+          "headers": {
+            "X-User-ID": "{{ print .Subject }}",
+            "X-User-Email": "{{ print .Extra.identity.traits.email }}"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "id": "kratos-admin",
+    "upstream": {
+      "preserve_host": false,
+      "strip_path": "/api",
+      "url": "http://kratos:4434"
+    },
+    "match": {
+      "url": "<(http|https)://(api\\.ory\\.localhost|admin\\.ory\\.localhost|auth\\.ory\\.localhost|app\\.ory\\.localhost|localhost(:[0-9]+)?|oathkeeper(:[0-9]+)?)/api/admin/(identities.*|sessions.*|recovery(?!\\/link).*|health|version|schemas.*)>",
+      "methods": ["GET", "POST", "PUT", "DELETE", "PATCH"]
+    },
+    "authenticators": [
+      {
+        "handler": "cookie_session"
+      }
+    ],
+    "authorizer": {
+      "handler": "remote_json",
+      "config": {
+        "remote": "http://keto:4466/relation-tuples/check",
+        "payload": "{\"namespace\":\"users\",\"object\":\"management\",\"relation\":\"view_users\",\"subject_id\":\"user:{{ print .Subject }}\"}",
+        "forward_response_headers_to_upstream": ["Content-Type"]
+      }
+    },
+    "mutators": [
+      {
+        "handler": "header",
+        "config": {
+          "headers": {
+            "X-User-ID": "{{ print .Subject }}",
+            "X-User-Email": "{{ print .Extra.identity.traits.email }}"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "id": "oauth2-public",
+    "upstream": {
+      "preserve_host": false,
+      "url": "http://hydra:4444"
+    },
+    "match": {
+      "url": "<(http|https)://(api\\.ory\\.localhost|admin\\.ory\\.localhost|auth\\.ory\\.localhost|app\\.ory\\.localhost|localhost(:[0-9]+)?|oathkeeper(:[0-9]+)?)/oauth2/.*>",
+      "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+    },
+    "authenticators": [
+      {
+        "handler": "noop"
+      }
+    ],
+    "authorizer": {
+      "handler": "allow"
+    },
+    "mutators": [
+      {
+        "handler": "noop"
+      }
+    ]
+  },
+  {
+    "id": "hydra-public-proxy",
+    "upstream": {
+      "preserve_host": false,
+      "strip_path": "/hydra-public",
+      "url": "http://hydra:4444"
+    },
+    "match": {
+      "url": "<(http|https)://(api\\.ory\\.localhost|admin\\.ory\\.localhost|auth\\.ory\\.localhost|app\\.ory\\.localhost|localhost(:[0-9]+)?|oathkeeper(:[0-9]+)?)/hydra-public/(oauth2|health|version|\\.well-known).*>",
+      "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+    },
+    "authenticators": [
+      {
+        "handler": "noop"
+      }
+    ],
+    "authorizer": {
+      "handler": "allow"
+    },
+    "mutators": [
+      {
+        "handler": "noop"
+      }
+    ]
+  },
+  {
+    "id": "hydra-public",
+    "upstream": {
+      "preserve_host": false,
+      "strip_path": "/api/hydra-public",
+      "url": "http://hydra:4444"
+    },
+    "match": {
+      "url": "<(http|https)://(api\\.ory\\.localhost|admin\\.ory\\.localhost|auth\\.ory\\.localhost|app\\.ory\\.localhost|localhost(:[0-9]+)?|oathkeeper(:[0-9]+)?)/api/hydra-public/(oauth2|health|version|\\.well-known).*>",
+      "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+    },
+    "authenticators": [
+      {
+        "handler": "noop"
+      }
+    ],
+    "authorizer": {
+      "handler": "allow"
+    },
+    "mutators": [
+      {
+        "handler": "noop"
+      }
+    ]
+  },
+  {
+    "id": "internal-hydra-admin",
+    "upstream": {
+      "preserve_host": false,
+      "strip_path": "/api/internal/hydra-admin",
+      "url": "http://hydra:4445"
+    },
+    "match": {
+      "url": "<(http|https)://(api\\.ory\\.localhost|admin\\.ory\\.localhost|auth\\.ory\\.localhost|app\\.ory\\.localhost|localhost(:[0-9]+)?|oathkeeper(:[0-9]+)?)/api/internal/hydra-admin/.*>",
+      "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
+    },
+    "authenticators": [
+      {
+        "handler": "noop"
+      }
+    ],
+    "authorizer": {
+      "handler": "allow"
+    },
+    "mutators": [
+      {
+        "handler": "noop"
+      }
+    ]
+  },
+  {
+    "id": "hydra-admin",
+    "upstream": {
+      "preserve_host": false,
+      "strip_path": "/api/hydra-admin",
+      "url": "http://hydra:4445"
+    },
+    "match": {
+      "url": "<(http|https)://(api\\.ory\\.localhost|admin\\.ory\\.localhost|auth\\.ory\\.localhost|app\\.ory\\.localhost|localhost(:[0-9]+)?|oathkeeper(:[0-9]+)?)/api/hydra-admin/.*>",
+      "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
+    },
+    "authenticators": [
+      {
+        "handler": "cookie_session"
+      }
+    ],
+    "authorizer": {
+      "handler": "allow"
+    },
+    "mutators": [
+      {
+        "handler": "header",
+        "config": {
+          "headers": {
+            "X-User-ID": "{{ print .Subject }}",
+            "X-User-Email": "{{ print .Extra.identity.traits.email }}"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "id": "frontend-auth",
+    "upstream": {
+      "preserve_host": false,
+      "url": "http://frontend-auth:5173"
+    },
+    "match": {
+      "url": "<(http|https)://(api\\.local|localhost(:[0-9]+)?|auth\\.ory\\.localhost)/auth/.*>",
+      "methods": ["GET", "POST", "PUT", "DELETE", "PATCH"]
+    },
+    "authenticators": [
+      {
+        "handler": "noop"
+      }
+    ],
+    "authorizer": {
+      "handler": "allow"
+    },
+    "mutators": [
+      {
+        "handler": "noop"
+      }
+    ]
+  },
+  {
+    "id": "frontend-admin",
+    "upstream": {
+      "preserve_host": false,
+      "url": "http://frontend-admin:5174"
+    },
+    "match": {
+      "url": "<(http|https)://(api\\.ory\\.localhost|localhost(:[0-9]+)?|admin\\.ory\\.localhost)/admin/(dashboard|users|permissions|settings)(/.*)?>",
+      "methods": ["GET", "POST", "PUT", "DELETE", "PATCH"]
+    },
+    "authenticators": [
+      {
+        "handler": "cookie_session"
+      }
+    ],
+    "authorizer": {
+      "handler": "remote_json",
+      "config": {
+        "remote": "http://keto:4466/relation-tuples/check",
+        "payload": "{\"namespace\":\"ranks\",\"object\":\"platform_admin\",\"relation\":\"member\",\"subject_id\":\"user:{{ print .Subject }}\"}",
+        "forward_response_headers_to_upstream": ["Content-Type"]
+      }
+    },
+    "mutators": [
+      {
+        "handler": "header",
+        "config": {
+          "headers": {
+            "X-User-ID": "{{ print .Subject }}",
+            "X-User-Email": "{{ print .Extra.identity.traits.email }}",
+            "X-User-Role": "{{ print .Extra.identity.traits.role }}"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "id": "frontend-app",
+    "upstream": {
+      "preserve_host": false,
+      "url": "http://frontend-app:5175"
+    },
+    "match": {
+      "url": "<(http|https)://(api\\.local|localhost(:[0-9]+)?)/app/.*>",
+      "methods": ["GET", "POST", "PUT", "DELETE", "PATCH"]
+    },
+    "authenticators": [
+      {
+        "handler": "cookie_session"
+      }
+    ],
+    "authorizer": {
+      "handler": "allow"
+    },
+    "mutators": [
+      {
+        "handler": "header",
+        "config": {
+          "headers": {
+            "X-User-ID": "{{ print .Subject }}",
+            "X-User-Email": "{{ print .Extra.identity.traits.email }}",
+            "X-User-Role": "{{ print .Extra.identity.traits.role }}"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "id": "hydra-login",
+    "upstream": {
+      "preserve_host": false,
+      "url": "http://frontend-auth:5173/auth/login"
+    },
+    "match": {
+      "url": "<(http|https)://(api\\.ory\\.localhost|api\\.local|localhost(:[0-9]+)?)/login>",
+      "methods": ["GET", "POST"]
+    },
+    "authenticators": [
+      {
+        "handler": "noop"
+      }
+    ],
+    "authorizer": {
+      "handler": "allow"
+    },
+    "mutators": [
+      {
+        "handler": "noop"
+      }
+    ]
+  },
+  {
+    "id": "hydra-consent",
+    "upstream": {
+      "preserve_host": false,
+      "url": "http://frontend-auth:5173/consent"
+    },
+    "match": {
+      "url": "<(http|https)://(api\\.ory\\.localhost|api\\.local|localhost(:[0-9]+)?)/consent>",
+      "methods": ["GET", "POST"]
+    },
+    "authenticators": [
+      {
+        "handler": "cookie_session"
+      }
+    ],
+    "authorizer": {
+      "handler": "allow"
+    },
+    "mutators": [
+      {
+        "handler": "noop"
+      }
+    ]
+  },
+  {
+    "id": "public-api",
+    "upstream": {
+      "preserve_host": true,
+      "strip_path": "/api",
+      "url": "http://api:8080"
+    },
+    "match": {
+      "url": "<(http|https)://(api\\.ory\\.localhost|admin\\.ory\\.localhost|auth\\.ory\\.localhost|app\\.ory\\.localhost|localhost(:[0-9]+)?|oathkeeper(:[0-9]+)?)/api/(health|public)>",
+      "methods": ["GET", "OPTIONS"]
+    },
+    "authenticators": [
+      {
+        "handler": "noop"
+      }
+    ],
+    "authorizer": {
+      "handler": "allow"
+    },
+    "mutators": [
+      {
+        "handler": "noop"
+      }
+    ]
+  },
+  {
+    "id": "api-test-public",
+    "upstream": {
+      "preserve_host": true,
+      "strip_path": "/api-test",
+      "url": "http://api:8080"
+    },
+    "match": {
+      "url": "<(http|https)://(api\\.ory\\.localhost|admin\\.ory\\.localhost|auth\\.ory\\.localhost|app\\.ory\\.localhost|localhost(:[0-9]+)?|oathkeeper(:[0-9]+)?)/api-test/(health|public)>",
+      "methods": ["GET", "OPTIONS"]
+    },
+    "authenticators": [
+      {
+        "handler": "noop"
+      }
+    ],
+    "authorizer": {
+      "handler": "allow"
+    },
+    "mutators": [
+      {
+        "handler": "noop"
+      }
+    ]
+  },
+  {
+    "id": "api-test",
+    "upstream": {
+      "preserve_host": true,
+      "strip_path": "/api-test",
+      "url": "http://api:8080"
+    },
+    "match": {
+      "url": "<(http|https)://(api\\.ory\\.localhost|admin\\.ory\\.localhost|auth\\.ory\\.localhost|app\\.ory\\.localhost|localhost(:[0-9]+)?|oathkeeper(:[0-9]+)?)/api-test/(?!health|public).*>",
+      "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
+    },
+    "authenticators": [
+      {
+        "handler": "oauth2_introspection"
+      }
+    ],
+    "authorizer": {
+      "handler": "allow"
+    },
+    "mutators": [
+      {
+        "handler": "header",
+        "config": {
+          "headers": {
+            "X-User-ID": "{{ print .Subject }}",
+            "X-User-Email": "{{ if .Extra.identity }}{{ .Extra.identity.traits.email }}{{ else }}{{ if index .Extra \"ext\" }}{{ index (index .Extra \"ext\") \"email\" }}{{ else }}{{ if index .Extra \"session\" }}{{ index (index .Extra \"session\") \"email\" }}{{ else }}{{ index .Extra \"email\" }}{{ end }}{{ end }}{{ end }}",
+            "X-User-Name": "{{ if .Extra.identity }}{{ .Extra.identity.traits.full_name }}{{ else }}{{ if index .Extra \"ext\" }}{{ index (index .Extra \"ext\") \"name\" }}{{ else }}{{ if index .Extra \"session\" }}{{ index (index .Extra \"session\") \"name\" }}{{ else }}{{ index .Extra \"name\" }}{{ end }}{{ end }}{{ end }}",
+            "X-User-Role": "{{ if .Extra.identity }}{{ .Extra.identity.traits.role }}{{ else }}{{ if index .Extra \"ext\" }}{{ index (index .Extra \"ext\") \"role\" }}{{ else }}{{ if index .Extra \"session\" }}{{ index (index .Extra \"session\") \"role\" }}{{ else }}{{ index .Extra \"role\" }}{{ end }}{{ end }}{{ end }}",
+            "X-User-App-Role": "{{ if index .Extra \"ext\" }}{{ index (index .Extra \"ext\") \"appRole\" }}{{ else }}{{ if index .Extra \"session\" }}{{ index (index .Extra \"session\") \"appRole\" }}{{ else }}{{ index .Extra \"appRole\" }}{{ end }}{{ end }}"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "id": "protected-api",
+    "upstream": {
+      "preserve_host": true,
+      "strip_path": "/api",
+      "url": "http://api:8080"
+    },
+    "match": {
+      "url": "<(http|https)://(api\\.ory\\.localhost|admin\\.ory\\.localhost|auth\\.ory\\.localhost|app\\.ory\\.localhost|localhost(:[0-9]+)?|oathkeeper(:[0-9]+)?)/api/(protected|user-demo|admin-demo|me|data|logs|nova-id-session|hydra-accept-login|hydra-accept-consent)(/.*)?>",
+      "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
+    },
+    "authenticators": [
+      {
+        "handler": "cookie_session",
+        "config": {
+          "check_session_url": "http://kratos:4433/sessions/whoami",
+          "preserve_path": true,
+          "extra_from": "@this",
+          "subject_from": "identity.id"
+        }
+      },
+      {
+        "handler": "oauth2_introspection"
+      }
+    ],
+    "authorizer": {
+      "handler": "allow"
+    },
+    "mutators": [
+      {
+        "handler": "header",
+        "config": {
+          "headers": {
+            "X-User-ID": "{{ print .Subject }}",
+            "X-User-Email": "{{ if .Extra.identity }}{{ .Extra.identity.traits.email }}{{ else }}{{ if index .Extra \"ext\" }}{{ index (index .Extra \"ext\") \"email\" }}{{ else }}{{ if index .Extra \"session\" }}{{ index (index .Extra \"session\") \"email\" }}{{ else }}{{ index .Extra \"email\" }}{{ end }}{{ end }}{{ end }}",
+            "X-User-Name": "{{ if .Extra.identity }}{{ .Extra.identity.traits.full_name }}{{ else }}{{ if index .Extra \"ext\" }}{{ index (index .Extra \"ext\") \"name\" }}{{ else }}{{ if index .Extra \"session\" }}{{ index (index .Extra \"session\") \"name\" }}{{ else }}{{ index .Extra \"name\" }}{{ end }}{{ end }}{{ end }}",
+            "X-User-Role": "{{ if .Extra.identity }}{{ .Extra.identity.traits.role }}{{ else }}{{ if index .Extra \"ext\" }}{{ index (index .Extra \"ext\") \"role\" }}{{ else }}{{ if index .Extra \"session\" }}{{ index (index .Extra \"session\") \"role\" }}{{ else }}{{ index .Extra \"role\" }}{{ end }}{{ end }}{{ end }}",
+            "X-User-App-Role": "{{ if index .Extra \"ext\" }}{{ index (index .Extra \"ext\") \"appRole\" }}{{ else }}{{ if index .Extra \"session\" }}{{ index (index .Extra \"session\") \"appRole\" }}{{ else }}{{ index .Extra \"appRole\" }}{{ end }}{{ end }}"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "id": "keto-read",
+    "upstream": {
+      "preserve_host": false,
+      "strip_path": "/api/keto/read",
+      "url": "http://keto:4466"
+    },
+    "match": {
+      "url": "<(http|https)://(api\\.ory\\.localhost|admin\\.ory\\.localhost|auth\\.ory\\.localhost|app\\.ory\\.localhost|localhost(:[0-9]+)?|oathkeeper(:[0-9]+)?)/api/keto/read/.*>",
+      "methods": ["GET", "POST"]
+    },
+    "authenticators": [
+      {
+        "handler": "cookie_session"
+      }
+    ],
+    "authorizer": {
+      "handler": "allow"
+    },
+    "mutators": [
+      {
+        "handler": "header",
+        "config": {
+          "headers": {
+            "X-User-ID": "{{ print .Subject }}",
+            "X-User-Email": "{{ print .Extra.identity.traits.email }}"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "id": "keto-write",
+    "upstream": {
+      "preserve_host": false,
+      "strip_path": "/api/keto/write",
+      "url": "http://keto:4467"
+    },
+    "match": {
+      "url": "<(http|https)://(api\\.ory\\.localhost|admin\\.ory\\.localhost|auth\\.ory\\.localhost|app\\.ory\\.localhost|localhost(:[0-9]+)?|oathkeeper(:[0-9]+)?)/api/keto/write/.*>",
+      "methods": ["GET", "POST", "PUT", "DELETE", "PATCH"]
+    },
+    "authenticators": [
+      {
+        "handler": "cookie_session"
+      }
+    ],
+    "authorizer": {
+      "handler": "allow"
+    },
+    "mutators": [
+      {
+        "handler": "header",
+        "config": {
+          "headers": {
+            "X-User-ID": "{{ print .Subject }}",
+            "X-User-Email": "{{ print .Extra.identity.traits.email }}"
+          }
+        }
+      }
+    ]
+  }
+]

@@ -1,0 +1,110 @@
+version: v2.2.0
+
+# DSN for local development (memory)
+dsn: memory
+
+serve:
+  public:
+    port: 4444
+    # CORS off: only Oathkeeper adds CORS. Browser calls api.ory.localhost/oauth2/* via Oathkeeper;
+    # if Hydra also adds Access-Control-Allow-Origin we get "multiple values" and ERR_FAILED.
+    cors:
+      enabled: false
+      allowed_origins:
+        - http://auth.local
+        - http://admin.local
+        - http://api.local
+        - http://auth.ory.localhost
+        - http://admin.ory.localhost
+        - http://app.ory.localhost
+        - http://api.ory.localhost
+        - http://localhost:5173
+        - http://localhost:5174
+        - http://localhost:5175
+        - http://localhost:3000
+      allowed_methods:
+        - POST
+        - GET
+        - PUT
+        - PATCH
+        - DELETE
+        - OPTIONS
+      allowed_headers:
+        - Authorization
+        - Content-Type
+        - X-Requested-With
+      exposed_headers:
+        - Content-Type
+        - X-Hydra-Request-Id
+      allow_credentials: true
+      max_age: 3600
+  admin:
+    port: 4445
+    cors:
+      enabled: true
+      allowed_origins:
+        - http://auth.local
+        - http://admin.local
+        - http://api.local
+        - http://auth.ory.localhost
+        - http://admin.ory.localhost
+        - http://app.ory.localhost
+        - http://api.ory.localhost
+        - http://localhost:5173
+        - http://localhost:5174
+        - http://localhost:5175
+        - http://localhost:3000
+      allowed_methods:
+        - POST
+        - GET
+        - PUT
+        - PATCH
+        - DELETE
+        - OPTIONS
+      allowed_headers:
+        - Authorization
+        - Content-Type
+        - X-Requested-With
+      exposed_headers:
+        - Content-Type
+        - X-Hydra-Request-Id
+      allow_credentials: true
+      max_age: 3600
+  cookies:
+    same_site_mode: Lax
+    # secure: false for local (http)
+
+urls:
+  self:
+    issuer: http://api.ory.localhost
+  # Login/consent use auth.ory.localhost so the auth UI loads (same origin for assets, correct host in URL bar)
+  consent: http://auth.ory.localhost/auth/consent
+  login: http://auth.ory.localhost/auth/login
+  logout: http://auth.ory.localhost/auth/login
+  error: http://auth.ory.localhost/auth/error
+  post_logout_redirect: http://auth.ory.localhost
+
+strategies:
+  access_token: jwt
+  scope: exact
+
+ttl:
+  access_token: 1h
+  refresh_token: 720h
+  id_token: 1h
+  auth_code: 10m
+
+oauth2:
+  expose_internal_errors: true
+  hashers:
+    algorithm: bcrypt
+    bcrypt:
+      cost: 8
+
+log:
+  level: debug
+  format: json
+
+secrets:
+  system:
+    - ${HYDRA_SYSTEM_SECRET}

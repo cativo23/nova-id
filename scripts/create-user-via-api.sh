@@ -1,0 +1,78 @@
+#!/bin/bash
+# Script to create a user via Kratos Admin API
+# This requires authentication - use the admin dashboard UI or run from browser console
+
+set -e
+
+OATHKEEPER_URL="${OATHKEEPER_URL:-http://localhost:4455}"
+EMAIL="${1:-cativo23.kt@gmail.com}"
+FULL_NAME="${2:-Carlos Cativo}"
+ROLE="${3:-platform_admin}"
+PASSWORD="${4:-Cacpac2323$}"
+
+echo "Creating user with the following details:"
+echo "  Email: $EMAIL"
+echo "  Name: $FULL_NAME"
+echo "  Role: $ROLE"
+echo ""
+
+# Create user
+echo "Creating user in Kratos..."
+USER_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$OATHKEEPER_URL/admin/identities" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d "{
+    \"schema_id\": \"default\",
+    \"traits\": {
+      \"email\": \"$EMAIL\",
+      \"full_name\": \"$FULL_NAME\",
+      \"role\": \"$ROLE\"
+    },
+    \"credentials\": {
+      \"password\": {
+        \"config\": {
+          \"password\": \"$PASSWORD\"
+        }
+      }
+    }
+  }")
+
+HTTP_CODE=$(echo "$USER_RESPONSE" | tail -n1)
+USER_BODY=$(echo "$USER_RESPONSE" | sed '$d')
+
+if [ "$HTTP_CODE" != "201" ] && [ "$HTTP_CODE" != "200" ]; then
+  echo "✗ Failed to create user (HTTP $HTTP_CODE)"
+  echo "$USER_BODY" | jq '.' 2>/dev/null || echo "$USER_BODY"
+  exit 1
+fi
+
+USER_ID=$(echo "$USER_BODY" | jq -r '.id')
+echo "✓ User created successfully!"
+echo "  User ID: $USER_ID"
+echo ""
+
+echo "Assigning user to role $ROLE in Keto..."
+KETO_RESPONSE=$(curl -s -w "\n%{http_code}" -X PUT "$OATHKEEPER_URL/keto/write/admin/relation-tuples" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d "{
+    \"namespace\": \"ranks\",
+    \"object\": \"$ROLE\",
+    \"relation\": \"member\",
+    \"subject_id\": \"user:$USER_ID\"
+  }")
+
+KETO_HTTP_CODE=$(echo "$KETO_RESPONSE" | tail -n1)
+
+if [ "$KETO_HTTP_CODE" = "200" ] || [ "$KETO_HTTP_CODE" = "201" ] || [ "$KETO_HTTP_CODE" = "204" ]; then
+  echo "✓ User assigned to $ROLE in Keto"
+else
+  echo "⚠ Warning: Failed to assign user to role in Keto (HTTP $KETO_HTTP_CODE)"
+fi
+
+echo ""
+echo "✓ User creation complete!"
+echo ""
+echo "Login credentials:"
+echo "  Email: $EMAIL"
+echo "  Password: $PASSWORD"

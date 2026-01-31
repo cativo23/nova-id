@@ -1,0 +1,63 @@
+# Docker Compose override for production
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.production.yml up
+# IMPORTANT: Connects to existing Traefik network (space-server_web)
+
+version: '3.8'
+
+services:
+  postgres:
+    ports: []  # No exposed ports in production
+
+  kratos:
+    ports: []  # No exposed ports - only accessible through Oathkeeper
+
+  hydra:
+    ports: []  # No exposed ports - only accessible through Oathkeeper
+
+  keto:
+    ports: []  # No exposed ports - only accessible through Oathkeeper
+
+  frontend-auth:
+    ports: []  # No exposed ports - Traefik handles routing
+    networks:
+      - apps
+      - web  # Traefik network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=space-server_web"
+      - "traefik.http.routers.frontend-auth.rule=Host(`auth.cativo.dev`)"
+      - "traefik.http.routers.frontend-auth.entrypoints=websecure"
+      - "traefik.http.routers.frontend-auth.tls.certresolver=letsencrypt"
+      - "traefik.http.services.frontend-auth.loadbalancer.server.port=5173"
+
+  frontend-admin:
+    ports: []  # No exposed ports - Traefik handles routing
+    networks:
+      - apps
+      - web  # Traefik network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=space-server_web"
+      - "traefik.http.routers.frontend-admin.rule=Host(`admin.cativo.dev`)"
+      - "traefik.http.routers.frontend-admin.entrypoints=websecure"
+      - "traefik.http.routers.frontend-admin.tls.certresolver=letsencrypt"
+      - "traefik.http.services.frontend-admin.loadbalancer.server.port=5174"
+
+  oathkeeper:
+    ports: []  # No exposed ports - Traefik handles routing
+    networks:
+      - ory-internal
+      - apps
+      - web  # Traefik network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=space-server_web"
+      - "traefik.http.routers.oathkeeper.rule=Host(`api.cativo.dev`)"
+      - "traefik.http.routers.oathkeeper.entrypoints=websecure"
+      - "traefik.http.routers.oathkeeper.tls.certresolver=letsencrypt"
+      - "traefik.http.services.oathkeeper.loadbalancer.server.port=4455"
+
+networks:
+  web:
+    external: true
+    name: space-server_web

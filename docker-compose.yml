@@ -1,0 +1,353 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./config/init-sql/create-dbs.sql:/docker-entrypoint-initdb.d/create-dbs.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ory-internal
+    restart: unless-stopped
+
+  postgres-init:
+    image: postgres:15-alpine
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      ORY_PASSWORD: ${ORY_PASSWORD}
+      KRATOS_DB_PASSWORD: ${KRATOS_DB_PASSWORD}
+      HYDRA_DB_PASSWORD: ${HYDRA_DB_PASSWORD}
+      KETO_DB_PASSWORD: ${KETO_DB_PASSWORD}
+    command: >
+      sh -c "
+        until pg_isready -h postgres -U postgres; do sleep 1; done &&
+        bash /docker-entrypoint-initdb.d/create-users.sh
+      "
+    volumes:
+      - ./config/init-sql/create-users.sh:/docker-entrypoint-initdb.d/create-users.sh:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ory-internal
+    restart: "no"
+
+  # Mailpit - SMTP testing server (Web UI on :8025)
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "1025:1025" # SMTP port
+      - "8025:8025" # Web UI port
+    environment:
+      - MP_SMTP_BIND_ADDR=0.0.0.0:1025
+      - MP_WEB_BIND_ADDR=0.0.0.0:8025
+    restart: unless-stopped
+    networks:
+      - ory-internal
+
+  kratos-migrate:
+    image: oryd/kratos:v25.4.0
+    environment:
+      - DSN=postgres://kratos_user:${KRATOS_DB_PASSWORD}@postgres:5432/kratos?sslmode=disable&max_conns=20&max_idle_conns=4
+      - KRATOS_DB_PASSWORD=${KRATOS_DB_PASSWORD}
+      - KRATOS_SECRETS_COOKIE=${KRATOS_SECRETS_COOKIE}
+      - KRATOS_SECRETS_CIPHER=${KRATOS_SECRETS_CIPHER}
+    command: -c /etc/config/kratos/kratos.${ENVIRONMENT:-local}.yml migrate sql -e --yes
+    volumes:
+      - ./config/kratos:/etc/config/kratos:ro
+    env_file:
+      - .env
+    depends_on:
+      postgres-init:
+        condition: service_completed_successfully
+    networks:
+      - ory-internal
+    restart: "no"
+
+  kratos:
+    image: oryd/kratos:v25.4.0
+    environment:
+      - DSN=postgres://kratos_user:${KRATOS_DB_PASSWORD}@postgres:5432/kratos?sslmode=disable&max_conns=20&max_idle_conns=4
+      - KRATOS_DB_PASSWORD=${KRATOS_DB_PASSWORD}
+      - KRATOS_SECRETS_COOKIE=${KRATOS_SECRETS_COOKIE}
+      - KRATOS_SECRETS_CIPHER=${KRATOS_SECRETS_CIPHER}
+      - SMTP_CONNECTION_URI=${SMTP_CONNECTION_URI}
+      - SMTP_FROM_ADDRESS=${SMTP_FROM_ADDRESS}
+    # --watch-courier runs the mail courier worker so recovery/verification emails reach Mailpit
+    command: serve -c /etc/config/kratos/kratos.${ENVIRONMENT:-local}.yml --watch-courier
+    volumes:
+      - ./config/kratos:/etc/config/kratos:ro
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:4433/health/ready",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    env_file:
+      - .env
+    networks:
+      - ory-internal
+    depends_on:
+      kratos-migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  hydra-migrate:
+    image: oryd/hydra:v25.4.0
+    environment:
+      - DSN=postgres://hydra_user:${HYDRA_DB_PASSWORD}@postgres:5432/hydra?sslmode=disable&max_conns=20&max_idle_conns=4
+      - HYDRA_DB_PASSWORD=${HYDRA_DB_PASSWORD}
+      - HYDRA_SYSTEM_SECRET=${HYDRA_SYSTEM_SECRET}
+    command: migrate sql -e --yes -c /etc/config/hydra/hydra.${ENVIRONMENT:-local}.yml
+    volumes:
+      - ./config/hydra:/etc/config/hydra:ro
+    env_file:
+      - .env
+    depends_on:
+      postgres-init:
+        condition: service_completed_successfully
+    networks:
+      - ory-internal
+    restart: "no"
+
+  hydra:
+    image: oryd/hydra:v25.4.0
+    environment:
+      - DSN=postgres://hydra_user:${HYDRA_DB_PASSWORD}@postgres:5432/hydra?sslmode=disable&max_conns=20&max_idle_conns=4
+      - HYDRA_DB_PASSWORD=${HYDRA_DB_PASSWORD}
+      - HYDRA_SYSTEM_SECRET=${HYDRA_SYSTEM_SECRET}
+    command: serve all -c /etc/config/hydra/hydra.${ENVIRONMENT:-local}.yml
+    volumes:
+      - ./config/hydra:/etc/config/hydra:ro
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:4444/health/ready",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    env_file:
+      - .env
+    networks:
+      - ory-internal
+    depends_on:
+      hydra-migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  keto-migrate:
+    image: oryd/keto:v25.4.0
+    environment:
+      - DSN=postgres://keto_user:${KETO_DB_PASSWORD}@postgres:5432/keto?sslmode=disable&max_conns=20&max_idle_conns=4
+      - KETO_DB_PASSWORD=${KETO_DB_PASSWORD}
+    command: migrate up -c /etc/config/keto/keto.${ENVIRONMENT:-local}.yml --yes
+    volumes:
+      - ./config/keto:/etc/config/keto:ro
+    env_file:
+      - .env
+    depends_on:
+      postgres-init:
+        condition: service_completed_successfully
+    networks:
+      - ory-internal
+    restart: "no"
+
+  keto:
+    image: oryd/keto:v25.4.0
+    environment:
+      - DSN=postgres://keto_user:${KETO_DB_PASSWORD}@postgres:5432/keto?sslmode=disable&max_conns=20&max_idle_conns=4
+      - KETO_DB_PASSWORD=${KETO_DB_PASSWORD}
+    command: serve -c /etc/config/keto/keto.${ENVIRONMENT:-local}.yml
+    volumes:
+      - ./config/keto:/etc/config/keto:ro
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:4466/health/ready",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    env_file:
+      - .env
+    networks:
+      - ory-internal
+    depends_on:
+      keto-migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  # NestJS API service with access control and logging
+  # ZERO TRUST: API is on external network; Oathkeeper injects auth headers.
+  # API has ory-internal only for Hydra accept-login (OAuth flow completion).
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile.dev
+    # API port exposed for development - in production, access only via Oathkeeper
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./api:/app
+      - /app/node_modules
+      - api_logs:/app/logs
+    command: sh -c "mkdir -p /app/data && chmod 777 /app/data && npm install && npm run start:dev"
+    environment:
+      - NODE_ENV=development
+      - PORT=8080
+      - OATHKEEPER_URL=http://oathkeeper:4455
+      - HYDRA_ADMIN_URL=http://oathkeeper:4455/api/internal/hydra-admin
+    networks:
+      - apps
+      - ory-internal
+    depends_on:
+      - oathkeeper
+    restart: unless-stopped
+
+  oathkeeper:
+    image: oryd/oathkeeper:v25.4.0
+    command: serve -c /etc/config/oathkeeper/oathkeeper.${ENVIRONMENT:-local}.yml
+    volumes:
+      - ./config/oathkeeper:/etc/config/oathkeeper:ro
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:4456/health/ready",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    env_file:
+      - .env
+    networks:
+      - ory-internal # Ory Stack network (can access Kratos, Keto, Hydra)
+      - apps # External network (can access API, frontends)
+    depends_on:
+      kratos:
+        condition: service_healthy
+      keto:
+        condition: service_healthy
+      hydra:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Frontend #1: Self-Service UI (Authentication flows)
+  # ZERO TRUST: Frontends are on external network, can only access Ory services through Oathkeeper
+  frontend-auth:
+    build:
+      context: ./frontend-auth
+      dockerfile: Dockerfile.dev
+      args:
+        VITE_KRATOS_PUBLIC_URL: http://localhost:4433
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend-auth:/app
+      - /app/node_modules
+    environment:
+      - VITE_KRATOS_PUBLIC_URL=http://localhost:4433
+    networks:
+      - apps
+    depends_on:
+      oathkeeper:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Frontend #2: Admin Dashboard (User & Permission Management)
+  # ZERO TRUST: Frontends are on external network, can only access Ory services through Oathkeeper
+  frontend-admin:
+    build:
+      context: ./frontend-admin
+      dockerfile: Dockerfile.dev
+      args:
+        VITE_KRATOS_PUBLIC_URL: http://localhost:4433
+        VITE_OATHKEEPER_URL: /api
+    ports:
+      - "5174:5174"
+    volumes:
+      - ./frontend-admin:/app
+      - /app/node_modules
+    # Environment variables are loaded from .env.local file (mounted via volume)
+    # Don't override here to allow .env.local to take precedence
+    networks:
+      - apps
+    depends_on:
+      - oathkeeper
+    restart: unless-stopped
+
+  # Frontend #3: Test Application (Business Logic with API Integration)
+  # ZERO TRUST: Frontends are on external network, can only access Ory services through Oathkeeper
+  frontend-app:
+    build:
+      context: ./frontend-app
+      dockerfile: Dockerfile.dev
+      args:
+        VITE_KRATOS_PUBLIC_URL: /api
+        VITE_OATHKEEPER_URL: /api
+    ports:
+      - "5175:5175"
+    volumes:
+      - ./frontend-app:/app
+      - /app/node_modules
+    # Environment variables are loaded from .env.local file (mounted via volume)
+    # Don't override here to allow .env.local to take precedence
+    environment:
+      - API_PROXY_TARGET=http://oathkeeper:4455
+    networks:
+      - apps
+    depends_on:
+      oathkeeper:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  api_logs:
+    driver: local
+
+networks:
+  # Ory Stack internal network: Kratos, Hydra, Keto, Postgres
+  # These services can communicate with each other
+  ory-internal:
+    driver: bridge
+    name: nova-id-ory-internal
+
+  # Apps network: Frontends and API (cannot directly access Ory services)
+  # These services can ONLY access Ory services through Oathkeeper
+  apps:
+    driver: bridge
+    name: nova-id-apps

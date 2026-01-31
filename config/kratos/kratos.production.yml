@@ -1,0 +1,135 @@
+version: v0.13.0
+
+# DSN for production (PostgreSQL)
+# Set via environment variable: DSN=postgres://kratos_user:${KRATOS_DB_PASSWORD}@postgres:5432/kratos?sslmode=disable&max_conns=20&max_idle_conns=4
+dsn: postgres://kratos_user:${KRATOS_DB_PASSWORD}@postgres:5432/kratos?sslmode=disable&max_conns=20&max_idle_conns=4
+
+serve:
+  public:
+    # Must include /auth/ so verification email link is https://auth.cativo.dev/auth/self-service/verification?code=...&flow=...
+    base_url: https://auth.cativo.dev/auth/
+    cors:
+      enabled: true
+      allowed_origins:
+        - https://auth.cativo.dev
+        - https://admin.cativo.dev
+        - https://api.cativo.dev
+      allowed_methods:
+        - GET
+        - POST
+        - PUT
+        - DELETE
+        - PATCH
+        - OPTIONS
+      allowed_headers:
+        - "*"
+      exposed_headers:
+        - Content-Type
+        - X-Kratos-Request-Id
+      allow_credentials: true
+      max_age: 3600
+  admin:
+    base_url: http://kratos:4434/
+
+selfservice:
+  default_browser_return_url: https://admin.cativo.dev/dashboard
+  allowed_return_urls:
+    - https://auth.cativo.dev
+    - https://admin.cativo.dev
+    - https://admin.cativo.dev/dashboard
+    - https://api.cativo.dev
+
+  methods:
+    password:
+      enabled: true
+      config:
+        # Enable in production for security
+        haveibeenpwned_enabled: true
+
+  flows:
+    error:
+      ui_url: https://auth.cativo.dev/auth/error
+
+    settings:
+      ui_url: https://auth.cativo.dev/settings
+      privileged_session_max_age: 15m
+      required_aal: highest_available
+
+    recovery:
+      enabled: true
+      ui_url: https://auth.cativo.dev/auth/recovery
+      use: code
+
+    verification:
+      enabled: true
+      ui_url: https://auth.cativo.dev/auth/verification
+      use: code
+      after:
+        default_browser_return_url: https://admin.cativo.dev/dashboard
+
+    logout:
+      after:
+        default_browser_return_url: https://admin.cativo.dev/
+
+    login:
+      ui_url: https://api.cativo.dev/auth/login
+      lifespan: 10m
+      after:
+        hooks:
+          - hook: require_verified_address
+
+    registration:
+      lifespan: 10m
+      ui_url: https://auth.cativo.dev/registration
+      enable_legacy_one_step: true
+      after:
+        password:
+          hooks:
+            # No session until verified: user must complete verification, then log in
+            - hook: show_verification_ui
+
+log:
+  level: info
+  format: json
+  leak_sensitive_values: false
+
+secrets:
+  cookie:
+    - ${KRATOS_SECRETS_COOKIE}
+  cipher:
+    - ${KRATOS_SECRETS_CIPHER}
+
+ciphers:
+  algorithm: xchacha20-poly1305
+
+hashers:
+  algorithm: bcrypt
+  bcrypt:
+    cost: 12
+
+identity:
+  default_schema_id: default
+  schemas:
+    - id: default
+      url: file:///etc/config/kratos/identity.schema.json
+
+courier:
+  template_override_path: /etc/config/kratos/courier-templates
+  smtp:
+    # Production SMTP - set via environment variable
+    connection_uri: ${SMTP_CONNECTION_URI}
+    from_address: ${SMTP_FROM_ADDRESS}
+
+cookies:
+  domain: cativo.dev
+  path: /
+  same_site: Lax
+  secure: true
+
+session:
+  lifespan: 720h
+  whoami:
+    required_aal: highest_available
+
+feature_flags:
+  use_continue_with_transitions: true
