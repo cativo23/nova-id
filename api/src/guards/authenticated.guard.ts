@@ -61,22 +61,29 @@ export class AuthenticatedGuard implements CanActivate {
     const headers = request.headers;
 
     // 1. Header-based auth: Oathkeeper injects these after validating Kratos session (cookie) or OAuth token.
-    const userId = headers['x-user-id'] || headers['X-User-ID'];
-    const email = headers['x-user-email'] || headers['X-User-Email'];
-    const role = headers['x-user-role'] || headers['X-User-Role'] || 'platform_user';
-    const appRole = headers['x-user-app-role'] || headers['X-User-App-Role'];
-    const fullName = headers['x-user-name'] || headers['X-User-Name'];
+    const getHeader = (name: string) => {
+      const val = headers[name.toLowerCase()] || headers[name];
+      return val && val !== '<no value>' ? val : undefined;
+    };
+
+    const userId = getHeader('X-User-Id');
+    const email = getHeader('X-User-Email');
+    const role = getHeader('X-User-Role') || 'platform_user';
+    const appRole = getHeader('X-User-App-Role');
+    const fullName = getHeader('X-User-Name');
 
     if (userId) {
       request.user = {
         userId,
-        email: email || undefined,
-        full_name: fullName || undefined,
+        email,
+        full_name: fullName,
         role,
-        appRole: appRole || undefined, // App role from OAuth token introspection (if available)
+        appRole, // App role from OAuth token introspection (if available)
         authMethod: 'header',
       };
-      this.logger.log(`Authenticated via Oathkeeper headers: ${userId} (${email || 'no email'})`);
+      this.logger.log(
+        `Authenticated via Oathkeeper headers: ${userId} (${email || 'no email'})`,
+      );
       return true;
     }
 
@@ -96,13 +103,14 @@ export class AuthenticatedGuard implements CanActivate {
         issuer: this.getJwtIssuer(),
       }) as any;
 
-      const fullName = decoded.name ?? decoded.full_name;
+      const clean = (val: any) => (val && val !== '<no value>' ? val : undefined);
+      const fullName = clean(decoded.name ?? decoded.full_name);
       request.user = {
         userId: decoded.sub,
-        email: decoded.email,
-        full_name: fullName || undefined,
-        role: decoded.role || 'platform_user',
-        appRole: decoded.appRole || undefined,
+        email: clean(decoded.email),
+        full_name: fullName,
+        role: clean(decoded.role) || 'platform_user',
+        appRole: clean(decoded.appRole),
         authMethod: 'jwt',
         jwtClaims: decoded,
       };
