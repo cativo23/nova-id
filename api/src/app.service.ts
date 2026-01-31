@@ -1,7 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import axios from 'axios';
 
 @Injectable()
 export class AppService {
+  private readonly logger = new Logger(AppService.name);
+
+  constructor(private readonly configService: ConfigService) { }
   getPublicData() {
     return {
       message: 'This is public data - no authentication required',
@@ -168,5 +173,67 @@ export class AppService {
       configured: body,
       verifiedBy: 'AppAdminGuard',
     };
+  }
+
+  async acceptHydraLogin(user: any, loginChallenge: string) {
+    const hydraAdminUrl = this.configService.get<string>('HYDRA_ADMIN_URL');
+    try {
+      this.logger.log(`Accepting Hydra login for user ${user.userId}`);
+      // Send subject and session info to Hydra
+      const response = await axios.put(
+        `${hydraAdminUrl}/oauth2/auth/requests/login/accept?login_challenge=${loginChallenge}`,
+        {
+          subject: user.userId,
+          remember: true,
+          remember_for: 3600,
+          session: {
+            id_token: {
+              email: user.email,
+              name: user.full_name,
+              role: user.role,
+              appRole: user.appRole,
+            },
+          },
+        },
+      );
+      return response.data;
+    } catch (error) {
+      this.logger.error(
+        'Error accepting Hydra login:',
+        error.response?.data || error.message,
+      );
+      throw error;
+    }
+  }
+
+  async acceptHydraConsent(user: any, body: any) {
+    const hydraAdminUrl = this.configService.get<string>('HYDRA_ADMIN_URL');
+    try {
+      this.logger.log(`Accepting Hydra consent for user ${user.userId}`);
+      const response = await axios.put(
+        `${hydraAdminUrl}/oauth2/auth/requests/consent/accept?consent_challenge=${body.consent_challenge}`,
+        {
+          grant_scope: body.grant_scope,
+          grant_access_token_audience: body.grant_access_token_audience,
+          remember: true,
+          remember_for: 3600,
+          session: {
+            id_token: {
+              email: user.email,
+              name: user.full_name,
+              role: user.role,
+              appRole: user.appRole,
+            },
+          },
+        },
+      );
+      return response.data;
+    } catch (error) {
+      this.logger.error(
+        'Error accepting Hydra consent:',
+        error.response?.data || error.message,
+      );
+      throw error;
+    }
   }
 }

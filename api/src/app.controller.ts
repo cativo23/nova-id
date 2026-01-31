@@ -22,7 +22,7 @@ export class AppController {
   constructor(
     private readonly appService: AppService,
     private readonly rolesService: RolesService,
-  ) {}
+  ) { }
 
   // --- Public (no auth) ---
   @Get('health')
@@ -143,5 +143,21 @@ export class AppController {
   @Delete(':id')
   deleteData(@GetUser() user: any, @Param('id') id: string) {
     return this.appService.deleteData(user, id);
+  }
+
+  // --- Hydra (OAuth2) Flow ---
+  @Post('hydra-accept-login')
+  @UseGuards(AppUserGuard)
+  async acceptHydraLogin(
+    @GetUser() user: any,
+    @Body() body: { login_challenge: string },
+  ) {
+    return this.appService.acceptHydraLogin(user, body.login_challenge);
+  }
+
+  @Post('hydra-accept-consent')
+  @UseGuards(AppUserGuard)
+  async acceptHydraConsent(@GetUser() user: any, @Body() body: any) {
+    return this.appService.acceptHydraConsent(user, body);
   }
 }
