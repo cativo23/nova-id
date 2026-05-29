@@ -7,7 +7,7 @@
 
 Production-**grade** identity & access management infrastructure built on the **Ory Stack** (Kratos, Hydra, Keto, Oathkeeper) with Vue 3 frontends. **Zero Trust** by design: every request goes through Oathkeeper; the internal identity services are never exposed.
 
-> **Scope, honestly.** The security layer — Ory Stack, the Oathkeeper Zero Trust gateway, and a dual RBAC model — is production-grade and fully wired. The NestJS API is a **demo surface** that exercises the auth, guards, and authorization end-to-end; it is not a real business domain. Nova ID exists to demonstrate IAM *architecture*, not to ship a product.
+> **Scope.** Nova ID is the central identity provider I self-host to secure my own services — a real auth foundation, not a throwaway demo, and not a commercial product. The security layer (Ory Stack + the Oathkeeper Zero Trust gateway + dual RBAC) is production-grade and is what actually runs. The bundled NestJS API is a thin reference service that exercises auth end-to-end; in practice each downstream service sits behind Oathkeeper and consumes Nova ID as its IdP rather than the API owning domain logic.
 
 ---
 
