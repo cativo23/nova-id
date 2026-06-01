@@ -2,8 +2,8 @@
 /dist
 /node_modules
 
-# Logs
-logs
+# Logs (runtime output only — anchored so api/src/logs/ source is NOT ignored)
+/logs/
 *.log
 npm-debug.log*
 pnpm-debug.log*
