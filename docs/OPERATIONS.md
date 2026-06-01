@@ -6,7 +6,7 @@ This guide covers running, verifying, and troubleshooting Nova ID.
 
 ## Security and deployment requirements
 
-- **API must only be reachable via Oathkeeper.** Do not expose the API (port 8080) to the public internet. All client traffic must go through the gateway; the API trusts headers (`X-User-ID`, etc.) injected by Oathkeeper. See [SECURITY_CODE_REVIEW.md](SECURITY_CODE_REVIEW.md).
+- **API must only be reachable via Oathkeeper.** Do not expose the API (port 8080) to the public internet. All client traffic must go through the gateway; the API trusts headers (`X-User-ID`, etc.) injected by Oathkeeper. See [SECURITY_REPORT.md](SECURITY_REPORT.md).
 - **Hydra Admin API:** The API calls Hydra Admin (login/consent accept) from the server. Set `HYDRA_ADMIN_URL=http://hydra:4445` (or your internal Hydra Admin URL). Do **not** expose Hydra Admin (port 4445) to the public internet. In local dev, the rule `internal-hydra-admin` (if used) must only be reachable from the API service on the internal network.
 - **Secrets:** Generate all secrets (Kratos, Hydra) with e.g. `openssl rand -base64 32`. Never deploy with placeholder values. See `.env.example`.
 
