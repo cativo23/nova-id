@@ -1,5 +1,4 @@
 import { Configuration, FrontendApi } from '@ory/client'
-import { logger } from '../utils/logger'
 
 // ZERO TRUST: All requests must go through Oathkeeper
 // Frontends cannot directly access Kratos - must use Oathkeeper gateway
@@ -54,17 +53,18 @@ async function kratosAdminRequest(endpoint, options = {}) {
 
 export async function checkSession() {
   try {
-    logger.log('checkSession - Calling toSession() via Oathkeeper at:', oathkeeperUrl)
+    console.log('checkSession - Calling toSession() via Oathkeeper at:', oathkeeperUrl)
     const { data } = await ory.toSession()
-    logger.log('checkSession - Session found:', data ? 'Yes' : 'No', data?.identity?.id ? `User: ${data.identity.id}` : '')
+    console.log('checkSession - Session found:', data ? 'Yes' : 'No', data?.identity?.id ? `User: ${data.identity.id}` : '')
     return data
   } catch (error) {
     // 401 is expected when there's no session - don't log as error
     if (error.response?.status === 401) {
-      logger.log('checkSession - No session (401) - this is expected when user is not logged in')
+      console.log('checkSession - No session (401) - this is expected when user is not logged in')
       return null
     }
-    logger.error('checkSession - Error:', error.response?.status, error.message)
+    // For other errors, log and throw
+    console.error('checkSession - Error:', error.response?.status, error.message)
     throw error
   }
 }
@@ -81,43 +81,66 @@ export async function getLoginFlow(flowId) {
 export async function createLoginFlow(returnTo = null) {
   try {
     const returnUrl = returnTo || (window.location.origin + '/dashboard')
-    logger.log('createLoginFlow - Creating login flow with returnTo:', returnUrl)
-
+    console.log('createLoginFlow - Creating login flow with returnTo:', returnUrl)
+    
+    // Use fetch directly to ensure Accept header is set correctly
+    // This avoids potential issues with @ory/client configuration
     const url = `${oathkeeperUrl}/self-service/login/browser?return_to=${encodeURIComponent(returnUrl)}`
-    logger.log('createLoginFlow - Making request to:', url)
-
+    console.log('createLoginFlow - Making request to:', url)
+    
     const response = await fetch(url, {
       method: 'GET',
-      credentials: 'include',
-      mode: 'cors',
-      headers: { 'Accept': 'application/json' }
+      credentials: 'include', // Include cookies for CORS
+      mode: 'cors', // Explicitly set CORS mode
+      headers: {
+        'Accept': 'application/json'
+        // Don't send Content-Type for GET requests - it can cause CORS issues
+      }
     })
-
-    logger.log('createLoginFlow - Response status:', response.status)
-
+    
+    console.log('createLoginFlow - Response status:', response.status)
+    console.log('createLoginFlow - Response headers:', {
+      'access-control-allow-origin': response.headers.get('access-control-allow-origin'),
+      'access-control-allow-credentials': response.headers.get('access-control-allow-credentials'),
+      'content-type': response.headers.get('content-type')
+    })
+    
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ message: response.statusText }))
       const error = new Error(errorData.error?.message || errorData.message || `HTTP ${response.status}`)
       error.response = { status: response.status, data: errorData }
       throw error
     }
-
+    
     const data = await response.json()
-    logger.log('createLoginFlow - Login flow created successfully:', data?.id)
+    console.log('createLoginFlow - Login flow created successfully:', data?.id)
     return data
   } catch (error) {
-    logger.error('createLoginFlow - Error:', error.response?.status, error.message)
-
+    console.error('createLoginFlow - Error:', {
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      message: error.message,
+      // Check if it's a CORS error
+      isCorsError: error.message?.includes('CORS') || error.message?.includes('Failed to fetch')
+    })
+    
+    // If it's a CORS error, provide more helpful message
     if (error.message?.includes('CORS') || error.message?.includes('Failed to fetch')) {
-      logger.warn('createLoginFlow - CORS? Check Oathkeeper CORS config and network tab.')
+      console.error('createLoginFlow - CORS Error detected. Check:')
+      console.error('  1. Oathkeeper CORS config includes http://localhost:5174')
+      console.error('  2. Browser console for actual CORS error message')
+      console.error('  3. Network tab to see response headers')
     }
-
-    if (error.response?.status === 400 &&
-        (error.response?.data?.error?.id === 'session_already_available' ||
+    
+    // If it's a 400 with session_already_available, that's expected if user has session
+    if (error.response?.status === 400 && 
+        (error.response?.data?.error?.id === 'session_already_available' || 
          error.response?.data?.error_id === 'session_already_available')) {
-      logger.log('createLoginFlow - Session already available')
+      console.log('createLoginFlow - Session already available (expected if user has session)')
     }
-
+    
+    // Re-throw to let caller handle it
     throw error
   }
 }
@@ -164,33 +187,9 @@ export async function updateRegistrationFlow(flowId, payload) {
   }
 }
 
-// Auth app base URL for logout/verification (Kratos may return relative or wrong-host URLs)
-function getAuthBaseUrl() {
-  return import.meta.env.VITE_KRATOS_BROWSER_URL || (import.meta.env.VITE_AUTH_URL || 'http://auth.ory.localhost') + '/auth'
-}
-
-// Ensure logout redirect goes to auth app; relative or admin-host URLs cause Vue Router "No match" on admin.
-function normalizeLogoutUrl(logoutUrl) {
-  if (!logoutUrl) return logoutUrl
-  const authBase = getAuthBaseUrl().replace(/\/$/, '')
-  if (logoutUrl.startsWith('/')) {
-    return `${authBase}${logoutUrl}`
-  }
-  try {
-    const u = new URL(logoutUrl)
-    if (u.origin === window.location.origin) {
-      return `${authBase}${u.pathname}${u.search}`
-    }
-  } catch (_) {}
-  return logoutUrl
-}
-
 export async function logout() {
   try {
     const { data } = await ory.createBrowserLogoutFlow()
-    if (data?.logout_url) {
-      data.logout_url = normalizeLogoutUrl(data.logout_url)
-    }
     return data
   } catch (error) {
     throw error
@@ -254,92 +253,17 @@ export async function updateSettingsFlow(flowId, payload) {
   }
 }
 
-// Parse Link header from Kratos response for pagination
-function parseLinkHeader(linkHeader) {
-  if (!linkHeader) return {}
-  
-  const links = {}
-  const parts = linkHeader.split(',')
-  
-  for (const part of parts) {
-    const section = part.split(';')
-    if (section.length !== 2) continue
-    
-    const url = section[0].trim().replace(/<(.*)>/, '$1')
-    const rel = section[1].trim().replace(/rel="(.*)"/, '$1')
-    
-    // Extract page_token from URL
-    const urlObj = new URL(url, 'http://dummy.com')
-    const pageToken = urlObj.searchParams.get('page_token')
-    
-    links[rel] = {
-      url,
-      pageToken
-    }
-  }
-  
-  return links
-}
-
-// List users from Kratos Admin API (via Oathkeeper) with pagination support
-export async function listUsers(options = {}) {
+// List users from Kratos Admin API (via Oathkeeper)
+export async function listUsers() {
   try {
-    const { pageToken = null, pageSize = 100, searchQuery = '' } = options
-    
-    // Build query parameters
-    const params = new URLSearchParams()
-    params.append('page_size', pageSize.toString())
-    if (pageToken) {
-      params.append('page_token', pageToken)
-    }
-    
-    // Make request and capture response with headers
-    const url = `${oathkeeperUrl}/admin/identities?${params}`
-    const response = await fetch(url, {
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    })
-    
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ message: response.statusText }))
-      const error = new Error(errorData.error?.message || errorData.message || `HTTP ${response.status}`)
-      error.response = { status: response.status, data: errorData }
-      throw error
-    }
-    
-    const data = await response.json()
-    const identities = Array.isArray(data) ? data : (data?.data || [])
-    
-    // Parse Link header for pagination
-    const linkHeader = response.headers.get('link')
-    const links = parseLinkHeader(linkHeader)
-    
-    // Filter by search query if provided (client-side filtering)
-    let filteredIdentities = identities
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase()
-      filteredIdentities = identities.filter(identity => {
-        const email = identity.traits?.email?.toLowerCase() || ''
-        const fullName = identity.traits?.full_name?.toLowerCase() || ''
-        const role = identity.traits?.role?.toLowerCase() || ''
-        return email.includes(query) || fullName.includes(query) || role.includes(query)
-      })
-    }
-    
-    return {
-      identities: filteredIdentities,
-      pagination: {
-        hasNext: !!links.next,
-        hasPrev: !!links.prev,
-        nextToken: links.next?.pageToken,
-        prevToken: links.prev?.pageToken,
-        firstToken: links.first?.pageToken
-      }
-    }
+    // Kratos Admin API: use per_page without page parameter for best results
+    // If page is needed, start with page_size and page_token for pagination
+    const params = new URLSearchParams({ per_page: '250' })
+    const data = await kratosAdminRequest(`/admin/identities?${params}`)
+    // Kratos returns an array directly
+    return Array.isArray(data) ? data : (data?.data || [])
   } catch (error) {
-    logger.error('Error listing users:', error)
+    console.error('Error listing users:', error)
     if (error.response?.status === 401 || error.response?.status === 403) {
       throw new Error('Unauthorized: You do not have permission to list users')
     }
@@ -353,27 +277,6 @@ export async function getUserById(identityId) {
     return await kratosAdminRequest(`/admin/identities/${identityId}`)
   } catch (error) {
     console.error('Error getting user:', error)
-    throw error
-  }
-}
-
-// Set identity state (active | inactive). Inactive identities cannot sign in.
-export async function setIdentityState(identityId, state) {
-  if (state !== 'active' && state !== 'inactive') {
-    throw new Error('Identity state must be "active" or "inactive"')
-  }
-  try {
-    const currentIdentity = await getUserById(identityId)
-    return await kratosAdminRequest(`/admin/identities/${identityId}`, {
-      method: 'PUT',
-      body: JSON.stringify({
-        schema_id: currentIdentity.schema_id,
-        traits: currentIdentity.traits,
-        state
-      })
-    })
-  } catch (error) {
-    logger.error('Error setting identity state:', error)
     throw error
   }
 }
@@ -396,20 +299,19 @@ export async function updateUser(identityId, traits) {
       })
     })
     
-    // If role (or legacy rank) changed, sync role membership in Keto (RBAC)
-    const newRole = traits.role ?? traits.rank
-    const currentRole = currentIdentity.traits?.role ?? currentIdentity.traits?.rank
-    if (newRole != null && newRole !== currentRole) {
+    // If rank changed, sync rank membership in Keto (RBAC)
+    if (traits.rank && traits.rank !== currentIdentity.traits?.rank) {
       try {
-        await syncRankPermissions(identityId, newRole)
+        await syncRankPermissions(identityId, traits.rank)
       } catch (syncError) {
-        logger.warn('Failed to sync role permissions, but user was updated:', syncError)
+        console.warn('Failed to sync rank permissions, but user was updated:', syncError)
+        // Don't throw - user update succeeded, permission sync can be retried
       }
     }
-
+    
     return updatedIdentity
   } catch (error) {
-    logger.error('Error updating user:', error)
+    console.error('Error updating user:', error)
     throw error
   }
 }
@@ -418,28 +320,28 @@ export async function updateUser(identityId, traits) {
 // This ensures permissions are automatically updated when rank changes
 export async function syncRankPermissions(userId, newRank) {
   try {
-    const { assignUserToRole, removeUserFromRole, getUserRole } = await import('./useKeto.js')
+    const { assignUserToRank, removeUserFromRank, getUserRank } = await import('./useKeto')
     
-    // Get current rank membership from Keto (stored in "ranks" namespace as role)
-    const currentKetoRank = await getUserRole(userId)
+    // Get current rank membership from Keto
+    const currentKetoRank = await getUserRank(userId)
     
     // If user already has the correct rank membership, no action needed
     if (currentKetoRank === newRank) {
-      logger.log(`User ${userId} already has rank membership: ${newRank}`)
+      console.log(`User ${userId} already has rank membership: ${newRank}`)
       return { success: true, message: 'Rank membership already synced' }
     }
     
     // Remove old rank membership if exists
     if (currentKetoRank) {
-      logger.log(`Removing user ${userId} from old rank: ${currentKetoRank}`)
-      await removeUserFromRole(userId, currentKetoRank)
+      console.log(`Removing user ${userId} from old rank: ${currentKetoRank}`)
+      await removeUserFromRank(userId, currentKetoRank)
     }
     
     // Assign user to new rank (if rank is not Private/Corporal, they may not have permissions)
     // But we still assign them to the rank for consistency
     if (newRank) {
-      logger.log(`Assigning user ${userId} to rank: ${newRank}`)
-      await assignUserToRole(userId, newRank)
+      console.log(`Assigning user ${userId} to rank: ${newRank}`)
+      await assignUserToRank(userId, newRank)
     }
     
     return { 
@@ -447,7 +349,7 @@ export async function syncRankPermissions(userId, newRank) {
       message: `Rank membership synced: ${currentKetoRank || 'none'} -> ${newRank || 'none'}` 
     }
   } catch (error) {
-    logger.error('Error syncing rank permissions:', error)
+    console.error('Error syncing rank permissions:', error)
     throw error
   }
 }
@@ -459,15 +361,15 @@ export async function createUser(traits, password = null) {
     // We'll use 'default' as it's the standard Kratos schema ID
     const schemaId = 'default'
     
-    // Default role from schema (platform_user / platform_admin)
-    const role = traits.role ?? traits.rank ?? 'platform_user'
-
+    // Default rank to Private if not specified
+    const rank = traits.rank || 'Private'
+    
     const payload = {
       schema_id: schemaId,
       traits: {
         email: traits.email,
         full_name: traits.full_name,
-        role
+        rank: rank
       }
     }
     
@@ -487,25 +389,26 @@ export async function createUser(traits, password = null) {
       body: JSON.stringify(payload)
     })
     
-    // Sync role membership in Keto (RBAC)
-    if (newUser.id && role) {
+    // Sync rank membership in Keto (RBAC)
+    if (newUser.id && rank) {
       try {
-        await syncRankPermissions(newUser.id, role)
+        await syncRankPermissions(newUser.id, rank)
       } catch (syncError) {
-        logger.warn('Failed to sync role permissions for new user, but user was created:', syncError)
+        console.warn('Failed to sync rank permissions for new user, but user was created:', syncError)
+        // Don't throw - user creation succeeded, permission sync can be retried
       }
     }
     
     return newUser
   } catch (error) {
-    logger.error('Error creating user:', error)
+    console.error('Error creating user:', error)
     throw error
   }
 }
 
 // Create a recovery code/link for a user (admin-triggered)
-// Kratos config uses recovery "use: code" so we must call /admin/recovery/code (not /admin/recovery/link)
-// The code endpoint returns both recovery_link and recovery_code; we use recovery_link for the UI
+// Create a recovery link for a user (admin-triggered) - sends email
+// Per Ory's documentation: /admin/recovery/link creates a recovery flow and sends email
 export async function createRecoveryLink(identityId, expiresIn = '1h') {
   try {
     // Get user info for display
@@ -516,10 +419,11 @@ export async function createRecoveryLink(identityId, expiresIn = '1h') {
       throw new Error('User email not found')
     }
     
-    logger.log('Creating recovery link for:', userEmail)
+    console.log('Creating recovery link for:', userEmail)
     
-    // Use admin recovery CODE endpoint (required when Kratos recovery flow is "use: code")
-    const recoveryLinkResponse = await kratosAdminRequest('/admin/recovery/code', {
+    // Use admin recovery link endpoint - this creates a recovery flow and sends email
+    // Unlike /admin/recovery/code, this actually sends an email to the user
+    const recoveryLinkResponse = await kratosAdminRequest('/admin/recovery/link', {
       method: 'POST',
       body: JSON.stringify({
         identity_id: identityId,
@@ -528,57 +432,27 @@ export async function createRecoveryLink(identityId, expiresIn = '1h') {
     })
     
     const recoveryLink = recoveryLinkResponse.recovery_link
-    const recoveryCode = recoveryLinkResponse.recovery_code
     
     if (!recoveryLink) {
       throw new Error('Failed to create recovery link')
     }
     
-    logger.log('Recovery link created successfully', { recovery_code: recoveryCode })
+    console.log('Recovery link created and email sent successfully')
     
-    // Build full recovery URL (Kratos may return a path; prepend auth base URL if needed)
-    const authBase = import.meta.env.VITE_KRATOS_BROWSER_URL || 'http://auth.ory.localhost/auth'
-    const recoveryUrl = recoveryLink.startsWith('http') ? recoveryLink : `${authBase.replace(/\/$/, '')}${recoveryLink.startsWith('/') ? '' : '/'}${recoveryLink}`
+    // Return the recovery link that can be used directly
+    const recoveryUrl = recoveryLink.replace(/^https?:\/\/[^\/]+/, window.location.origin) // Replace Kratos URL with frontend URL
     
     return {
       success: true,
-      message: `Recovery link created for ${userEmail}`,
+      message: `Recovery email sent to ${userEmail}`,
       recovery_link: recoveryLink,
-      recovery_url: recoveryUrl,
-      recovery_code: recoveryCode ?? null
+      recovery_url: recoveryUrl
     }
   } catch (error) {
-    logger.error('Error creating recovery link:', error)
+    console.error('Error creating recovery link:', error)
     throw error
   }
 }
-
-// Resend verification email: use Kratos self-service verification flow (no new tab).
-// Creates a verification flow and submits the user's email so Kratos sends the verification email.
-export async function sendVerificationEmail(identityId) {
-  const identity = await getUserById(identityId)
-  const email = identity?.traits?.email
-  if (!email) {
-    throw new Error('User has no email in traits')
-  }
-  const returnTo = import.meta.env.VITE_ADMIN_URL || 'http://admin.ory.localhost'
-  const { data: flow } = await ory.createBrowserVerificationFlow({ returnTo })
-  const csrfNode = flow?.ui?.nodes?.find(
-    n => n.attributes?.name === 'csrf_token' && n.attributes?.type === 'hidden'
-  )
-  const csrfToken = csrfNode?.attributes?.value
-  if (!csrfToken) {
-    throw new Error('Could not get verification flow token')
-  }
-  await ory.updateVerificationFlow({
-    flow: flow.id,
-    updateVerificationFlowBody: { method: 'code', email, csrf_token: csrfToken }
-  })
-  return { userEmail: email }
-}
-
-// Alias for UI
-export { sendVerificationEmail as markEmailAsVerified }
 
 // Delete user identity
 export async function deleteUser(identityId) {
@@ -588,7 +462,7 @@ export async function deleteUser(identityId) {
     })
     return true
   } catch (error) {
-    logger.error('Error deleting user:', error)
+    console.error('Error deleting user:', error)
     throw error
   }
 }

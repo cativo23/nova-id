@@ -320,8 +320,9 @@
         extra_from: "@this"
         subject_from: "identity.id"
   authorizer:
-    # Rate limiting: implement at reverse proxy (nginx/Traefik) or API layer; Oathkeeper has no built-in remote_json_rate_limit.
-    handler: allow
+    # Apply rate limiting before allowing access
+    # Note: Requires external rate limiting service (e.g., Redis-based)
+    handler: remote_json_rate_limit
   mutators:
     - handler: id_token
       config:
@@ -329,8 +330,7 @@
           {
             "sub": "{{ print .Subject }}",
             "email": "{{ print .Extra.identity.traits.email }}",
-            "name": "{{ print .Extra.identity.traits.full_name }}",
-            "role": "{{ print .Extra.identity.traits.role }}",
+            "role": "{{ print .Extra.identity.traits.rank }}",
             "iat": {{ .Now | date "unix" }},
             "exp": {{ .Now | date_modify "+15m" | date "unix" }}
           }
@@ -357,11 +357,12 @@
         extra_from: "@this"
         subject_from: "identity.id"
   authorizer:
-    # Check membership in Keto "ranks" namespace (platform_admin#member@user:<id>); see AUTH_AND_RBAC.md.
+    # Example: Check if user has platform_admin or app-specific role
+    # Adjust payload based on your role structure in Keto
     handler: remote_json
     config:
       remote: http://keto:4466/relation-tuples/check
-      payload: '{"namespace":"ranks","object":"platform_admin","relation":"member","subject_id":"user:{{ print .Subject }}"}'
+      payload: '{"namespace":"roles","object":"platform_admin","relation":"members","subject_id":"{{ print .Subject }}"}'
       forward_response_headers_to_upstream:
         - Content-Type
   mutators:
@@ -371,8 +372,7 @@
           {
             "sub": "{{ print .Subject }}",
             "email": "{{ print .Extra.identity.traits.email }}",
-            "name": "{{ print .Extra.identity.traits.full_name }}",
-            "role": "{{ print .Extra.identity.traits.role }}",
+            "role": "platform_admin",
             "iat": {{ .Now | date "unix" }},
             "exp": {{ .Now | date_modify "+15m" | date "unix" }}
           }

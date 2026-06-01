@@ -165,50 +165,6 @@ export async function updateRecoveryFlow(flowId, payload) {
   }
 }
 
-// Verification flow functions
-export async function getVerificationFlow(flowId) {
-  try {
-    const { data } = await ory.getVerificationFlow({ id: flowId })
-    return data
-  } catch (error) {
-    throw error
-  }
-}
-
-export async function createBrowserVerificationFlow(returnTo = null) {
-  try {
-    const returnUrl = returnTo || (window.location.origin + '/verification')
-    const { data } = await ory.createBrowserVerificationFlow({
-      returnTo: returnUrl
-    })
-    return data
-  } catch (error) {
-    throw error
-  }
-}
-
-export async function updateVerificationFlow(flowId, payload) {
-  try {
-    const { data } = await ory.updateVerificationFlow({
-      flow: flowId,
-      updateVerificationFlowBody: payload
-    })
-    return data
-  } catch (error) {
-    throw error
-  }
-}
-
-// Error flow: fetch user-facing error details by id (for /error?id=...)
-export async function getFlowError(id) {
-  try {
-    const { data } = await ory.getFlowError({ id })
-    return data
-  } catch (error) {
-    throw error
-  }
-}
-
 // Settings flow functions
 export async function getSettingsFlow(flowId) {
   try {
@@ -300,7 +256,7 @@ export async function updateUser(identityId, traits) {
 // This ensures permissions are automatically updated when rank changes
 export async function syncRankPermissions(userId, newRank) {
   try {
-    const { assignUserToRank, removeUserFromRank, getUserRank } = await import('./useKeto.js')
+    const { assignUserToRank, removeUserFromRank, getUserRank } = await import('./useKeto')
     
     // Get current rank membership from Keto
     const currentKetoRank = await getUserRank(userId)

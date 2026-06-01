@@ -1,85 +1,70 @@
 <template>
   <div class="min-h-screen bg-cyber-bg text-cyber-light">
-    <!-- Global error (uncaught in event handlers) -->
-    <div v-if="globalError" class="flex min-h-screen items-center justify-center px-4 py-12">
-      <div class="card max-w-md w-full p-8 text-center">
-        <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-red-500/15 border border-red-500/25">
-          <svg class="h-7 w-7 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-          </svg>
-        </div>
-        <h2 class="text-lg font-semibold text-cyber-light mb-2">Something went wrong</h2>
-        <p class="text-sm text-cyber-light/70 mb-6">
-          An unexpected error occurred. Reload the page or return home.
-        </p>
-        <div class="flex flex-wrap gap-3 justify-center">
-          <button type="button" @click="reload" class="btn-primary">Reload page</button>
-          <router-link to="/" class="btn-secondary" @click="clearGlobalError">Go home</router-link>
-        </div>
-      </div>
-    </div>
-
-    <!-- Normal app -->
-    <template v-else>
-      <!-- Authenticated layout: sidebar + main -->
-      <template v-if="showNav">
-        <AppSidebar @logout="handleLogout" />
-        <div
-          class="admin-main"
-          role="main"
-        >
-          <AppHeader />
-          <div class="page-content">
-            <AppErrorBoundary>
-              <router-view v-slot="{ Component }">
-                <Transition name="page" mode="out-in">
-                  <component :is="Component" :key="route.path" />
-                </Transition>
-              </router-view>
-            </AppErrorBoundary>
+    <!-- Navigation only shown on authenticated routes (not on home/login) -->
+    <nav v-if="showNav" class="bg-cyber-dark border-b border-cyber-accent/20">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between h-16">
+          <div class="flex items-center gap-3">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-cyber-accent" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+            </svg>
+            <h1 class="text-2xl font-bold text-cyber-accent">Nova ID - Admin Dashboard</h1>
+          </div>
+          <div class="flex items-center space-x-4">
+            <router-link
+              to="/dashboard"
+              class="px-4 py-2 text-cyber-light hover:text-cyber-accent transition-colors"
+            >
+              Dashboard
+            </router-link>
+            <router-link
+              to="/users"
+              class="px-4 py-2 text-cyber-light hover:text-cyber-accent transition-colors"
+            >
+              Users
+            </router-link>
+            <router-link
+              to="/permissions"
+              class="px-4 py-2 text-cyber-light hover:text-cyber-accent transition-colors"
+            >
+              Permissions
+            </router-link>
+            <button
+              @click="handleLogout"
+              class="px-4 py-2 text-cyber-light hover:text-cyber-accent transition-colors"
+            >
+              Logout
+            </button>
           </div>
         </div>
-      </template>
-
-      <!-- Public layout: full-width (home / login) -->
-      <template v-else>
-        <AppErrorBoundary>
-          <router-view v-slot="{ Component }">
-            <Transition name="page" mode="out-in">
-              <component :is="Component" :key="route.path" />
-            </Transition>
-          </router-view>
-        </AppErrorBoundary>
-      </template>
-    </template>
+      </div>
+    </nav>
+    <main>
+      <router-view />
+    </main>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, provide } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import AppSidebar from './components/AppSidebar.vue'
-import AppHeader from './components/AppHeader.vue'
-import AppErrorBoundary from './components/AppErrorBoundary.vue'
-import { globalError, clearGlobalError } from './state/errorState'
 import { checkSession, logout } from './composables/useAuth'
 
 const router = useRouter()
 const route = useRoute()
 const isAuthenticated = ref(false)
 
-const showNav = computed(() => route.path !== '/')
-
-function reload () {
-  clearGlobalError()
-  window.location.reload()
-}
+// Show navigation only on authenticated routes (not on home/login page)
+const showNav = computed(() => {
+  return route.path !== '/'
+})
 
 const refreshAuth = async () => {
   try {
     const session = await checkSession()
     isAuthenticated.value = !!session
   } catch (error) {
+    console.error('Session check failed:', error)
     isAuthenticated.value = false
   }
 }
@@ -92,27 +77,26 @@ onMounted(async () => {
 
 const handleLogout = async () => {
   try {
+    console.log('Starting logout process...')
     const returnTo = window.location.origin + '/'
     const data = await logout(returnTo)
-    if (data?.logout_url) {
-      // Use Kratos logout URL as-is so user goes to auth app; rewriting to admin origin
-      // would load admin SPA at /self-service/logout and trigger "No match" in Vue Router.
-      window.location.href = data.logout_url
+    
+    // If Kratos returned a logout_url, rewrite it to go through Oathkeeper
+    if (data.logout_url) {
+      const oathkeeperUrl = import.meta.env.VITE_OATHKEEPER_URL || 'http://localhost:4455'
+      // Replace Kratos URL with Oathkeeper URL for Zero Trust
+      const logoutUrl = data.logout_url.replace(/https?:\/\/[^\/]+/, oathkeeperUrl)
+      console.log('Logout flow created, redirecting to:', logoutUrl)
+      window.location.href = logoutUrl
     } else {
+      // No logout_url - redirect to home
+      console.log('No logout_url, redirecting to home')
       router.push('/')
     }
-  } catch {
+  } catch (error) {
+    console.error('Logout error:', error)
+    // On error, redirect to home anyway
     router.push('/')
   }
 }
 </script>
-
-<style scoped>
-.admin-main {
-  margin-left: var(--sidebar-width);
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  transition: margin-left 0.25s ease;
-}
-</style>
