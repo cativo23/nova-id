@@ -206,9 +206,9 @@
               <td>
                 <span
                   class="role-badge"
-                  :class="getRoleBadgeClass(user.traits?.role)"
+                  :class="getRoleBadgeClass(user.metadata_public?.role)"
                 >
-                  {{ formatRole(user.traits?.role) }}
+                  {{ formatRole(user.metadata_public?.role) }}
                 </span>
               </td>
               <td>
@@ -785,6 +785,10 @@ const createUserAction = async () => {
   success.value = null
   
   try {
+    // NOTE: role is intentionally NOT submitted here. Role lives in metadata_public
+    // (admin-only) and is granted via the BFF admin API + Keto (A1). New users default
+    // to platform_user. To set a role at creation, pass `role: addUserForm.value.role`
+    // — createUser() already writes it to metadata_public.role via the Admin API.
     await createUser(
       {
         email: addUserForm.value.email,
@@ -933,7 +937,7 @@ const editUser = (user) => {
   editForm.value = {
     email: user.traits?.email || '',
     full_name: user.traits?.full_name || '',
-    role: user.traits?.role || 'platform_user'
+    role: user.metadata_public?.role || 'platform_user'
   }
 }
 
@@ -949,6 +953,11 @@ const saveUser = async () => {
   success.value = null
   
   try {
+    // NOTE: role is intentionally NOT submitted here. Role lives in metadata_public
+    // (admin-only) and is granted via the BFF admin API + Keto (A1), not from the
+    // browser. The role <select> is display-only until the A1 admin endpoint lands.
+    // To re-enable from here, pass `role: editForm.value.role` — updateUser() already
+    // writes it to metadata_public.role via the Kratos Admin API.
     await updateUser(editingUser.value.id, {
       email: editForm.value.email,
       full_name: editForm.value.full_name

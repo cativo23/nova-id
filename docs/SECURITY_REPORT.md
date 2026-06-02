@@ -28,9 +28,9 @@ Nova ID utiliza un modelo de **Identity & Access Proxy (IAP)**:
 ### Prioridad P0 – Crítico (Acción Inmediata)
 
 #### 1. Clave Pública JWT Hardcodeada en API
-- **Problema:** El `AuthenticatedGuard` utiliza una clave pública por defecto (`DEFAULT_PUBLIC_KEY`) si no se encuentra la variable de entorno `OAUTH_PUBLIC_KEY`.
-- **Riesgo:** Si un despliegue olvida configurar la clave real, la API aceptará tokens firmados con una clave privada conocida (o la que corresponda al placeholder), permitiendo suplantación total de identidad.
-- **Acción:** Eliminar el fallback en producción; lanzar un error si las claves no están configuradas.
+- **Problema (resuelto):** El `AuthenticatedGuard` ya no usa ninguna clave pública hardcodeada ni la variable `OAUTH_PUBLIC_KEY`. Ahora verifica los tokens contra el endpoint JWKS de Oathkeeper mediante `OAUTH_JWKS_URL` (p. ej. `http://oathkeeper:4456/.well-known/jwks.json`).
+- **Riesgo:** El riesgo original (fallback a una clave conocida) queda eliminado: si `OAUTH_JWKS_URL` no está configurada, el guard lanza un error en el arranque en lugar de aceptar tokens con una clave conocida.
+- **Acción:** Verificar que cada despliegue defina `OAUTH_JWKS_URL` apuntando al JWKS de Oathkeeper. La rotación de la clave se recoge automáticamente vía JWKS (ver `docs/SECURITY_KEY_ROTATION.md`).
 
 #### 2. Regla `internal-hydra-admin` expuesta con `noop` (Local)
 - **Problema:** En `rules.local.json`, la regla que apunta a Hydra Admin (`http://hydra:4445`) no tiene autenticación.

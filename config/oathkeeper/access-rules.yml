@@ -330,7 +330,7 @@
             "sub": "{{ print .Subject }}",
             "email": "{{ print .Extra.identity.traits.email }}",
             "name": "{{ print .Extra.identity.traits.full_name }}",
-            "role": "{{ print .Extra.identity.traits.role }}",
+            "role": "{{ if .Extra.identity.metadata_public }}{{ print .Extra.identity.metadata_public.role }}{{ end }}",
             "iat": {{ .Now | date "unix" }},
             "exp": {{ .Now | date_modify "+15m" | date "unix" }}
           }
@@ -372,7 +372,7 @@
             "sub": "{{ print .Subject }}",
             "email": "{{ print .Extra.identity.traits.email }}",
             "name": "{{ print .Extra.identity.traits.full_name }}",
-            "role": "{{ print .Extra.identity.traits.role }}",
+            "role": "{{ if .Extra.identity.metadata_public }}{{ print .Extra.identity.metadata_public.role }}{{ end }}",
             "iat": {{ .Now | date "unix" }},
             "exp": {{ .Now | date_modify "+15m" | date "unix" }}
           }

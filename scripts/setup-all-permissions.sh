@@ -91,12 +91,12 @@ setup_role_permissions() {
   echo ""
 }
 
-# Assign existing users to their roles (from Kratos traits.role)
+# Assign existing users to their roles (from Kratos metadata_public.role)
 assign_users_to_roles() {
   echo "Assigning existing users to their roles..."
   echo ""
 
-  USERS=$(curl -s "$KRATOS_ADMIN_URL/admin/identities" | jq -r '.[] | "\(.id)|\(.traits.role // "platform_user")"')
+  USERS=$(curl -s "$KRATOS_ADMIN_URL/admin/identities" | jq -r '.[] | "\(.id)|\(.metadata_public.role // "platform_user")"')
 
   if [ -z "$USERS" ]; then
     echo "  ⚠ No users found"

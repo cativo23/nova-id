@@ -212,18 +212,21 @@ services:
     build:
       context: ./api
       dockerfile: Dockerfile.dev
-    # API port exposed for development - in production, access only via Oathkeeper
-    ports:
-      - "8080:8080"
+    # API is NOT host-published — reachable only on the Docker networks for
+    # Oathkeeper to proxy. Publishing it would let a direct request bypass the gateway.
     volumes:
       - ./api:/app
       - /app/node_modules
       - api_logs:/app/logs
     command: sh -c "mkdir -p /app/data && chmod 777 /app/data && npm install && npm run start:dev"
+    env_file:
+      - .env
     environment:
       - NODE_ENV=development
       - PORT=8080
       - OATHKEEPER_URL=http://oathkeeper:4455
+      # HYDRA_ADMIN_URL is corrected to the direct address in the config-hygiene plan (A0.5);
+      # for now it stays as-is so the OAuth flow keeps working until internal-hydra-admin is removed.
       - HYDRA_ADMIN_URL=http://oathkeeper:4455/api/internal/hydra-admin
     networks:
       - apps

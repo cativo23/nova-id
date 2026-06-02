@@ -47,3 +47,9 @@ secrets/
 *.key
 *.crt
 *.env.production
+
+# Oathkeeper id_token signing key (generate locally; never commit)
+config/oathkeeper/id_token.jwks.json
+
+# Local planning scratch (superpowers plans + generated specs) — never commit
+docs/superpowers/

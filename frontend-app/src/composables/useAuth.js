@@ -254,21 +254,27 @@ export async function updateUser(identityId, traits) {
     // First get the current identity to preserve other fields
     const currentIdentity = await getUserById(identityId)
     
+    // role is admin-only: it lives in metadata_public (Admin-API-writable), not user traits.
+    const { role: nextRole, ...traitFields } = traits
+    const body = {
+      schema_id: currentIdentity.schema_id,
+      traits: {
+        ...currentIdentity.traits,
+        ...traitFields
+      },
+      state: currentIdentity.state
+    }
+    if (nextRole != null) {
+      body.metadata_public = { ...(currentIdentity.metadata_public || {}), role: nextRole }
+    }
     const updatedIdentity = await kratosAdminRequest(`/admin/identities/${identityId}`, {
       method: 'PUT',
-      body: JSON.stringify({
-        schema_id: currentIdentity.schema_id,
-        traits: {
-          ...currentIdentity.traits,
-          ...traits
-        },
-        state: currentIdentity.state
-      })
+      body: JSON.stringify(body)
     })
-    
-    if (traits.role && traits.role !== currentIdentity.traits?.role) {
+
+    if (nextRole && nextRole !== currentIdentity.metadata_public?.role) {
       try {
-        await syncRolePermissions(identityId, traits.role)
+        await syncRolePermissions(identityId, nextRole)
       } catch (syncError) {
         console.warn('Failed to sync role permissions, but user was updated:', syncError)
       }
@@ -282,17 +288,8 @@ export async function updateUser(identityId, traits) {
 }
 
 export async function syncRolePermissions(userId, newRole) {
-  try {
-    const { assignUserToRole, removeUserFromRole, getUserRole } = await import('./useKeto.js')
-    const currentRole = await getUserRole(userId)
-    if (currentRole === newRole) return { success: true, message: 'Role membership already synced' }
-    if (currentRole) await removeUserFromRole(userId, currentRole)
-    if (newRole) await assignUserToRole(userId, newRole)
-    return { success: true, message: `Role synced: ${currentRole || 'none'} -> ${newRole || 'none'}` }
-  } catch (error) {
-    console.error('Error syncing role permissions:', error)
-    throw error
-  }
+  // Permission writes moved to the BFF admin API (A1). Direct browser Keto writes were removed in A0.3.
+  throw new Error('Permission writes moved to the BFF admin API (A1)')
 }
 
 // Create a new user identity
@@ -302,14 +299,15 @@ export async function createUser(traits, password = null) {
     // We'll use 'default' as it's the standard Kratos schema ID
     const schemaId = 'default'
     
+    // role is admin-only: set via metadata_public (Admin API), not user-editable traits
     const role = traits.role || 'platform_user'
     const payload = {
       schema_id: schemaId,
       traits: {
         email: traits.email,
-        full_name: traits.full_name,
-        role
-      }
+        full_name: traits.full_name
+      },
+      metadata_public: { role }
     }
     
     // If password is provided, add credentials

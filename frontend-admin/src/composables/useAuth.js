@@ -323,7 +323,7 @@ export async function listUsers(options = {}) {
       filteredIdentities = identities.filter(identity => {
         const email = identity.traits?.email?.toLowerCase() || ''
         const fullName = identity.traits?.full_name?.toLowerCase() || ''
-        const role = identity.traits?.role?.toLowerCase() || ''
+        const role = identity.metadata_public?.role?.toLowerCase() || ''
         return email.includes(query) || fullName.includes(query) || role.includes(query)
       })
     }
@@ -384,21 +384,28 @@ export async function updateUser(identityId, traits) {
     // First get the current identity to preserve other fields
     const currentIdentity = await getUserById(identityId)
     
+    // role is admin-only: it lives in metadata_public (Admin-API-writable), not user traits.
+    const { role: traitRole, rank: traitRank, ...traitFields } = traits
+    const incomingRole = traitRole ?? traitRank
+    const body = {
+      schema_id: currentIdentity.schema_id,
+      traits: {
+        ...currentIdentity.traits,
+        ...traitFields
+      },
+      state: currentIdentity.state
+    }
+    if (incomingRole != null) {
+      body.metadata_public = { ...(currentIdentity.metadata_public || {}), role: incomingRole }
+    }
     const updatedIdentity = await kratosAdminRequest(`/admin/identities/${identityId}`, {
       method: 'PUT',
-      body: JSON.stringify({
-        schema_id: currentIdentity.schema_id,
-        traits: {
-          ...currentIdentity.traits,
-          ...traits
-        },
-        state: currentIdentity.state
-      })
+      body: JSON.stringify(body)
     })
-    
-    // If role (or legacy rank) changed, sync role membership in Keto (RBAC)
-    const newRole = traits.role ?? traits.rank
-    const currentRole = currentIdentity.traits?.role ?? currentIdentity.traits?.rank
+
+    // If role changed, sync role membership in Keto (RBAC)
+    const newRole = incomingRole
+    const currentRole = currentIdentity.metadata_public?.role
     if (newRole != null && newRole !== currentRole) {
       try {
         await syncRankPermissions(identityId, newRole)
@@ -417,39 +424,8 @@ export async function updateUser(identityId, traits) {
 // RBAC: Sync user's rank membership in Keto based on their rank in Kratos
 // This ensures permissions are automatically updated when rank changes
 export async function syncRankPermissions(userId, newRank) {
-  try {
-    const { assignUserToRole, removeUserFromRole, getUserRole } = await import('./useKeto.js')
-    
-    // Get current rank membership from Keto (stored in "ranks" namespace as role)
-    const currentKetoRank = await getUserRole(userId)
-    
-    // If user already has the correct rank membership, no action needed
-    if (currentKetoRank === newRank) {
-      logger.log(`User ${userId} already has rank membership: ${newRank}`)
-      return { success: true, message: 'Rank membership already synced' }
-    }
-    
-    // Remove old rank membership if exists
-    if (currentKetoRank) {
-      logger.log(`Removing user ${userId} from old rank: ${currentKetoRank}`)
-      await removeUserFromRole(userId, currentKetoRank)
-    }
-    
-    // Assign user to new rank (if rank is not Private/Corporal, they may not have permissions)
-    // But we still assign them to the rank for consistency
-    if (newRank) {
-      logger.log(`Assigning user ${userId} to rank: ${newRank}`)
-      await assignUserToRole(userId, newRank)
-    }
-    
-    return { 
-      success: true, 
-      message: `Rank membership synced: ${currentKetoRank || 'none'} -> ${newRank || 'none'}` 
-    }
-  } catch (error) {
-    logger.error('Error syncing rank permissions:', error)
-    throw error
-  }
+  // Permission writes moved to the BFF admin API (A1). Direct browser Keto writes were removed in A0.3.
+  throw new Error('Permission writes moved to the BFF admin API (A1)')
 }
 
 // Create a new user identity
@@ -459,16 +435,16 @@ export async function createUser(traits, password = null) {
     // We'll use 'default' as it's the standard Kratos schema ID
     const schemaId = 'default'
     
-    // Default role from schema (platform_user / platform_admin)
+    // role is admin-only: set via metadata_public (Admin API), not user-editable traits
     const role = traits.role ?? traits.rank ?? 'platform_user'
 
     const payload = {
       schema_id: schemaId,
       traits: {
         email: traits.email,
-        full_name: traits.full_name,
-        role
-      }
+        full_name: traits.full_name
+      },
+      metadata_public: { role }
     }
     
     // If password is provided, add credentials
