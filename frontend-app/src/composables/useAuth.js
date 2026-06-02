@@ -282,17 +282,8 @@ export async function updateUser(identityId, traits) {
 }
 
 export async function syncRolePermissions(userId, newRole) {
-  try {
-    const { assignUserToRole, removeUserFromRole, getUserRole } = await import('./useKeto.js')
-    const currentRole = await getUserRole(userId)
-    if (currentRole === newRole) return { success: true, message: 'Role membership already synced' }
-    if (currentRole) await removeUserFromRole(userId, currentRole)
-    if (newRole) await assignUserToRole(userId, newRole)
-    return { success: true, message: `Role synced: ${currentRole || 'none'} -> ${newRole || 'none'}` }
-  } catch (error) {
-    console.error('Error syncing role permissions:', error)
-    throw error
-  }
+  // Permission writes moved to the BFF admin API (A1). Direct browser Keto writes were removed in A0.3.
+  throw new Error('Permission writes moved to the BFF admin API (A1)')
 }
 
 // Create a new user identity

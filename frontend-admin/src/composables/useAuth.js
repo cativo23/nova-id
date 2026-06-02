@@ -417,39 +417,8 @@ export async function updateUser(identityId, traits) {
 // RBAC: Sync user's rank membership in Keto based on their rank in Kratos
 // This ensures permissions are automatically updated when rank changes
 export async function syncRankPermissions(userId, newRank) {
-  try {
-    const { assignUserToRole, removeUserFromRole, getUserRole } = await import('./useKeto.js')
-    
-    // Get current rank membership from Keto (stored in "ranks" namespace as role)
-    const currentKetoRank = await getUserRole(userId)
-    
-    // If user already has the correct rank membership, no action needed
-    if (currentKetoRank === newRank) {
-      logger.log(`User ${userId} already has rank membership: ${newRank}`)
-      return { success: true, message: 'Rank membership already synced' }
-    }
-    
-    // Remove old rank membership if exists
-    if (currentKetoRank) {
-      logger.log(`Removing user ${userId} from old rank: ${currentKetoRank}`)
-      await removeUserFromRole(userId, currentKetoRank)
-    }
-    
-    // Assign user to new rank (if rank is not Private/Corporal, they may not have permissions)
-    // But we still assign them to the rank for consistency
-    if (newRank) {
-      logger.log(`Assigning user ${userId} to rank: ${newRank}`)
-      await assignUserToRole(userId, newRank)
-    }
-    
-    return { 
-      success: true, 
-      message: `Rank membership synced: ${currentKetoRank || 'none'} -> ${newRank || 'none'}` 
-    }
-  } catch (error) {
-    logger.error('Error syncing rank permissions:', error)
-    throw error
-  }
+  // Permission writes moved to the BFF admin API (A1). Direct browser Keto writes were removed in A0.3.
+  throw new Error('Permission writes moved to the BFF admin API (A1)')
 }
 
 // Create a new user identity

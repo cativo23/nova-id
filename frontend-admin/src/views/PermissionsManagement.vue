@@ -333,8 +333,6 @@ import { useRouter } from 'vue-router'
 import { checkSession } from '../composables/useAuth'
 import {
   checkPermission,
-  createRelation,
-  deleteRelation,
   getNamespaceRelations
 } from '../composables/useKeto'
 import {
@@ -509,42 +507,13 @@ const loadPermissions = async () => {
 }
 
 const grantPermission = async () => {
-  granting.value = true
-  error.value = null
-  success.value = null
-  try {
-    await createRelation(
-      permissionForm.value.namespace,
-      permissionForm.value.object,
-      permissionForm.value.relation,
-      permissionForm.value.subject.startsWith('user:') || permissionForm.value.subject.startsWith('user@') 
-        ? permissionForm.value.subject 
-        : `user:${permissionForm.value.subject}`
-    )
-    success.value = 'Permission granted successfully'
-    permissionForm.value = { namespace: 'users', object: 'management', relation: 'view_users', subject: '' }
-    await loadPermissions()
-    setTimeout(() => { success.value = null }, 3000)
-  } catch (err) {
-    error.value = err.message || 'Failed to grant permission'
-  } finally {
-    granting.value = false
-  }
+  // Permission writes moved to the BFF admin API (A1). Direct browser Keto writes were removed in A0.3.
+  error.value = 'Permission writes moved to the BFF admin API (A1)'
 }
 
 const revokePermission = async (perm) => {
-  if (!confirm('Are you sure you want to revoke this permission?')) return
-  
-  error.value = null
-  success.value = null
-  try {
-    await deleteRelation(perm.namespace, perm.object, perm.relation, perm.subject)
-    success.value = 'Permission revoked successfully'
-    await loadPermissions()
-    setTimeout(() => { success.value = null }, 3000)
-  } catch (err) {
-    error.value = err.message || 'Failed to revoke permission'
-  }
+  // Permission writes moved to the BFF admin API (A1). Direct browser Keto writes were removed in A0.3.
+  error.value = 'Permission writes moved to the BFF admin API (A1)'
 }
 
 const testPermission = async () => {

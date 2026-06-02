@@ -392,7 +392,12 @@
       }
     ],
     "authorizer": {
-      "handler": "allow"
+      "handler": "remote_json",
+      "config": {
+        "remote": "http://keto:4466/relation-tuples/check",
+        "payload": "{\"namespace\":\"ranks\",\"object\":\"platform_admin\",\"relation\":\"member\",\"subject_id\":\"user:{{ print .Subject }}\"}",
+        "forward_response_headers_to_upstream": ["Content-Type"]
+      }
     },
     "mutators": [
       {
