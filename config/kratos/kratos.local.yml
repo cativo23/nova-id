@@ -1,4 +1,4 @@
-version: v0.13.0
+version: v25.4.0
 
 # DSN for local development (memory or postgres)
 # Use memory for quick testing, postgres for persistence

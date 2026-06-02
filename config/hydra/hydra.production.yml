@@ -1,4 +1,4 @@
-version: v2.2.0
+version: v25.4.0
 
 # DSN for production (PostgreSQL)
 # Set via environment variable: DSN=postgres://hydra_user:${HYDRA_DB_PASSWORD}@postgres:5432/hydra?sslmode=disable&max_conns=20&max_idle_conns=4

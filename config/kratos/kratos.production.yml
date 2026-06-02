@@ -1,4 +1,4 @@
-version: v0.13.0
+version: v25.4.0
 
 # DSN for production (PostgreSQL)
 # Set via environment variable: DSN=postgres://kratos_user:${KRATOS_DB_PASSWORD}@postgres:5432/kratos?sslmode=disable&max_conns=20&max_idle_conns=4
