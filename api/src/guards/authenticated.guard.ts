@@ -24,6 +24,7 @@ export class AuthenticatedGuard implements CanActivate {
   private readonly logger = new Logger(AuthenticatedGuard.name);
   private readonly publicKey: string;
   private readonly issuer: string;
+  private readonly gatewaySecret: string;
 
   constructor(
     private reflector: Reflector,
@@ -43,6 +44,13 @@ export class AuthenticatedGuard implements CanActivate {
     }
     this.publicKey = publicKey;
     this.issuer = issuer;
+
+    this.gatewaySecret = this.config.get<string>('GATEWAY_SHARED_SECRET');
+    if (!this.gatewaySecret) {
+      throw new Error(
+        'GATEWAY_SHARED_SECRET is required. Oathkeeper injects it as X-Gateway-Auth; the API rejects header auth without it.',
+      );
+    }
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -64,19 +72,26 @@ export class AuthenticatedGuard implements CanActivate {
       return val && val !== '<no value>' ? val : undefined;
     };
 
+    const gatewayAuth = getHeader('X-Gateway-Auth');
     const userId = getHeader('X-User-Id');
-    const email = getHeader('X-User-Email');
-    const role = getHeader('X-User-Role') || 'platform_user';
-    const appRole = getHeader('X-User-App-Role');
-    const fullName = getHeader('X-User-Name');
 
     if (userId) {
+      // Header identity is only trustworthy if it came through Oathkeeper,
+      // which injects the shared secret. A direct/forged request lacks it.
+      if (gatewayAuth !== this.gatewaySecret) {
+        this.logger.warn('X-User-* present without a valid X-Gateway-Auth — rejecting');
+        throw new UnauthorizedException('Unauthorized.');
+      }
+      const email = getHeader('X-User-Email');
+      const role = getHeader('X-User-Role') || 'platform_user';
+      const appRole = getHeader('X-User-App-Role');
+      const fullName = getHeader('X-User-Name');
       request.user = {
         userId,
         email,
         full_name: fullName,
         role,
-        appRole, // App role from OAuth token introspection (if available)
+        appRole,
         authMethod: 'header',
       };
       this.logger.log(

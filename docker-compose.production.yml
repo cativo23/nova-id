@@ -17,6 +17,9 @@ services:
   keto:
     ports: []  # No exposed ports - only accessible through Oathkeeper
 
+  api:
+    ports: []  # No exposed ports - only reachable via Oathkeeper
+
   frontend-auth:
     ports: []  # No exposed ports - Traefik handles routing
     networks:
