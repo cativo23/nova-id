@@ -41,7 +41,10 @@
           "enum": [
             "platform_user",
             "platform_admin"
-          ]
+          ],
+          "ory.sh/kratos": {
+            "ory:protected": true
+          }
         }
       },
       "required": ["email", "full_name", "role"],
