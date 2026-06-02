@@ -80,8 +80,6 @@ authenticators:
         - oauth2
       token_from:
         header: Authorization
-        sources:
-          - Bearer
 
   noop:
     enabled: true
