@@ -197,7 +197,7 @@ else
     echo -e "\n${YELLOW}Troubleshooting:${NC}"
     echo -e "1. Check Kratos courier: docker compose logs kratos | grep -iE 'courier|smtp'"
     echo -e "2. Mailpit on same network as Kratos (default)"
-    echo -e "3. kratos.config.yaml: connection_uri smtp://mailpit:1025/?disable_starttls=true"
+    echo -e "3. kratos.local.yml: connection_uri smtp://mailpit:1025/?disable_starttls=true"
     echo -e "4. docker-compose: kratos command includes --watch-courier"
 fi
 

@@ -221,7 +221,7 @@ curl -s http://localhost:4434/admin/identities | jq '.[] | {id, email: .traits.e
 
 ### “Expected exactly one rule” (Oathkeeper)
 
-The request matches more than one Oathkeeper access rule. Check `config/oathkeeper/access-rules.yml`: URL patterns must not overlap (e.g. `/api/health` vs `/api/*`). Public routes should be more specific or listed first.
+The request matches more than one Oathkeeper access rule. Check `config/oathkeeper/rules.local.json` / `config/oathkeeper/rules.production.json`: URL patterns must not overlap (e.g. `/api/health` vs `/api/*`). Public routes should be more specific or listed first.
 
 ### 401 on protected endpoints
 
@@ -243,7 +243,7 @@ Frontend must call the API via the same origin (e.g. Vite proxy to Oathkeeper) o
 ### Email not received
 
 - Development: check **Mailpit** (http://localhost:8025).
-- Verify Kratos courier config in `config/kratos/kratos.config.yaml` (SMTP / Mailpit).
+- Verify Kratos courier config in `config/kratos/kratos.local.yml` (SMTP / Mailpit).
 - Run `./scripts/test-email-sending.sh` to confirm sending.
 
 ### Database issues
