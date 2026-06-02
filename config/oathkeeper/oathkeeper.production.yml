@@ -124,7 +124,7 @@ mutators:
       jwks_url: file:///etc/config/oathkeeper/id_token.jwks.json
       claims: |
         {
-          "email": "{{ print .Extra.identity.traits.email }}",
-          "name": "{{ print .Extra.identity.traits.full_name }}",
-          "role": "{{ if .Extra.identity.metadata_public }}{{ print .Extra.identity.metadata_public.role }}{{ end }}"
+          "email": "{{ if .Extra.identity }}{{ .Extra.identity.traits.email }}{{ else }}{{ if index .Extra \"ext\" }}{{ index (index .Extra \"ext\") \"email\" }}{{ else }}{{ if index .Extra \"session\" }}{{ index (index .Extra \"session\") \"email\" }}{{ else }}{{ index .Extra \"email\" }}{{ end }}{{ end }}{{ end }}",
+          "name": "{{ if .Extra.identity }}{{ .Extra.identity.traits.full_name }}{{ else }}{{ if index .Extra \"ext\" }}{{ index (index .Extra \"ext\") \"name\" }}{{ else }}{{ if index .Extra \"session\" }}{{ index (index .Extra \"session\") \"name\" }}{{ else }}{{ index .Extra \"name\" }}{{ end }}{{ end }}{{ end }}",
+          "role": "{{ if .Extra.identity }}{{ if .Extra.identity.metadata_public }}{{ .Extra.identity.metadata_public.role }}{{ end }}{{ else }}{{ if index .Extra \"ext\" }}{{ index (index .Extra \"ext\") \"role\" }}{{ else }}{{ if index .Extra \"session\" }}{{ index (index .Extra \"session\") \"role\" }}{{ else }}{{ index .Extra \"role\" }}{{ end }}{{ end }}{{ end }}"
         }
