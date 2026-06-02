@@ -61,9 +61,9 @@ serve:
 urls:
   self:
     issuer: https://api.cativo.dev
-  consent: https://api.cativo.dev/consent
-  login: https://api.cativo.dev/login
-  logout: https://api.cativo.dev/logout
+  consent: https://auth.cativo.dev/auth/consent
+  login: https://auth.cativo.dev/auth/login
+  logout: https://auth.cativo.dev/auth/logout
   error: https://api.cativo.dev/error
   post_logout_redirect: https://api.cativo.dev
 

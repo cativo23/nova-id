@@ -75,7 +75,7 @@ selfservice:
         default_browser_return_url: https://admin.cativo.dev/
 
     login:
-      ui_url: https://api.cativo.dev/auth/login
+      ui_url: https://auth.cativo.dev/auth/login
       lifespan: 10m
       after:
         hooks:
