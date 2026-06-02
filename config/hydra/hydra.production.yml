@@ -1,8 +1,10 @@
 version: v25.4.0
 
-# DSN for production (PostgreSQL)
-# Set via environment variable: DSN=postgres://hydra_user:${HYDRA_DB_PASSWORD}@postgres:5432/hydra?sslmode=disable&max_conns=20&max_idle_conns=4
-dsn: postgres://hydra_user:${HYDRA_DB_PASSWORD}@postgres:5432/hydra?sslmode=disable&max_conns=20&max_idle_conns=4
+# DSN for production (PostgreSQL). Injected via the DSN environment variable from
+# docker-compose (Ory does NOT expand ${VAR} in YAML). docker-compose sets:
+#   DSN=postgres://hydra_user:${HYDRA_DB_PASSWORD}@postgres:5432/hydra?sslmode=...
+# The DSN env var overrides this placeholder entirely at runtime.
+dsn: THIS_WILL_BE_OVERRIDDEN_BY_DSN_ENV_VAR
 
 serve:
   public:
@@ -89,5 +91,10 @@ log:
   format: json
 
 secrets:
-  system:
-    - ${HYDRA_SYSTEM_SECRET}
+  # Ory does NOT expand ${VAR} in YAML, and the HYDRA_ prefix is NOT a recognized
+  # path-mapped name. The system secret (signs/encrypts OAuth2 tokens + login/consent
+  # challenges) is injected via the path-mapped env var SECRETS_SYSTEM, which
+  # docker-compose maps from HYDRA_SYSTEM_SECRET in .env.
+  #   SECRETS_SYSTEM → secrets.system[0]  (≥16 chars)
+  # Intentionally left empty here (fail-safe): if the env var is absent the service
+  # refuses to boot rather than silently signing tokens with a placeholder.

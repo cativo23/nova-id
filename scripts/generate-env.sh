@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Generate .env file with high-entropy secrets for Nova ID.
 #
 # Output matches .env.example EXACTLY (same keys, same order).
@@ -12,7 +12,9 @@ set -euo pipefail
 generate_secret() {
     local n="${1:-40}"
     # Pull enough base64 bytes to guarantee we have n alnum chars after stripping.
-    openssl rand -base64 96 | tr -dc 'A-Za-z0-9' | head -c "${n}"
+    # `|| true` guards against SIGPIPE killing the pipeline under `set -o pipefail`
+    # when `head -c` closes the stream early (notably on bash 3.2 / macOS).
+    openssl rand -base64 96 | tr -dc 'A-Za-z0-9' | head -c "${n}" || true
 }
 
 # Exactly 32 alphanumeric chars for KRATOS_SECRETS_CIPHER (xchacha20-poly1305).

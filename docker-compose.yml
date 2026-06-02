@@ -118,7 +118,10 @@ services:
     environment:
       - DSN=postgres://hydra_user:${HYDRA_DB_PASSWORD}@postgres:5432/hydra?sslmode=disable&max_conns=20&max_idle_conns=4
       - HYDRA_DB_PASSWORD=${HYDRA_DB_PASSWORD}
-      - HYDRA_SYSTEM_SECRET=${HYDRA_SYSTEM_SECRET}
+      # Ory path-mapped env var: secrets.system ← SECRETS_SYSTEM. The HYDRA_ prefix is
+      # NOT recognized and Ory does NOT expand ${VAR} in YAML, so the system secret must
+      # arrive under this exact name. Sourced from HYDRA_SYSTEM_SECRET in .env.
+      - SECRETS_SYSTEM=${HYDRA_SYSTEM_SECRET}
     command: migrate sql -e --yes -c /etc/config/hydra/hydra.${ENVIRONMENT:-local}.yml
     volumes:
       - ./config/hydra:/etc/config/hydra:ro
@@ -136,7 +139,10 @@ services:
     environment:
       - DSN=postgres://hydra_user:${HYDRA_DB_PASSWORD}@postgres:5432/hydra?sslmode=disable&max_conns=20&max_idle_conns=4
       - HYDRA_DB_PASSWORD=${HYDRA_DB_PASSWORD}
-      - HYDRA_SYSTEM_SECRET=${HYDRA_SYSTEM_SECRET}
+      # Ory path-mapped env var: secrets.system ← SECRETS_SYSTEM. The HYDRA_ prefix is
+      # NOT recognized and Ory does NOT expand ${VAR} in YAML, so the system secret must
+      # arrive under this exact name. Sourced from HYDRA_SYSTEM_SECRET in .env.
+      - SECRETS_SYSTEM=${HYDRA_SYSTEM_SECRET}
     command: serve all -c /etc/config/hydra/hydra.${ENVIRONMENT:-local}.yml
     volumes:
       - ./config/hydra:/etc/config/hydra:ro
