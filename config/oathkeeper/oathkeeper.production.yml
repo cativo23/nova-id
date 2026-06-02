@@ -115,7 +115,7 @@ mutators:
       headers:
         X-User-ID: "{{ print .Subject }}"
         X-User-Email: "{{ print .Extra.identity.traits.email }}"
-        X-User-Role: "{{ print .Extra.identity.metadata_public.role }}"
+        X-User-Role: "{{ if .Extra.identity.metadata_public }}{{ print .Extra.identity.metadata_public.role }}{{ end }}"
 
   id_token:
     enabled: true
@@ -126,5 +126,5 @@ mutators:
         {
           "email": "{{ print .Extra.identity.traits.email }}",
           "name": "{{ print .Extra.identity.traits.full_name }}",
-          "role": "{{ print .Extra.identity.metadata_public.role }}"
+          "role": "{{ if .Extra.identity.metadata_public }}{{ print .Extra.identity.metadata_public.role }}{{ end }}"
         }
