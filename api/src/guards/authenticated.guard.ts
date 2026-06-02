@@ -10,17 +10,6 @@ import { Reflector } from '@nestjs/core';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import * as jwt from 'jsonwebtoken';
 
-/** Default Oathkeeper id_token JWKS public key (local dev only); production must set OAUTH_PUBLIC_KEY. */
-const DEFAULT_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
-MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA5l5yXVUlH9vphJactgCR
-8sOPiDIhz66KBatfjFAVuz-sahRZVGLTJsXEBlxVLkOvL186P-lVK9EuW-2Ozs6u
-SbZiy7TYu686IASXU0XZ7OmWjaHk1KTZGM26Mo1RlU8lJlLaYqcTevFn2bHOWnDP
-DEl274ptM4oy1m7w5FJYnfV4Ob2bp9ZRFmFxBK6ggXVDMQ9jFn-lVHBrFiXlARKw
-qJIeJknrXfNB3qShkKXqOzqDPKl4HbNetvC6P6-wJU9ugy2q9i55OfJW1FRfINPr
-XukloZUJT0TyoUJPtwfOUS_O-FjQBX6Dgw_p4LJf9pM_Y8hBlaAdET7eHohmuCgp
-XQIDAQAB
------END PUBLIC KEY-----`;
-
 /**
  * AuthenticatedGuard - ZERO TRUST with Oathkeeper
  *
@@ -33,18 +22,27 @@ XQIDAQAB
 @Injectable()
 export class AuthenticatedGuard implements CanActivate {
   private readonly logger = new Logger(AuthenticatedGuard.name);
+  private readonly publicKey: string;
+  private readonly issuer: string;
 
   constructor(
     private reflector: Reflector,
     private config: ConfigService,
-  ) { }
-
-  private getJwtPublicKey(): string {
-    return this.config.get<string>('OAUTH_PUBLIC_KEY') || DEFAULT_PUBLIC_KEY;
-  }
-
-  private getJwtIssuer(): string {
-    return this.config.get<string>('OAUTH_ISSUER') || 'http://localhost:4455/';
+  ) {
+    const publicKey = this.config.get<string>('OAUTH_PUBLIC_KEY');
+    const issuer = this.config.get<string>('OAUTH_ISSUER');
+    if (!publicKey) {
+      throw new Error(
+        'OAUTH_PUBLIC_KEY is required (no built-in fallback). Set it to the Oathkeeper id_token public key PEM.',
+      );
+    }
+    if (!issuer) {
+      throw new Error(
+        'OAUTH_ISSUER is required (no built-in fallback). Set it to match the Oathkeeper id_token issuer_url.',
+      );
+    }
+    this.publicKey = publicKey;
+    this.issuer = issuer;
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -98,9 +96,9 @@ export class AuthenticatedGuard implements CanActivate {
 
     const token = authHeader.substring(7);
     try {
-      const decoded = jwt.verify(token, this.getJwtPublicKey(), {
+      const decoded = jwt.verify(token, this.publicKey, {
         algorithms: ['RS256'],
-        issuer: this.getJwtIssuer(),
+        issuer: this.issuer,
       }) as any;
 
       const clean = (val: any) => (val && val !== '<no value>' ? val : undefined);
