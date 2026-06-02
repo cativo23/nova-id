@@ -1,8 +1,11 @@
 version: v25.4.0
 
 # DSN for production (PostgreSQL)
-# Set via environment variable: DSN=postgres://kratos_user:${KRATOS_DB_PASSWORD}@postgres:5432/kratos?sslmode=disable&max_conns=20&max_idle_conns=4
-dsn: postgres://kratos_user:${KRATOS_DB_PASSWORD}@postgres:5432/kratos?sslmode=disable&max_conns=20&max_idle_conns=4
+# Injected via the DSN environment variable from docker-compose (Ory does NOT
+# expand ${VAR} in YAML). docker-compose sets:
+#   DSN=postgres://kratos_user:${KRATOS_DB_PASSWORD}@postgres:5432/kratos?sslmode=...
+# The DSN env var overrides this placeholder entirely at runtime.
+dsn: THIS_WILL_BE_OVERRIDDEN_BY_DSN_ENV_VAR
 
 serve:
   public:
@@ -94,10 +97,15 @@ log:
   leak_sensitive_values: false
 
 secrets:
-  cookie:
-    - ${KRATOS_SECRETS_COOKIE}
-  cipher:
-    - ${KRATOS_SECRETS_CIPHER}
+  # Ory does NOT expand ${VAR} syntax in YAML files. Secrets are injected via
+  # path-mapped environment variables (dots → underscores, uppercase).
+  # docker-compose passes SECRETS_COOKIE, SECRETS_CIPHER, SECRETS_DEFAULT,
+  # mapping them from KRATOS_SECRETS_* in .env.
+  #
+  # Env var → config key mapping:
+  #   SECRETS_COOKIE  → secrets.cookie[0]   (≥16 chars)
+  #   SECRETS_CIPHER  → secrets.cipher[0]   (exactly 32 chars, xchacha20-poly1305)
+  #   SECRETS_DEFAULT → secrets.default[0]  (≥16 chars, fallback signing key)
 
 ciphers:
   algorithm: xchacha20-poly1305
@@ -116,20 +124,34 @@ identity:
 courier:
   template_override_path: /etc/config/kratos/courier-templates
   smtp:
-    # Production SMTP - set via environment variable
-    connection_uri: ${SMTP_CONNECTION_URI}
-    from_address: ${SMTP_FROM_ADDRESS}
+    # Production SMTP: injected at runtime via COURIER_SMTP_CONNECTION_URI and
+    # COURIER_SMTP_FROM_ADDRESS environment variables (path-mapped: dots →
+    # underscores, uppercase). docker-compose maps these from SMTP_* in .env.
+    # Note: the env var name for connection_uri is COURIER_SMTP_CONNECTION_URI,
+    # not SMTP_CONNECTION_URI — compose renames it before passing to the container.
+    # The placeholders below are OVERRIDDEN by those env vars (Ory does NOT expand
+    # ${VAR} in YAML); they exist so the schema sees courier.smtp as a valid object
+    # (the smtp block is required to be an object — a null block fails validation).
+    connection_uri: smtps://CHANGE_ME@smtp.example.com:465/?skip_ssl_verify=false
+    from_address: noreply@cativo.dev
 
 cookies:
   domain: cativo.dev
   path: /
   same_site: Lax
-  secure: true
+  secure: "true"  # Ory expects string not boolean for cookies.secure
 
 session:
   lifespan: 720h
   whoami:
     required_aal: highest_available
+
+clients:
+  http:
+    # Block outgoing HTTP calls to RFC-1918 private IP ranges to prevent SSRF.
+    # Enabled in production only; local dev needs private IPs (Mailpit, postgres).
+    # Ref: config schema clients.http.disallow_private_ip_ranges (v25.4.0 confirmed).
+    disallow_private_ip_ranges: true
 
 feature_flags:
   use_continue_with_transitions: true

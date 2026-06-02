@@ -58,10 +58,12 @@ services:
   kratos-migrate:
     image: oryd/kratos:v25.4.0
     environment:
+      # Ory path-mapped env vars: dots→underscores, uppercase. KRATOS_ prefix is
+      # NOT recognized — the correct names are SECRETS_*, DSN, etc.
       - DSN=postgres://kratos_user:${KRATOS_DB_PASSWORD}@postgres:5432/kratos?sslmode=disable&max_conns=20&max_idle_conns=4
-      - KRATOS_DB_PASSWORD=${KRATOS_DB_PASSWORD}
-      - KRATOS_SECRETS_COOKIE=${KRATOS_SECRETS_COOKIE}
-      - KRATOS_SECRETS_CIPHER=${KRATOS_SECRETS_CIPHER}
+      - SECRETS_COOKIE=${KRATOS_SECRETS_COOKIE}
+      - SECRETS_CIPHER=${KRATOS_SECRETS_CIPHER}
+      - SECRETS_DEFAULT=${KRATOS_SECRETS_DEFAULT}
     command: -c /etc/config/kratos/kratos.${ENVIRONMENT:-local}.yml migrate sql -e --yes
     volumes:
       - ./config/kratos:/etc/config/kratos:ro
@@ -77,12 +79,14 @@ services:
   kratos:
     image: oryd/kratos:v25.4.0
     environment:
+      # Ory path-mapped env vars: dots→underscores, uppercase. KRATOS_ prefix is
+      # NOT recognized — the correct names are SECRETS_*, DSN, COURIER_SMTP_*, etc.
       - DSN=postgres://kratos_user:${KRATOS_DB_PASSWORD}@postgres:5432/kratos?sslmode=disable&max_conns=20&max_idle_conns=4
-      - KRATOS_DB_PASSWORD=${KRATOS_DB_PASSWORD}
-      - KRATOS_SECRETS_COOKIE=${KRATOS_SECRETS_COOKIE}
-      - KRATOS_SECRETS_CIPHER=${KRATOS_SECRETS_CIPHER}
-      - SMTP_CONNECTION_URI=${SMTP_CONNECTION_URI}
-      - SMTP_FROM_ADDRESS=${SMTP_FROM_ADDRESS}
+      - SECRETS_COOKIE=${KRATOS_SECRETS_COOKIE}
+      - SECRETS_CIPHER=${KRATOS_SECRETS_CIPHER}
+      - SECRETS_DEFAULT=${KRATOS_SECRETS_DEFAULT}
+      - COURIER_SMTP_CONNECTION_URI=${SMTP_CONNECTION_URI}
+      - COURIER_SMTP_FROM_ADDRESS=${SMTP_FROM_ADDRESS}
     # --watch-courier runs the mail courier worker so recovery/verification emails reach Mailpit
     command: serve -c /etc/config/kratos/kratos.${ENVIRONMENT:-local}.yml --watch-courier
     volumes:
