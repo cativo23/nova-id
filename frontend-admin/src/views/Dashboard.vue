@@ -63,12 +63,12 @@
             <span class="text-cyber-light/50">Name</span>
             <span class="ml-2 font-medium text-cyber-light">{{ session.identity.traits.full_name }}</span>
           </p>
-          <div v-if="session.identity?.traits?.role || session.identity?.traits?.rank" class="pt-1">
+          <div v-if="session.identity?.metadata_public?.role" class="pt-1">
             <span
               class="inline-flex rounded-badge border px-2 py-0.5 text-xs font-semibold"
-              :class="getRoleBadgeClass(session.identity.traits.role || session.identity.traits.rank)"
+              :class="getRoleBadgeClass(session.identity.metadata_public.role)"
             >
-              {{ (session.identity.traits.role || session.identity.traits.rank || '').replace('platform_', '') }}
+              {{ (session.identity.metadata_public.role || '').replace('platform_', '') }}
             </span>
           </div>
         </div>
@@ -215,13 +215,13 @@
       <p class="text-sm text-cyber-light/60 mb-4">Permission-based access for your account</p>
       <p v-if="loadingPermissions" class="text-sm text-cyber-light/50">Loading…</p>
       <div v-else class="space-y-3">
-        <p v-if="session.identity?.traits?.role || session.identity?.traits?.rank" class="text-sm text-cyber-light/70 mb-2">
+        <p v-if="session.identity?.metadata_public?.role" class="text-sm text-cyber-light/70 mb-2">
           Identity role:
           <span
             class="ml-2 inline-flex rounded-badge border px-2 py-0.5 text-xs font-semibold"
-            :class="getRoleBadgeClass(session.identity.traits.role || session.identity.traits.rank)"
+            :class="getRoleBadgeClass(session.identity.metadata_public.role)"
           >
-            {{ (session.identity.traits.role || session.identity.traits.rank || '').replace('platform_', '') }}
+            {{ (session.identity.metadata_public.role || '').replace('platform_', '') }}
           </span>
         </p>
         <ul v-if="userPermissions.length > 0" class="grid gap-2 sm:grid-cols-2">
@@ -283,7 +283,7 @@ const roleChartData = computed(() => {
   if (!users.length) return []
   const counts = {}
   users.forEach((u) => {
-    const role = u.traits?.role || u.traits?.rank || 'platform_user'
+    const role = u.metadata_public?.role || 'platform_user'
     counts[role] = (counts[role] || 0) + 1
   })
   const total = users.length

@@ -86,9 +86,9 @@
                   <span class="text-cyber-light/50 text-xs uppercase tracking-wider">Full name</span>
                   <span class="text-cyber-light font-medium mt-1">{{ session.identity?.traits?.full_name || '—' }}</span>
                 </div>
-                <div v-if="session.identity?.traits?.role" class="flex flex-col p-3 rounded-xl bg-cyber-accent/5 border border-cyber-accent/20">
+                <div v-if="session.identity?.metadata_public?.role" class="flex flex-col p-3 rounded-xl bg-cyber-accent/5 border border-cyber-accent/20">
                   <span class="text-cyber-light/50 text-xs uppercase tracking-wider">Platform role</span>
-                  <span class="text-cyber-accent font-semibold mt-1">{{ session.identity.traits.role }}</span>
+                  <span class="text-cyber-accent font-semibold mt-1">{{ session.identity.metadata_public.role }}</span>
                 </div>
                 <div class="flex flex-col p-3 rounded-xl bg-orange-500/5 border border-orange-500/20">
                   <span class="text-cyber-light/50 text-xs uppercase tracking-wider">App role</span>
@@ -343,8 +343,8 @@ const userFromMe = inject('userFromMe', null)
 
 const isAdmin = computed(() => {
   const s = session.value
-  if (!s?.identity?.traits) return false
-  return s.identity.traits.role === 'platform_admin' || s.identity.traits.appRole === 'app_admin'
+  if (!s?.identity) return false
+  return s.identity.metadata_public?.role === 'platform_admin' || s.identity.traits?.appRole === 'app_admin'
 })
 
 const showDebug = computed(() => {
@@ -510,7 +510,11 @@ watch(
     const traits = session.value.identity.traits
     if (user.email) traits.email = user.email
     if (user.full_name || user.name) traits.full_name = user.full_name ?? user.name ?? traits.full_name ?? ''
-    if (user.role != null) traits.role = user.role
+    // role is admin-only and lives in metadata_public, not user-editable traits
+    if (user.role != null) {
+      if (!session.value.identity.metadata_public) session.value.identity.metadata_public = {}
+      session.value.identity.metadata_public.role = user.role
+    }
     traits.appRole = user.appRole ?? traits.appRole ?? 'app_user'
     const isUserAdmin = user.role === 'platform_admin' || user.appRole === 'app_admin'
     if (isUserAdmin && recentLogs.value.length === 0 && !recentLogsLoading.value) loadRecentLogs()

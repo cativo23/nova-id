@@ -387,7 +387,7 @@ async function ensureAllowed() {
     } else {
       const data = await checkSession()
       session.value = data || null
-      const role = data?.identity?.traits?.role
+      const role = data?.identity?.metadata_public?.role
       const appRole = data?.identity?.traits?.appRole
       // Allow access if platform_admin OR app_admin
       allowed.value = role === 'platform_admin' || appRole === 'app_admin'

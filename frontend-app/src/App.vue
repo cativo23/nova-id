@@ -219,7 +219,7 @@ const refreshAuth = async () => {
     const session = await checkSession()
     isAuthenticated.value = !!session
     userEmail.value = session?.identity?.traits?.email || ''
-    isPlatformAdmin.value = session?.identity?.traits?.role === 'platform_admin'
+    isPlatformAdmin.value = session?.identity?.metadata_public?.role === 'platform_admin'
     isAppAdmin.value = session?.identity?.traits?.appRole === 'app_admin'
   } catch {
     isAuthenticated.value = false

@@ -25,7 +25,9 @@ USER_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$OATHKEEPER_URL/admin/ident
     \"schema_id\": \"default\",
     \"traits\": {
       \"email\": \"$EMAIL\",
-      \"full_name\": \"$FULL_NAME\",
+      \"full_name\": \"$FULL_NAME\"
+    },
+    \"metadata_public\": {
       \"role\": \"$ROLE\"
     },
     \"credentials\": {

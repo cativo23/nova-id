@@ -1,6 +1,6 @@
 #!/bin/bash
 # Assign platform_admin role to a user by email.
-# Updates Kratos (traits.role) and Keto (ranks:platform_admin#member@user:ID).
+# Updates Kratos (metadata_public.role, admin-only) and Keto (ranks:platform_admin#member@user:ID).
 #
 # Prerequisites:
 #   - Run ./scripts/setup-all-permissions.sh first (grants permissions to platform_admin).
@@ -42,7 +42,7 @@ if [ -z "$USER_JSON" ] || [ "$USER_JSON" = "null" ]; then
 fi
 
 USER_ID=$(echo "$USER_JSON" | jq -r '.id')
-CURRENT_ROLE=$(echo "$USER_JSON" | jq -r '.traits.role // .traits.rank // "platform_user"')
+CURRENT_ROLE=$(echo "$USER_JSON" | jq -r '.metadata_public.role // "platform_user"')
 echo -e "${GREEN}✓ Found user: $USER_ID (current role: $CURRENT_ROLE)${NC}"
 echo ""
 
@@ -50,12 +50,15 @@ if [ "$CURRENT_ROLE" = "platform_admin" ]; then
   echo "User already has platform_admin. Syncing Keto membership..."
 fi
 
-echo "Updating Kratos identity (role -> platform_admin)..."
+echo "Updating Kratos identity (metadata_public.role -> platform_admin)..."
 SCHEMA_ID=$(echo "$USER_JSON" | jq -r '.schema_id')
 STATE=$(echo "$USER_JSON" | jq -r '.state')
-TRAITS=$(echo "$USER_JSON" | jq -c '.traits | . + {"role": "platform_admin"} | del(.rank)')
-PAYLOAD=$(jq -n -c --arg sid "$SCHEMA_ID" --arg st "$STATE" --argjson tr "$TRAITS" \
-  '{schema_id: $sid, state: $st, traits: $tr}')
+# role is admin-only: stored in identity metadata_public (writable ONLY via the Admin API),
+# never in user-editable traits. Strip any legacy role/rank from traits.
+TRAITS=$(echo "$USER_JSON" | jq -c '.traits | del(.role) | del(.rank)')
+META_PUBLIC=$(echo "$USER_JSON" | jq -c '(.metadata_public // {}) | . + {"role": "platform_admin"}')
+PAYLOAD=$(jq -n -c --arg sid "$SCHEMA_ID" --arg st "$STATE" --argjson tr "$TRAITS" --argjson mp "$META_PUBLIC" \
+  '{schema_id: $sid, state: $st, traits: $tr, metadata_public: $mp}')
 
 HTTP=$(curl -s -o /tmp/kratos_update.json -w "%{http_code}" -X PUT \
   "$KRATOS_ADMIN_URL/admin/identities/$USER_ID" \

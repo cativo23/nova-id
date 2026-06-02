@@ -33,21 +33,9 @@
           "type": "string",
           "title": "Full Name",
           "minLength": 1
-        },
-        "role": {
-          "type": "string",
-          "title": "Role",
-          "default": "platform_user",
-          "enum": [
-            "platform_user",
-            "platform_admin"
-          ],
-          "ory.sh/kratos": {
-            "ory:protected": true
-          }
         }
       },
-      "required": ["email", "full_name", "role"],
+      "required": ["email", "full_name"],
       "additionalProperties": false
     }
   }
