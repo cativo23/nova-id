@@ -225,9 +225,8 @@ services:
       - NODE_ENV=development
       - PORT=8080
       - OATHKEEPER_URL=http://oathkeeper:4455
-      # HYDRA_ADMIN_URL is corrected to the direct address in the config-hygiene plan (A0.5);
-      # for now it stays as-is so the OAuth flow keeps working until internal-hydra-admin is removed.
-      - HYDRA_ADMIN_URL=http://oathkeeper:4455/api/internal/hydra-admin
+      # API reaches Hydra Admin directly on the ory-internal network; no gateway hop.
+      - HYDRA_ADMIN_URL=http://hydra:4445
     networks:
       - apps
       - ory-internal
