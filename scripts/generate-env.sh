@@ -1,70 +1,82 @@
 #!/bin/bash
-# Generate .env file with high-entropy secrets for Nova ID
+# Generate .env file with high-entropy secrets for Nova ID.
+#
+# Output matches .env.example EXACTLY (same keys, same order).
+# Secrets are alphanumeric-only (no /+=) so they are safe inside DSN URLs.
+# KRATOS_SECRETS_CIPHER is exactly 32 chars (xchacha20-poly1305 requirement).
 
+set -euo pipefail
+
+# Produce N alphanumeric chars using openssl for entropy, stripping non-alnum.
+# Usage: generate_secret [N]   (default: 40, satisfies ≥16 and ≥32 requirements)
 generate_secret() {
-    python3 -c "import secrets, string; print(''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(32)))"
+    local n="${1:-40}"
+    # Pull enough base64 bytes to guarantee we have n alnum chars after stripping.
+    openssl rand -base64 96 | tr -dc 'A-Za-z0-9' | head -c "${n}"
+}
+
+# Exactly 32 alphanumeric chars for KRATOS_SECRETS_CIPHER (xchacha20-poly1305).
+generate_cipher_secret() {
+    generate_secret 32
 }
 
 cat > .env << EOF
 # Nova ID Environment Configuration
 # Generated on $(date)
-# Production-ready high-entropy secrets (32 characters each)
+# NEVER commit this file — it contains real secrets.
+#
+# Re-generate at any time with: ./scripts/generate-env.sh
+# After (re-)generating, run once:  ./scripts/generate-jwks.sh
+# (generate-jwks.sh writes config/oathkeeper/id_token.jwks.json, which is
+# gitignored. Oathkeeper needs it to mint RS256 id_tokens.)
 
-# Development Mode
-DEV=true
+# Environment
+ENVIRONMENT=local
+NODE_ENV=development
 
-# Log Level (debug for dev, info for prod)
-LOG_LEVEL=debug
-
-# Cookie Settings
-COOKIES_SAMESITE=Lax
-COOKIES_SECURE=false
-
-# Cookie Domain
-COOKIE_DOMAIN=cativo.dev
-
-# Database Configuration
+# Database passwords (alphanumeric; safe inside DSN URLs)
 POSTGRES_PASSWORD=$(generate_secret)
 ORY_PASSWORD=$(generate_secret)
 KRATOS_DB_PASSWORD=$(generate_secret)
 HYDRA_DB_PASSWORD=$(generate_secret)
 KETO_DB_PASSWORD=$(generate_secret)
 
-# Kratos Configuration
-KRATOS_PUBLIC_URL=http://localhost:4433
-KRATOS_ADMIN_URL=http://localhost:4434
-KRATOS_CORS_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000,https://id.cativo.dev,https://cativo.dev
-
 # Kratos Secrets
+# cookie:  ≥16 chars — signs session cookies
+# cipher:  EXACTLY 32 chars — xchacha20-poly1305 data encryption
+# default: ≥16 chars — fallback signing key
 KRATOS_SECRETS_COOKIE=$(generate_secret)
-KRATOS_SECRETS_CIPHER=$(generate_secret)
+KRATOS_SECRETS_CIPHER=$(generate_cipher_secret)
+KRATOS_SECRETS_DEFAULT=$(generate_secret)
 
-# Hydra Configuration
-HYDRA_SELF_ISSUER=https://oidc.cativo.dev
-HYDRA_CONSENT_URL=http://localhost:4455/consent
-HYDRA_LOGIN_URL=http://localhost:4455/login
-HYDRA_LOGOUT_URL=http://localhost:4455/logout
-HYDRA_ERROR_URL=http://localhost:4455/error
-HYDRA_POST_LOGOUT_REDIRECT_URL=http://localhost:4455
-HYDRA_CORS_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000,https://oidc.cativo.dev
+# Hydra System Secret (≥32 chars; key name MUST be HYDRA_SYSTEM_SECRET)
+HYDRA_SYSTEM_SECRET=$(generate_secret)
 
-# Hydra Secrets
-HYDRA_SECRETS_SYSTEM=$(generate_secret)
+# Hydra Admin URL (internal Docker network; never expose publicly)
+HYDRA_ADMIN_URL=http://hydra:4445
 
-# Keto Configuration
-KETO_DB_PASSWORD=\${KETO_DB_PASSWORD}
+# OAuth / JWT validation
+OAUTH_ISSUER=http://api.local/
+OAUTH_JWKS_URL=http://oathkeeper:4456/.well-known/jwks.json
 
-# Oathkeeper Configuration
-OATHKEEPER_CHECK_SESSION_URL=http://kratos:4433/sessions/whoami
-OATHKEEPER_CORS_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000,https://gateway.cativo.dev
+# CORS allowed origins
+CORS_ALLOWED_ORIGINS=http://auth.ory.localhost,http://admin.ory.localhost,http://app.ory.localhost
 
-# Frontend Configuration
-FRONTEND_URL=http://localhost:5173
+# Service URLs
+API_URL=http://api.local
+KRATOS_BROWSER_URL=http://auth.local
+ADMIN_URL=http://admin.local
 
-# SMTP Configuration (Mailpit for local development)
-SMTP_CONNECTION_URI=smtp://mailpit:1025
+# SMTP (Mailpit for local dev; ?disable_starttls=true required by Kratos courier)
+SMTP_CONNECTION_URI=smtp://mailpit:1025/?disable_starttls=true
 SMTP_FROM_ADDRESS=noreply@cativo.dev
 EOF
 
-echo ".env file generated successfully!"
-echo "Remember to update SMTP_CONNECTION_URI with your actual SMTP credentials."
+echo ""
+echo ".env generated successfully."
+echo ""
+echo "Next step — generate Oathkeeper JWKS signing keys (required once per environment):"
+echo "  ./scripts/generate-jwks.sh"
+echo ""
+echo "Then start the stack:"
+echo "  docker compose up -d"
