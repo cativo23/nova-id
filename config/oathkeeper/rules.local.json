@@ -74,8 +74,7 @@
         "config": {
           "headers": {
             "X-User-ID": "{{ print .Subject }}",
-            "X-User-Email": "{{ print .Extra.identity.traits.email }}",
-            "X-Gateway-Auth": "{{ getenv \"GATEWAY_SHARED_SECRET\" }}"
+            "X-User-Email": "{{ print .Extra.identity.traits.email }}"
           }
         }
       }
@@ -111,8 +110,7 @@
         "config": {
           "headers": {
             "X-User-ID": "{{ print .Subject }}",
-            "X-User-Email": "{{ print .Extra.identity.traits.email }}",
-            "X-Gateway-Auth": "{{ getenv \"GATEWAY_SHARED_SECRET\" }}"
+            "X-User-Email": "{{ print .Extra.identity.traits.email }}"
           }
         }
       }
@@ -242,8 +240,7 @@
         "config": {
           "headers": {
             "X-User-ID": "{{ print .Subject }}",
-            "X-User-Email": "{{ print .Extra.identity.traits.email }}",
-            "X-Gateway-Auth": "{{ getenv \"GATEWAY_SHARED_SECRET\" }}"
+            "X-User-Email": "{{ print .Extra.identity.traits.email }}"
           }
         }
       }
@@ -303,8 +300,7 @@
           "headers": {
             "X-User-ID": "{{ print .Subject }}",
             "X-User-Email": "{{ print .Extra.identity.traits.email }}",
-            "X-User-Role": "{{ print .Extra.identity.metadata_public.role }}",
-            "X-Gateway-Auth": "{{ getenv \"GATEWAY_SHARED_SECRET\" }}"
+            "X-User-Role": "{{ print .Extra.identity.metadata_public.role }}"
           }
         }
       }
@@ -335,8 +331,7 @@
           "headers": {
             "X-User-ID": "{{ print .Subject }}",
             "X-User-Email": "{{ print .Extra.identity.traits.email }}",
-            "X-User-Role": "{{ print .Extra.identity.metadata_public.role }}",
-            "X-Gateway-Auth": "{{ getenv \"GATEWAY_SHARED_SECRET\" }}"
+            "X-User-Role": "{{ print .Extra.identity.metadata_public.role }}"
           }
         }
       }
@@ -461,17 +456,7 @@
     },
     "mutators": [
       {
-        "handler": "header",
-        "config": {
-          "headers": {
-            "X-User-ID": "{{ print .Subject }}",
-            "X-User-Email": "{{ if .Extra.identity }}{{ .Extra.identity.traits.email }}{{ else }}{{ if index .Extra \"ext\" }}{{ index (index .Extra \"ext\") \"email\" }}{{ else }}{{ if index .Extra \"session\" }}{{ index (index .Extra \"session\") \"email\" }}{{ else }}{{ index .Extra \"email\" }}{{ end }}{{ end }}{{ end }}",
-            "X-User-Name": "{{ if .Extra.identity }}{{ .Extra.identity.traits.full_name }}{{ else }}{{ if index .Extra \"ext\" }}{{ index (index .Extra \"ext\") \"name\" }}{{ else }}{{ if index .Extra \"session\" }}{{ index (index .Extra \"session\") \"name\" }}{{ else }}{{ index .Extra \"name\" }}{{ end }}{{ end }}{{ end }}",
-            "X-User-Role": "{{ if .Extra.identity }}{{ .Extra.identity.metadata_public.role }}{{ else }}{{ if index .Extra \"ext\" }}{{ index (index .Extra \"ext\") \"role\" }}{{ else }}{{ if index .Extra \"session\" }}{{ index (index .Extra \"session\") \"role\" }}{{ else }}{{ index .Extra \"role\" }}{{ end }}{{ end }}{{ end }}",
-            "X-User-App-Role": "{{ if index .Extra \"ext\" }}{{ index (index .Extra \"ext\") \"appRole\" }}{{ else }}{{ if index .Extra \"session\" }}{{ index (index .Extra \"session\") \"appRole\" }}{{ else }}{{ index .Extra \"appRole\" }}{{ end }}{{ end }}",
-            "X-Gateway-Auth": "{{ getenv \"GATEWAY_SHARED_SECRET\" }}"
-          }
-        }
+        "handler": "id_token"
       }
     ]
   },
@@ -505,17 +490,7 @@
     },
     "mutators": [
       {
-        "handler": "header",
-        "config": {
-          "headers": {
-            "X-User-ID": "{{ print .Subject }}",
-            "X-User-Email": "{{ if .Extra.identity }}{{ .Extra.identity.traits.email }}{{ else }}{{ if index .Extra \"ext\" }}{{ index (index .Extra \"ext\") \"email\" }}{{ else }}{{ if index .Extra \"session\" }}{{ index (index .Extra \"session\") \"email\" }}{{ else }}{{ index .Extra \"email\" }}{{ end }}{{ end }}{{ end }}",
-            "X-User-Name": "{{ if .Extra.identity }}{{ .Extra.identity.traits.full_name }}{{ else }}{{ if index .Extra \"ext\" }}{{ index (index .Extra \"ext\") \"name\" }}{{ else }}{{ if index .Extra \"session\" }}{{ index (index .Extra \"session\") \"name\" }}{{ else }}{{ index .Extra \"name\" }}{{ end }}{{ end }}{{ end }}",
-            "X-User-Role": "{{ if .Extra.identity }}{{ .Extra.identity.metadata_public.role }}{{ else }}{{ if index .Extra \"ext\" }}{{ index (index .Extra \"ext\") \"role\" }}{{ else }}{{ if index .Extra \"session\" }}{{ index (index .Extra \"session\") \"role\" }}{{ else }}{{ index .Extra \"role\" }}{{ end }}{{ end }}{{ end }}",
-            "X-User-App-Role": "{{ if index .Extra \"ext\" }}{{ index (index .Extra \"ext\") \"appRole\" }}{{ else }}{{ if index .Extra \"session\" }}{{ index (index .Extra \"session\") \"appRole\" }}{{ else }}{{ index .Extra \"appRole\" }}{{ end }}{{ end }}",
-            "X-Gateway-Auth": "{{ getenv \"GATEWAY_SHARED_SECRET\" }}"
-          }
-        }
+        "handler": "id_token"
       }
     ]
   },
@@ -544,8 +519,7 @@
         "config": {
           "headers": {
             "X-User-ID": "{{ print .Subject }}",
-            "X-User-Email": "{{ print .Extra.identity.traits.email }}",
-            "X-Gateway-Auth": "{{ getenv \"GATEWAY_SHARED_SECRET\" }}"
+            "X-User-Email": "{{ print .Extra.identity.traits.email }}"
           }
         }
       }
@@ -581,8 +555,7 @@
         "config": {
           "headers": {
             "X-User-ID": "{{ print .Subject }}",
-            "X-User-Email": "{{ print .Extra.identity.traits.email }}",
-            "X-Gateway-Auth": "{{ getenv \"GATEWAY_SHARED_SECRET\" }}"
+            "X-User-Email": "{{ print .Extra.identity.traits.email }}"
           }
         }
       }

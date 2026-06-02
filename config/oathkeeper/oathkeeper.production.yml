@@ -124,5 +124,7 @@ mutators:
       jwks_url: file:///etc/config/oathkeeper/id_token.jwks.json
       claims: |
         {
-          "session": {{ .Extra | toJson }}
+          "email": "{{ print .Extra.identity.traits.email }}",
+          "name": "{{ print .Extra.identity.traits.full_name }}",
+          "role": "{{ print .Extra.identity.metadata_public.role }}"
         }
