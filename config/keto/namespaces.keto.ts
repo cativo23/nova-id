@@ -24,6 +24,14 @@ class Platform implements Namespace {
 // One per registered app (object id = the app's Hydra client_id / appId).
 //   App:<appId>#members@user:<id>  => may consume the app.
 //   App:<appId>#admins@user:<id>   => admin of the app (also a member).
+//
+// A0 design decision: Platform:nova#admins membership does NOT automatically
+// grant App#administer on any app. App admin is a separate, per-app tuple
+// (App:<appId>#admins@user:<id>) written via the Platform-gated keto-write path.
+// Per-app domain roles are out of scope for A0 and will be introduced in A1
+// (app-onboarding milestone), which provisions App tuples on client registration.
+// This is intentional: a platform admin who also needs app-admin access must be
+// explicitly granted it through the keto-write endpoint.
 class App implements Namespace {
   related: {
     admins: User[]
@@ -38,6 +46,8 @@ class App implements Namespace {
       this.related.members.includes(ctx.subject),
 
     // May administer this app's users.
+    // Note: this checks only App#admins — Platform:nova#admins is NOT evaluated
+    // here. A Platform admin is NOT an implicit App admin (see A0 design decision above).
     administer: (ctx: Context): boolean =>
       this.related.admins.includes(ctx.subject),
   }
