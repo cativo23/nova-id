@@ -6,7 +6,7 @@
 Hydra uses environment variables for URLs, allowing easy switching between dev and production:
 
 ```yaml
-# In config/hydra/hydra.config.yaml
+# In config/hydra/hydra.${ENVIRONMENT}.yml
 urls:
   self:
     issuer: ${HYDRA_SELF_ISSUER:-https://oidc.cativo.dev}

@@ -12,7 +12,7 @@ Nova ID uses **Kratos** for identity management and **MailHog** for email testin
 - **Password recovery** - Reset forgotten passwords
 - **Account notifications** - Security and status updates
 
-**Production Setup:** Configure SMTP settings in `config/kratos/kratos.config.yaml`
+**Production Setup:** Configure SMTP settings in `config/kratos/kratos.${ENVIRONMENT}.yml`
 
 ---
 
@@ -23,7 +23,7 @@ Nova ID uses **Kratos** for identity management and **MailHog** for email testin
 Nova ID uses MailHog for local email testing:
 
 ```yaml
-# config/kratos/kratos.config.yaml
+# config/kratos/kratos.${ENVIRONMENT}.yml
 courier:
   smtp:
     connection_uri: smtp://mailhog:1025/?disable_starttls=true
@@ -179,7 +179,7 @@ curl http://localhost:8025/api/v2/messages
 2. **Verify Configuration**:
 ```bash
 # Check Kratos config
-docker-compose exec kratos cat /etc/config/kratos/kratos.config.yaml | grep -A 10 courier
+docker-compose exec kratos cat /etc/config/kratos/kratos.${ENVIRONMENT}.yml | grep -A 10 courier
 ```
 
 3. **Monitor Logs**:
@@ -302,7 +302,7 @@ curl http://localhost:8025/api/v2/messages | jq '.total'
 curl http://localhost:8025/api/v2/messages | jq '.items[0].Content.Body'
 
 # Check Kratos courier status
-docker-compose exec kratos kratos courier watch --config /etc/config/kratos/kratos.config.yaml
+docker-compose exec kratos kratos courier watch --config /etc/config/kratos/kratos.${ENVIRONMENT}.yml
 ```
 
 ### Log Analysis

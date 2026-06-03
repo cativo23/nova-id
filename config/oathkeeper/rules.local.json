@@ -191,31 +191,6 @@
     ]
   },
   {
-    "id": "internal-hydra-admin",
-    "upstream": {
-      "preserve_host": false,
-      "strip_path": "/api/internal/hydra-admin",
-      "url": "http://hydra:4445"
-    },
-    "match": {
-      "url": "<(http|https)://(api\\.ory\\.localhost|admin\\.ory\\.localhost|auth\\.ory\\.localhost|app\\.ory\\.localhost|localhost(:[0-9]+)?|oathkeeper(:[0-9]+)?)/api/internal/hydra-admin/.*>",
-      "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
-    },
-    "authenticators": [
-      {
-        "handler": "noop"
-      }
-    ],
-    "authorizer": {
-      "handler": "allow"
-    },
-    "mutators": [
-      {
-        "handler": "noop"
-      }
-    ]
-  },
-  {
     "id": "hydra-admin",
     "upstream": {
       "preserve_host": false,
@@ -232,7 +207,12 @@
       }
     ],
     "authorizer": {
-      "handler": "allow"
+      "handler": "remote_json",
+      "config": {
+        "remote": "http://keto:4466/relation-tuples/check",
+        "payload": "{\"namespace\":\"ranks\",\"object\":\"platform_admin\",\"relation\":\"member\",\"subject_id\":\"user:{{ print .Subject }}\"}",
+        "forward_response_headers_to_upstream": ["Content-Type"]
+      }
     },
     "mutators": [
       {

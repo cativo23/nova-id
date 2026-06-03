@@ -87,7 +87,7 @@ Used for mobile apps, SPAs, and third‑party integrations. Web session-based fl
 - **Mutate**: inject `X-User-ID`, `X-User-Email`, `X-User-Role` (from Kratos traits)
 - **Route**: forward to API or frontends
 
-Access rules live in `config/oathkeeper/access-rules.yml`.
+Access rules live in `config/oathkeeper/rules.${ENVIRONMENT}.json` (loaded via `oathkeeper.${ENVIRONMENT}.yml`).
 
 ---
 

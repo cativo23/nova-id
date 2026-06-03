@@ -1,4 +1,4 @@
-version: v2.2.0
+version: v25.4.0
 
 # DSN for local development (memory)
 dsn: memory
@@ -106,5 +106,9 @@ log:
   format: json
 
 secrets:
-  system:
-    - ${HYDRA_SYSTEM_SECRET}
+  # Ory does NOT expand ${VAR} in YAML, and the HYDRA_ prefix is NOT a recognized
+  # path-mapped name. The system secret is injected via the path-mapped env var
+  # SECRETS_SYSTEM, which docker-compose maps from HYDRA_SYSTEM_SECRET in .env.
+  #   SECRETS_SYSTEM → secrets.system[0]  (≥16 chars)
+  # Left empty here (fail-safe): absent env var → the service refuses to boot
+  # rather than signing tokens with a literal placeholder.

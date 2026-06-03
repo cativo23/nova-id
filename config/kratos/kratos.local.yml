@@ -1,4 +1,4 @@
-version: v0.13.0
+version: v25.4.0
 
 # DSN for local development (memory or postgres)
 # Use memory for quick testing, postgres for persistence
@@ -107,10 +107,16 @@ log:
   leak_sensitive_values: true
 
 secrets:
-  cookie:
-    - PLEASE-CHANGE-ME-I-AM-VERY-INSECURE
-  cipher:
-    - 32-LONG-SECRET-NOT-SECURE-AT-ALL
+  # Secrets are injected via path-mapped environment variables (Ory does NOT expand
+  # ${VAR} syntax inside YAML files). The container receives SECRETS_COOKIE,
+  # SECRETS_CIPHER, and SECRETS_DEFAULT from docker-compose, which maps them from
+  # the KRATOS_SECRETS_* vars in .env. Removing literal values prevents copy-paste
+  # accidents into production.
+  #
+  # Env var → config key mapping (dots become underscores, uppercase):
+  #   SECRETS_COOKIE  → secrets.cookie[0]
+  #   SECRETS_CIPHER  → secrets.cipher[0]   (exactly 32 chars, xchacha20-poly1305)
+  #   SECRETS_DEFAULT → secrets.default[0]
 
 ciphers:
   algorithm: xchacha20-poly1305
@@ -129,7 +135,10 @@ identity:
 courier:
   template_override_path: /etc/config/kratos/courier-templates
   smtp:
-    # Local dev: Mailpit. Values here so Kratos validates config; env vars are not expanded in YAML.
+    # Local dev: Mailpit defaults. docker-compose overrides these at runtime via
+    # COURIER_SMTP_CONNECTION_URI and COURIER_SMTP_FROM_ADDRESS env vars (path-mapped
+    # from SMTP_CONNECTION_URI / SMTP_FROM_ADDRESS in .env). Ory does NOT expand
+    # ${VAR} in YAML, so we keep concrete fallback values here for dev convenience.
     connection_uri: smtp://mailpit:1025/?disable_starttls=true
     from_address: noreply@cativo.dev
 

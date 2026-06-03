@@ -23,7 +23,7 @@
 
 ### Config & schema
 - `config/kratos/identity.schema.json` – Trait **`role`** (replaces `rank`): enum `platform_user` | `platform_admin`, default `platform_user`
-- `config/oathkeeper/access-rules.yml` – `X-User-Role` from `traits.role`; comments use "role"
+- `config/oathkeeper/rules.${ENV}.json` – `X-User-Role` from `traits.role` (the live rule files; the old `access-rules.yml` was never loaded and has been removed)
 
 ### API (`api/src`)
 - `app.controller.ts` – `/admin-demo` (platform_admin), `/user-demo` (authenticated)

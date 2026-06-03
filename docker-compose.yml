@@ -58,10 +58,12 @@ services:
   kratos-migrate:
     image: oryd/kratos:v25.4.0
     environment:
+      # Ory path-mapped env vars: dots→underscores, uppercase. KRATOS_ prefix is
+      # NOT recognized — the correct names are SECRETS_*, DSN, etc.
       - DSN=postgres://kratos_user:${KRATOS_DB_PASSWORD}@postgres:5432/kratos?sslmode=disable&max_conns=20&max_idle_conns=4
-      - KRATOS_DB_PASSWORD=${KRATOS_DB_PASSWORD}
-      - KRATOS_SECRETS_COOKIE=${KRATOS_SECRETS_COOKIE}
-      - KRATOS_SECRETS_CIPHER=${KRATOS_SECRETS_CIPHER}
+      - SECRETS_COOKIE=${KRATOS_SECRETS_COOKIE}
+      - SECRETS_CIPHER=${KRATOS_SECRETS_CIPHER}
+      - SECRETS_DEFAULT=${KRATOS_SECRETS_DEFAULT}
     command: -c /etc/config/kratos/kratos.${ENVIRONMENT:-local}.yml migrate sql -e --yes
     volumes:
       - ./config/kratos:/etc/config/kratos:ro
@@ -77,12 +79,14 @@ services:
   kratos:
     image: oryd/kratos:v25.4.0
     environment:
+      # Ory path-mapped env vars: dots→underscores, uppercase. KRATOS_ prefix is
+      # NOT recognized — the correct names are SECRETS_*, DSN, COURIER_SMTP_*, etc.
       - DSN=postgres://kratos_user:${KRATOS_DB_PASSWORD}@postgres:5432/kratos?sslmode=disable&max_conns=20&max_idle_conns=4
-      - KRATOS_DB_PASSWORD=${KRATOS_DB_PASSWORD}
-      - KRATOS_SECRETS_COOKIE=${KRATOS_SECRETS_COOKIE}
-      - KRATOS_SECRETS_CIPHER=${KRATOS_SECRETS_CIPHER}
-      - SMTP_CONNECTION_URI=${SMTP_CONNECTION_URI}
-      - SMTP_FROM_ADDRESS=${SMTP_FROM_ADDRESS}
+      - SECRETS_COOKIE=${KRATOS_SECRETS_COOKIE}
+      - SECRETS_CIPHER=${KRATOS_SECRETS_CIPHER}
+      - SECRETS_DEFAULT=${KRATOS_SECRETS_DEFAULT}
+      - COURIER_SMTP_CONNECTION_URI=${SMTP_CONNECTION_URI}
+      - COURIER_SMTP_FROM_ADDRESS=${SMTP_FROM_ADDRESS}
     # --watch-courier runs the mail courier worker so recovery/verification emails reach Mailpit
     command: serve -c /etc/config/kratos/kratos.${ENVIRONMENT:-local}.yml --watch-courier
     volumes:
@@ -114,7 +118,10 @@ services:
     environment:
       - DSN=postgres://hydra_user:${HYDRA_DB_PASSWORD}@postgres:5432/hydra?sslmode=disable&max_conns=20&max_idle_conns=4
       - HYDRA_DB_PASSWORD=${HYDRA_DB_PASSWORD}
-      - HYDRA_SYSTEM_SECRET=${HYDRA_SYSTEM_SECRET}
+      # Ory path-mapped env var: secrets.system ← SECRETS_SYSTEM. The HYDRA_ prefix is
+      # NOT recognized and Ory does NOT expand ${VAR} in YAML, so the system secret must
+      # arrive under this exact name. Sourced from HYDRA_SYSTEM_SECRET in .env.
+      - SECRETS_SYSTEM=${HYDRA_SYSTEM_SECRET}
     command: migrate sql -e --yes -c /etc/config/hydra/hydra.${ENVIRONMENT:-local}.yml
     volumes:
       - ./config/hydra:/etc/config/hydra:ro
@@ -132,7 +139,10 @@ services:
     environment:
       - DSN=postgres://hydra_user:${HYDRA_DB_PASSWORD}@postgres:5432/hydra?sslmode=disable&max_conns=20&max_idle_conns=4
       - HYDRA_DB_PASSWORD=${HYDRA_DB_PASSWORD}
-      - HYDRA_SYSTEM_SECRET=${HYDRA_SYSTEM_SECRET}
+      # Ory path-mapped env var: secrets.system ← SECRETS_SYSTEM. The HYDRA_ prefix is
+      # NOT recognized and Ory does NOT expand ${VAR} in YAML, so the system secret must
+      # arrive under this exact name. Sourced from HYDRA_SYSTEM_SECRET in .env.
+      - SECRETS_SYSTEM=${HYDRA_SYSTEM_SECRET}
     command: serve all -c /etc/config/hydra/hydra.${ENVIRONMENT:-local}.yml
     volumes:
       - ./config/hydra:/etc/config/hydra:ro
@@ -225,9 +235,8 @@ services:
       - NODE_ENV=development
       - PORT=8080
       - OATHKEEPER_URL=http://oathkeeper:4455
-      # HYDRA_ADMIN_URL is corrected to the direct address in the config-hygiene plan (A0.5);
-      # for now it stays as-is so the OAuth flow keeps working until internal-hydra-admin is removed.
-      - HYDRA_ADMIN_URL=http://oathkeeper:4455/api/internal/hydra-admin
+      # API reaches Hydra Admin directly on the ory-internal network; no gateway hop.
+      - HYDRA_ADMIN_URL=http://hydra:4445
     networks:
       - apps
       - ory-internal
