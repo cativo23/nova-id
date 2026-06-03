@@ -137,9 +137,9 @@ docker compose run --rm keto-seed
 
 ```bash
 ./scripts/assign-platform-admin-to-user.sh user@example.com
-# Then re-run the seed to sync the new admin into Keto:
-docker compose run --rm keto-seed
 ```
+
+The script updates `metadata_public.role` in Kratos **and** writes the `Platform:nova#admins` tuple directly to Keto in one step — no separate keto-seed run is required. Re-running `docker compose run --rm keto-seed` is safe (idempotent) but only needed for reconciliation (e.g., after a Keto data reset).
 
 #### Verify Keto OPL permission check
 

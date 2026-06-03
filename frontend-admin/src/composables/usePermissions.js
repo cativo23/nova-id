@@ -21,6 +21,10 @@ export async function hasPermission(userId, permission, namespace = 'Platform', 
 }
 
 // Platform-level permissions (OPL: Platform:nova#manage_users)
+// Note: canViewUsers (manage_users) and canChangePermissions (administer) both
+// resolve to Platform:nova#admins in the A0 OPL model — they are functionally
+// identical today. They will diverge when finer-grain permits are added in A1
+// (e.g., a dedicated user-manager role that grants manage_users without administer).
 export async function canViewUsers(userId) {
   return await hasPermission(userId, 'manage_users', 'Platform', 'nova')
 }

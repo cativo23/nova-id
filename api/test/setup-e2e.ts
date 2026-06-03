@@ -13,5 +13,9 @@
  *   OAUTH_PUBLIC_KEY       — removed in plan-1 (A0.1): key resolution moved to JWKS.
  *   GATEWAY_SHARED_SECRET  — removed in plan-1 (A0.1): gateway-header trust path deleted.
  */
+// OAUTH_ISSUER uses the internal Docker hostname (oathkeeper:4456). These e2e
+// tests are designed to run in-process within the Docker network (module compile
+// only). There is no live JWKS fetch at boot time — jwks-rsa defers network I/O
+// to request time, so the module compiles and tests run without a real Oathkeeper.
 process.env.OAUTH_JWKS_URL = 'http://oathkeeper:4456/.well-known/jwks.json';
 process.env.OAUTH_ISSUER = 'http://oathkeeper:4456/';

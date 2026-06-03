@@ -57,7 +57,7 @@
                   >
                     <option value="Platform">Platform - Platform-wide</option>
                     <option value="App">App - Per-application</option>
-                    <option value="User">User - User namespace</option>
+                    <option value="User" disabled>User - no active OPL permits (read-only; tuples here are never evaluated)</option>
                   </select>
                 </div>
                 <div>
@@ -171,7 +171,7 @@
                   >
                     <option value="Platform">Platform - Platform-wide</option>
                     <option value="App">App - Per-application</option>
-                    <option value="User">User - User namespace</option>
+                    <option value="User" disabled>User - no active OPL permits (tuples here are never evaluated)</option>
                   </select>
                 </div>
                 <div>
