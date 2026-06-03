@@ -50,7 +50,7 @@ if [ -z "${ADMIN_IDS}" ]; then
 fi
 
 echo "[seed-permissions] Found platform_admin identities:"
-printf '%s\n' "${ADMIN_IDS}" | while IFS= read -r id; do
+for id in ${ADMIN_IDS}; do
   echo "  - ${id}"
 done
 echo ""
@@ -58,7 +58,7 @@ echo ""
 SEEDED=0
 FAILED=0
 
-printf '%s\n' "${ADMIN_IDS}" | while IFS= read -r id; do
+for id in ${ADMIN_IDS}; do
   SUBJECT="user:${id}"
   PAYLOAD="{\"namespace\":\"Platform\",\"object\":\"nova\",\"relation\":\"admins\",\"subject_id\":\"${SUBJECT}\"}"
 
@@ -69,7 +69,11 @@ printf '%s\n' "${ADMIN_IDS}" | while IFS= read -r id; do
     -H "Content-Type: application/json" \
     -d "${PAYLOAD}")
 
-  if [ "${HTTP_CODE}" = "200" ] || [ "${HTTP_CODE}" = "201" ] || [ "${HTTP_CODE}" = "204" ]; then
+  if [ "${HTTP_CODE}" = "000" ]; then
+    echo "FAILED (connection refused)" >&2
+    echo "[seed-permissions] Cannot reach Keto at ${KETO_WRITE_URL} — run this on the compose network (docker compose run) or expose the port." >&2
+    FAILED=$((FAILED + 1))
+  elif [ "${HTTP_CODE}" = "200" ] || [ "${HTTP_CODE}" = "201" ] || [ "${HTTP_CODE}" = "204" ]; then
     echo "OK (HTTP ${HTTP_CODE})"
     SEEDED=$((SEEDED + 1))
   else
@@ -79,4 +83,8 @@ printf '%s\n' "${ADMIN_IDS}" | while IFS= read -r id; do
 done
 
 echo ""
-echo "[seed-permissions] Done."
+echo "[seed-permissions] Seed complete: ${SEEDED} seeded, ${FAILED} failed."
+
+if [ "${FAILED}" -gt 0 ]; then
+  exit 1
+fi
