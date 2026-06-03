@@ -14,7 +14,7 @@ NC='\033[0m'
 
 KRATOS_PUBLIC_URL="${KRATOS_PUBLIC_URL:-http://localhost:4433}"
 OATHKEEPER_URL="${OATHKEEPER_URL:-http://localhost:4455}"
-MAILHOG_URL="${MAILHOG_URL:-http://localhost:8025}"
+MAILPIT_URL="${MAILPIT_URL:-http://localhost:8025}"
 
 echo -e "${BLUE}=== Testing Email with Real User ===${NC}\n"
 
@@ -46,10 +46,10 @@ fi
 
 echo -e "${GREEN}✓ Found user: ${USER_EMAIL}${NC}\n"
 
-# Clear MailHog
-echo -e "${YELLOW}Clearing MailHog...${NC}"
-curl -s -X DELETE "${MAILHOG_URL}/api/v1/messages" > /dev/null
-echo -e "${GREEN}✓ MailHog cleared${NC}\n"
+# Clear Mailpit
+echo -e "${YELLOW}Clearing Mailpit...${NC}"
+curl -s -X DELETE "${MAILPIT_URL}/api/v1/messages" > /dev/null
+echo -e "${GREEN}✓ Mailpit cleared${NC}\n"
 
 # Test Recovery Email
 echo -e "${BLUE}Test: Sending Recovery Email${NC}"
@@ -73,19 +73,19 @@ echo -e "${YELLOW}Flow state: ${STATE}${NC}"
 echo -e "${YELLOW}Waiting for email to be sent...${NC}"
 sleep 5
 
-# Check MailHog
-MAIL_COUNT=$(curl -s "${MAILHOG_URL}/api/v2/messages" | jq '.total')
+# Check Mailpit
+MAIL_COUNT=$(curl -s "${MAILPIT_URL}/api/v1/messages" | jq '.total')
 
 if [ "$MAIL_COUNT" -gt 0 ]; then
-    echo -e "${GREEN}✓ Email sent! Total emails in MailHog: ${MAIL_COUNT}${NC}"
-    LATEST_EMAIL=$(curl -s "${MAILHOG_URL}/api/v2/messages" | jq '.items[0]')
+    echo -e "${GREEN}✓ Email sent! Total emails in Mailpit: ${MAIL_COUNT}${NC}"
+    LATEST_EMAIL=$(curl -s "${MAILPIT_URL}/api/v1/messages" | jq '.messages[0]')
     SUBJECT=$(echo "$LATEST_EMAIL" | jq -r '.Content.Headers.Subject[0]')
     TO=$(echo "$LATEST_EMAIL" | jq -r '.Content.Headers.To[0]')
     echo -e "  Subject: ${SUBJECT}"
     echo -e "  To: ${TO}"
-    echo -e "\n${GREEN}View email at: ${MAILHOG_URL}${NC}"
+    echo -e "\n${GREEN}View email at: ${MAILPIT_URL}${NC}"
 else
-    echo -e "${RED}✗ No email sent (MailHog shows ${MAIL_COUNT} emails)${NC}"
+    echo -e "${RED}✗ No email sent (Mailpit shows ${MAIL_COUNT} emails)${NC}"
     echo -e "${YELLOW}Checking Kratos logs...${NC}"
     echo -e "${YELLOW}Run: docker-compose logs kratos | grep -i 'courier\|recovery\|was_notified'${NC}"
 fi

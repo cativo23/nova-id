@@ -33,12 +33,12 @@ This directory contains utility scripts for managing the Nova ID stack.
 - **`test-email-sending.sh`** - Test email sending (verification, recovery, etc.)
   - Tests registration verification emails
   - Tests password recovery emails
-  - Requires MailHog to be running
+  - Requires Mailpit to be running
 
 - **`test-email-with-real-user.sh`** - Test email sending with an existing user
   - Fetches a real user from Kratos
   - Sends a recovery email to that user
-  - Verifies email was sent to MailHog
+  - Verifies email was sent to Mailpit
 
 ## Utility Scripts
 

@@ -16,7 +16,7 @@ NC='\033[0m' # No Color
 OATHKEEPER_URL="${OATHKEEPER_URL:-http://localhost:4455}"
 KRATOS_PUBLIC_URL="${KRATOS_PUBLIC_URL:-${OATHKEEPER_URL}}"
 KRATOS_ADMIN_URL="${KRATOS_ADMIN_URL:-http://localhost:4434}"
-MAILHOG_URL="${MAILHOG_URL:-http://localhost:8025}"
+MAILPIT_URL="${MAILPIT_URL:-http://localhost:8025}"
 
 echo -e "${BLUE}=== Nova ID Email Sending Test ===${NC}\n"
 
@@ -27,8 +27,6 @@ if ! curl -sf "${KRATOS_PUBLIC_URL}/self-service/recovery/api" -H "Accept: appli
     exit 1
 fi
 echo -e "${GREEN}✓ Kratos (via Oathkeeper) is running${NC}"
-
-MAILPIT_URL="${MAILPIT_URL:-${MAILHOG_URL:-http://localhost:8025}}"
 if ! curl -s "${MAILPIT_URL}/api/v1/info" > /dev/null; then
     echo -e "${RED}✗ Mailpit is not running${NC}"
     echo -e "${YELLOW}  Start Mailpit: docker-compose up -d mailpit${NC}"

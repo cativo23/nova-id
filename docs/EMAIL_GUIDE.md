@@ -6,7 +6,7 @@
 
 ## 📧 Email System Overview
 
-Nova ID uses **Kratos** for identity management and **MailHog** for email testing in development. The email system handles:
+Nova ID uses **Kratos** for identity management and **Mailpit** for email testing in development. The email system handles:
 
 - **Registration verification** - Confirm new user emails
 - **Password recovery** - Reset forgotten passwords
@@ -18,15 +18,15 @@ Nova ID uses **Kratos** for identity management and **MailHog** for email testin
 
 ## ⚙️ Configuration
 
-### Development (MailHog)
+### Development (Mailpit)
 
-Nova ID uses MailHog for local email testing:
+Nova ID uses Mailpit for local email testing:
 
 ```yaml
 # config/kratos/kratos.${ENVIRONMENT}.yml
 courier:
   smtp:
-    connection_uri: smtp://mailhog:1025/?disable_starttls=true
+    connection_uri: smtp://mailpit:1025/?disable_starttls=true
     from_address: noreply@cativo.dev
 ```
 
@@ -41,11 +41,11 @@ courier:
     from_address: noreply@yourdomain.com
 ```
 
-### MailHog Access Points
+### Mailpit Access Points
 
 - **Web UI**: http://localhost:8025
 - **SMTP Port**: localhost:1025
-- **API**: http://localhost:8025/api/v2/messages
+- **API**: http://localhost:8025/api/v1/messages
 
 ---
 
@@ -72,7 +72,7 @@ Use the provided test scripts:
 
 1. **Open the registration page**: http://localhost:8082
 2. **Register a new account** with a real email
-3. **Check MailHog**: http://localhost:8025
+3. **Check Mailpit**: http://localhost:8025
 4. **Verify email** using the link in the email
 
 #### Test Password Recovery
@@ -89,8 +89,8 @@ curl -X POST "http://localhost:4433/self-service/recovery?flow=${FLOW_ID}" \
   -H "Content-Type: application/json" \
   -d '{"email":"your-real-user@example.com","method":"code"}'
 
-# Check MailHog for the email
-curl http://localhost:8025/api/v2/messages | jq '.total'
+# Check Mailpit for the email
+curl http://localhost:8025/api/v1/messages | jq '.total'
 ```
 
 ### Email Types Tested
@@ -164,7 +164,7 @@ docker-compose ps kratos
 **Check**:
 ```bash
 # Test SMTP connection
-telnet localhost 1025  # For MailHog
+telnet localhost 1025  # For Mailpit
 telnet smtp.gmail.com 587  # For production
 ```
 
@@ -196,10 +196,10 @@ docker-compose logs -f kratos | grep -i courier
 
 ```bash
 # Check recent emails
-curl http://localhost:8025/api/v2/messages | jq '.items[0]'
+curl http://localhost:8025/api/v1/messages | jq '.messages[0]'
 
 # Count emails by type
-curl http://localhost:8025/api/v2/messages | jq '.items[].Content.Headers.Subject[0]' | sort | uniq -c
+curl http://localhost:8025/api/v1/messages | jq '.messages[].Content.Headers.Subject[0]' | sort | uniq -c
 ```
 
 ### Production Monitoring
@@ -299,7 +299,7 @@ curl -X DELETE http://localhost:8025/api/v1/messages
 curl http://localhost:8025/api/v2/messages | jq '.total'
 
 # View latest email
-curl http://localhost:8025/api/v2/messages | jq '.items[0].Content.Body'
+curl http://localhost:8025/api/v1/messages | jq '.messages[0].Content.Body'
 
 # Check Kratos courier status
 docker-compose exec kratos kratos courier watch --config /etc/config/kratos/kratos.${ENVIRONMENT}.yml
