@@ -55,10 +55,9 @@
                     class="w-full px-4 py-2 bg-cyber-dark border border-cyber-accent/30 rounded text-cyber-light"
                     required
                   >
-                    <option value="users">users - User Management</option>
-                    <option value="system">system - System-wide</option>
-                    <option value="admin">admin - Administrative</option>
-                    <option value="nova">nova - Applications</option>
+                    <option value="Platform">Platform - Platform-wide</option>
+                    <option value="App">App - Per-application</option>
+                    <option value="User">User - User namespace</option>
                   </select>
                 </div>
                 <div>
@@ -78,11 +77,10 @@
                     class="w-full px-4 py-2 bg-cyber-dark border border-cyber-accent/30 rounded text-cyber-light"
                     required
                   >
-                    <option value="view">view</option>
-                    <option value="edit">edit</option>
-                    <option value="delete">delete</option>
-                    <option value="owner">owner</option>
-                    <option value="member">member</option>
+                    <option value="admins">admins (direct membership)</option>
+                    <option value="administer">administer (computed permit)</option>
+                    <option value="manage_users">manage_users (computed permit)</option>
+                    <option value="access">access</option>
                   </select>
                 </div>
                 <div>
@@ -171,10 +169,9 @@
                     v-model="testForm.namespace"
                     class="w-full px-4 py-2 bg-cyber-dark border border-cyber-accent/30 rounded text-cyber-light"
                   >
-                    <option value="users">users - User Management</option>
-                    <option value="system">system - System-wide</option>
-                    <option value="admin">admin - Administrative</option>
-                    <option value="nova">nova - Applications</option>
+                    <option value="Platform">Platform - Platform-wide</option>
+                    <option value="App">App - Per-application</option>
+                    <option value="User">User - User namespace</option>
                   </select>
                 </div>
                 <div>
@@ -357,44 +354,33 @@ const creatingClient = ref(false)
 const showCreateClient = ref(false)
 
 const permissionForm = ref({
-  namespace: 'users',  // Default to users namespace
-  object: 'management',  // Default object for user management
-  relation: 'view_users',
+  namespace: 'Platform',  // OPL: Platform namespace
+  object: 'nova',         // OPL: Platform object is always "nova"
+  relation: 'admins',
   subject: ''
 })
 
 const testForm = ref({
-  namespace: 'users',  // Default to users namespace
-  object: 'management',  // Default object for user management
-  relation: 'view_users',  // Default relation
+  namespace: 'Platform',  // OPL: Platform namespace
+  object: 'nova',         // OPL: Platform object is always "nova"
+  relation: 'administer', // OPL: most common check
   subject: ''  // Will be populated with current user ID if available
 })
 
-// Define available relations per namespace
+// OPL namespace → available relations for the test form.
+// Platform object is always "nova"; App object is the app ID.
 const namespaceRelations = {
-  users: [
-    { value: 'view_users', label: 'view_users - View Users' },
-    { value: 'add_users', label: 'add_users - Add Users' },
-    { value: 'edit_users', label: 'edit_users - Edit Users' },
-    { value: 'delete_users', label: 'delete_users - Delete Users' },
-    { value: 'change_permissions', label: 'change_permissions - Change Permissions' }
+  Platform: [
+    { value: 'administer', label: 'administer - Platform admin (computed permit)' },
+    { value: 'manage_users', label: 'manage_users - Manage users (computed permit)' },
+    { value: 'admins', label: 'admins - Direct admin membership' }
   ],
-  system: [
-    { value: 'manage_permissions', label: 'manage_permissions - Manage Permissions' },
-    { value: 'system_settings', label: 'system_settings - System Settings' },
-    { value: 'configure', label: 'configure - Configure System' }
+  App: [
+    { value: 'access', label: 'access - Access application' },
+    { value: 'administer', label: 'administer - Administer application' }
   ],
-  admin: [
-    { value: 'access', label: 'access - Access Admin Panel' },
-    { value: 'configure', label: 'configure - Configure Admin Settings' },
-    { value: 'manage', label: 'manage - Manage Admin' }
-  ],
-  nova: [
-    { value: 'access', label: 'access - Access Application' },
-    { value: 'read', label: 'read - Read Data' },
-    { value: 'write', label: 'write - Write Data' },
-    { value: 'admin', label: 'admin - Admin Application' },
-    { value: 'delete', label: 'delete - Delete Data' }
+  User: [
+    { value: 'self', label: 'self - Self reference' }
   ]
 }
 
@@ -403,41 +389,38 @@ const availableRelations = computed(() => {
   return namespaceRelations[testForm.value.namespace] || []
 })
 
-// Watch namespace changes and update relation and object defaults
+// Watch namespace changes and update relation and object defaults (OPL model).
 watch(() => testForm.value.namespace, (newNamespace) => {
-  // Update default object based on namespace
+  // Platform object is always "nova"; App object is the app ID (user fills it in).
   const defaultObjects = {
-    users: 'management',
-    system: 'admin',
-    admin: 'panel',
-    nova: 'app'
+    Platform: 'nova',
+    App: '',
+    User: ''
   }
-  testForm.value.object = defaultObjects[newNamespace] || ''
-  
-  // Update relation to first available relation for the namespace
+  testForm.value.object = defaultObjects[newNamespace] ?? ''
+
+  // Reset relation to first available for the new namespace.
   if (availableRelations.value.length > 0) {
     testForm.value.relation = availableRelations.value[0].value
   }
 })
 
-// Get object placeholder based on namespace
+// Get object placeholder based on OPL namespace.
 const getObjectPlaceholder = (namespace) => {
   const placeholders = {
-    users: 'management',
-    system: 'admin',
-    admin: 'panel',
-    nova: 'app-name (e.g., analytics, reports)'
+    Platform: 'nova',
+    App: 'app-id (e.g., analytics, reports)',
+    User: 'user-id'
   }
-  return placeholders[namespace] || 'object name'
+  return placeholders[namespace] || 'object'
 }
 
-// Get object suggestions based on namespace
+// Get object suggestions based on OPL namespace.
 const getObjectSuggestions = (namespace) => {
   const suggestions = {
-    users: ['management'],
-    system: ['admin', 'settings', 'config'],
-    admin: ['panel', 'dashboard'],
-    nova: ['analytics', 'reports', 'api', 'dashboard']
+    Platform: ['nova'],
+    App: ['analytics', 'reports', 'api', 'dashboard'],
+    User: []
   }
   return suggestions[namespace] || []
 }
@@ -481,8 +464,8 @@ const loadPermissions = async () => {
   loading.value = true
   error.value = null
   try {
-    // Load permissions from all namespaces
-    const namespaces = ['users', 'system', 'admin', 'nova']
+    // Load permissions from OPL namespaces (A0.7: ranks/users/system/admin removed).
+    const namespaces = ['Platform', 'App', 'User']
     const allRelations = []
     
     for (const ns of namespaces) {

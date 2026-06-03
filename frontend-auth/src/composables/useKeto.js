@@ -60,18 +60,19 @@ export async function getSubjectRelations(subject, namespace = null) {
   }
 }
 
-// RBAC: Get user's current role (from Keto "ranks" namespace)
+// RBAC: Get user's current role by checking OPL Platform:nova permissions.
+// Returns 'platform_admin' if the user has the Platform:nova#administer permit,
+// 'user' otherwise. (Legacy "ranks" namespace removed in A0.7; full BFF
+// migration to /me/permissions deferred to A1.3.)
 export async function getUserRole(userId) {
   try {
-    const relations = await getSubjectRelations(`user:${userId}`, 'ranks')
-    const roleRelation = relations.find(r => r.namespace === 'ranks' && r.relation === 'member')
-    if (roleRelation) return roleRelation.object
-    return null
+    const isPlatformAdmin = await checkPermission('Platform', 'nova', 'administer', `user:${userId}`)
+    return isPlatformAdmin ? 'platform_admin' : 'user'
   } catch (error) {
     console.error('Error getting user role:', error)
     throw error
   }
 }
 
-// Aliases for consumers that use "rank" terminology (same as role in ranks namespace)
+// Alias kept for backward-compatibility with callers that used "rank" terminology.
 export { getUserRole as getUserRank }

@@ -279,15 +279,8 @@ export async function updateUser(identityId, traits) {
       })
     })
     
-    // If rank changed, sync rank membership in Keto (RBAC)
-    if (traits.rank && traits.rank !== currentIdentity.traits?.rank) {
-      try {
-        await syncRankPermissions(identityId, traits.rank)
-      } catch (syncError) {
-        console.warn('Failed to sync rank permissions, but user was updated:', syncError)
-        // Don't throw - user update succeeded, permission sync can be retried
-      }
-    }
+    // Role sync moved to the BFF admin API (A1.3 — /me/permissions endpoint).
+    // No Keto writes from the frontend.
     
     return updatedIdentity
   } catch (error) {
@@ -310,18 +303,18 @@ export async function createUser(traits, password = null) {
     // We'll use 'default' as it's the standard Kratos schema ID
     const schemaId = 'default'
     
-    // Default rank to Private if not specified
-    const rank = traits.rank || 'Private'
-    
+    // role lives in metadata_public (Admin-API-writable), not user-editable traits.
+    const role = traits.role ?? traits.rank ?? 'platform_user'
+
     const payload = {
       schema_id: schemaId,
       traits: {
         email: traits.email,
-        full_name: traits.full_name,
-        rank: rank
-      }
+        full_name: traits.full_name
+      },
+      metadata_public: { role }
     }
-    
+
     // If password is provided, add credentials
     if (password) {
       payload.credentials = {
@@ -332,22 +325,15 @@ export async function createUser(traits, password = null) {
         }
       }
     }
-    
+
     const newUser = await kratosAdminRequest('/admin/identities', {
       method: 'POST',
       body: JSON.stringify(payload)
     })
-    
-    // Sync rank membership in Keto (RBAC)
-    if (newUser.id && rank) {
-      try {
-        await syncRankPermissions(newUser.id, rank)
-      } catch (syncError) {
-        console.warn('Failed to sync rank permissions for new user, but user was created:', syncError)
-        // Don't throw - user creation succeeded, permission sync can be retried
-      }
-    }
-    
+
+    // Role sync moved to the BFF admin API (A1.3 — /me/permissions endpoint).
+    // No Keto writes from the frontend.
+
     return newUser
   } catch (error) {
     console.error('Error creating user:', error)
