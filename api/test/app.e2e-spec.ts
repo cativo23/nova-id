@@ -61,7 +61,9 @@ describe('App (e2e) - Zero Trust JWT Implementation', () => {
         .set('Authorization', 'Bearer invalid.jwt.token')
         .expect(401)
         .expect((res) => {
-          expect(res.body.message).toContain('Invalid JWT token');
+          // Guard throws UnauthorizedException('Invalid token') for any JWT
+          // that fails JWKS verification (malformed, wrong key, wrong issuer, etc.)
+          expect(res.body.message).toContain('Invalid token');
         });
     });
 
