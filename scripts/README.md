@@ -4,10 +4,10 @@ This directory contains utility scripts for managing the Nova ID stack.
 
 ## Setup Scripts
 
-- **`setup-all-permissions.sh`** - Sets up RBAC with platform_admin / platform_user
-  - Grants permissions to platform_admin only; platform_user has no admin permissions
-  - Assigns existing users to roles from Kratos traits.role
-  - Run after initial setup or when resetting permissions
+- **`seed-permissions.sh`** - Bootstraps Keto by writing `Platform:nova#admins` tuples for every
+  Kratos identity whose `metadata_public.role == "platform_admin"`.
+  Permissions are **computed in OPL** (no separate grant step); only membership tuples are seeded.
+  Runs automatically via the `keto-seed` Compose service on every `docker compose up`.
 
 - **`setup-hydra-test-client.sh`** - Creates a test OAuth client in Hydra for testing OAuth2/OIDC flows
 
@@ -19,9 +19,9 @@ This directory contains utility scripts for managing the Nova ID stack.
 
 - **`create-user-via-api.sh [email] [name] [role] [password]`** - Creates a user via the admin API (through Oathkeeper). Requires a valid admin session/cookie. See [CREATE_USER_INSTRUCTIONS.md](../CREATE_USER_INSTRUCTIONS.md).
 
-- **`clear-all-permissions.sh`** - Removes all permissions from Keto (for testing/resetting)
-  - Clears all relation tuples from all namespaces
-  - Use before running `setup-all-permissions.sh` for a fresh start
+- **`clear-all-permissions.sh`** - Removes all relation tuples from Keto (for testing/resetting)
+  - Clears OPL namespaces: `Platform`, `App`, `User`
+  - Use before running `seed-permissions.sh` for a fresh start
 
 ## Testing Scripts
 
@@ -51,9 +51,9 @@ This directory contains utility scripts for managing the Nova ID stack.
 All scripts should be run from the project root:
 
 ```bash
-# Set up RBAC permissions (fresh start)
+# Reseed platform admin memberships (fresh start)
 ./scripts/clear-all-permissions.sh
-./scripts/setup-all-permissions.sh
+./scripts/seed-permissions.sh
 
 # Test the stack
 ./scripts/test-stack-comprehensive.sh
@@ -64,9 +64,12 @@ All scripts should be run from the project root:
 
 Make sure you have the required environment variables set in your `.env` file before running scripts.
 
-## RBAC Permissions
+## OPL Permission Model
 
-- **platform_admin**: Admin dashboard, user management, all admin permissions
-- **platform_user**: App access only (default for new users)
+Permissions are **computed by the Keto OPL policy** — no explicit grant tuples are needed:
+- **Platform:nova#admins** → computed permits `administer` + `manage_users` (platform_admin)
+- **App:\<id\>#admins** → computed permits `administer` + `access` (app admin)
+- **App:\<id\>#members** → computed permit `access` (regular app user)
 
-Permissions are granted to roles; users are assigned via Keto. Use **`assign-platform-admin-to-user.sh`** to grant platform_admin to a user by email.
+Use **`seed-permissions.sh`** to bootstrap the initial admin membership from `metadata_public.role`.
+Use **`assign-platform-admin-to-user.sh`** to add platform_admin by email after bootstrap.

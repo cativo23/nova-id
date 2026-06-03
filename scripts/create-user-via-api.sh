@@ -53,23 +53,36 @@ echo "✓ User created successfully!"
 echo "  User ID: $USER_ID"
 echo ""
 
-echo "Assigning user to role $ROLE in Keto..."
-KETO_RESPONSE=$(curl -s -w "\n%{http_code}" -X PUT "$OATHKEEPER_URL/keto/write/admin/relation-tuples" \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json" \
-  -d "{
-    \"namespace\": \"ranks\",
-    \"object\": \"$ROLE\",
-    \"relation\": \"member\",
-    \"subject_id\": \"user:$USER_ID\"
-  }")
+# Write the Platform:nova#admins tuple only for platform_admin.
+# Non-admin roles (platform_user, etc.) have no platform-level Keto tuple;
+# app-level membership (App:<id>#members/#admins) is handled by the BFF in A1, not here.
+#
+# NOTE: This script routes writes through the Oathkeeper gateway (/keto/write/...),
+# which is itself admin-gated. This works when a platform admin session is already active.
+# For bootstrapping the FIRST admin (before any admin exists), use seed-permissions.sh
+# or write directly to keto:4467 — the gateway path requires an existing admin to authorize.
+if [ "$ROLE" = "platform_admin" ]; then
+  echo "Granting Platform:nova#admins membership in Keto for platform_admin user..."
+  KETO_RESPONSE=$(curl -s -w "\n%{http_code}" -X PUT "$OATHKEEPER_URL/keto/write/admin/relation-tuples" \
+    -H "Content-Type: application/json" \
+    -H "Accept: application/json" \
+    -d "{
+      \"namespace\": \"Platform\",
+      \"object\": \"nova\",
+      \"relation\": \"admins\",
+      \"subject_id\": \"user:$USER_ID\"
+    }")
 
-KETO_HTTP_CODE=$(echo "$KETO_RESPONSE" | tail -n1)
+  KETO_HTTP_CODE=$(echo "$KETO_RESPONSE" | tail -n1)
 
-if [ "$KETO_HTTP_CODE" = "200" ] || [ "$KETO_HTTP_CODE" = "201" ] || [ "$KETO_HTTP_CODE" = "204" ]; then
-  echo "✓ User assigned to $ROLE in Keto"
+  if [ "$KETO_HTTP_CODE" = "200" ] || [ "$KETO_HTTP_CODE" = "201" ] || [ "$KETO_HTTP_CODE" = "204" ]; then
+    echo "✓ User added to Platform:nova#admins in Keto"
+  else
+    echo "⚠ Warning: Failed to write Platform:nova#admins tuple in Keto (HTTP $KETO_HTTP_CODE)"
+    echo "  If this is the first admin, use seed-permissions.sh to bootstrap via direct Keto access."
+  fi
 else
-  echo "⚠ Warning: Failed to assign user to role in Keto (HTTP $KETO_HTTP_CODE)"
+  echo "ℹ Role '$ROLE' requires no Keto platform tuple (app membership is handled by the BFF)."
 fi
 
 echo ""

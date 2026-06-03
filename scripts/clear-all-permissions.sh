@@ -8,8 +8,9 @@ KETO_WRITE_URL="${KETO_WRITE_URL:-http://localhost:4467}"
 echo "Clearing all permissions from Keto..."
 echo ""
 
-# Namespaces to clear
-NAMESPACES=("ranks" "users" "system" "admin" "nova" "files")
+# OPL namespaces in use (Platform holds nova membership tuples; App holds per-app tuples;
+# User is included for safety — no tuples expected but cleared for completeness).
+NAMESPACES=("Platform" "App" "User")
 
 TOTAL_DELETED=0
 
@@ -95,5 +96,5 @@ done
 echo ""
 echo "✓ Permission clearing complete!"
 echo ""
-echo "To set up permissions again, run:"
-echo "  ./setup-all-permissions.sh"
+echo "To reseed platform admin memberships, run:"
+echo "  ./scripts/seed-permissions.sh"

@@ -1,9 +1,10 @@
 #!/bin/bash
 # Assign platform_admin role to a user by email.
-# Updates Kratos (metadata_public.role, admin-only) and Keto (ranks:platform_admin#member@user:ID).
+# Updates Kratos (metadata_public.role, admin-only) and Keto (Platform:nova#admins@user:ID).
+# Permissions are computed in OPL (administer/manage_users derive from Platform:nova#admins);
+# only the membership tuple is written here — no separate permission-grant step required.
 #
 # Prerequisites:
-#   - Run ./scripts/setup-all-permissions.sh first (grants permissions to platform_admin).
 #   - Kratos Admin and Keto Read/Write must be reachable. If using Zero Trust
 #     (ports not exposed), temporarily uncomment in docker-compose.yml:
 #       - "4434:4434" under kratos
@@ -73,8 +74,8 @@ fi
 echo -e "${GREEN}✓ Kratos identity updated${NC}"
 echo ""
 
-echo "Checking Keto role membership..."
-RANKS_JSON=$(curl -sf "$KETO_READ_URL/relation-tuples?namespace=ranks&subject_id=user:$USER_ID" 2>/dev/null || true)
+echo "Checking existing Keto Platform:nova#admins membership..."
+RANKS_JSON=$(curl -sf "$KETO_READ_URL/relation-tuples?namespace=Platform&object=nova&relation=admins&subject_id=user:$USER_ID" 2>/dev/null || true)
 if [ -z "$RANKS_JSON" ]; then
   echo -e "  ${YELLOW}⚠ Cannot reach Keto Read at $KETO_READ_URL${NC}"
 fi
@@ -97,14 +98,16 @@ echo "${RANKS_JSON:-{\"relation_tuples\":[]}}" | jq -c '.relation_tuples[]?' 2>/
   fi
 done
 
-echo "Adding platform_admin role membership in Keto..."
+echo "Writing Platform:nova#admins membership to Keto..."
+# OPL: admins relation on Platform:nova grants computed permits administer + manage_users.
+# No separate permission-grant step is needed — Keto evaluates these from the OPL policy.
 KETO_PUT=$(curl -s -o /tmp/keto_put.txt -w "%{http_code}" -X PUT \
   "$KETO_WRITE_URL/admin/relation-tuples" \
   -H "Content-Type: application/json" \
   -d "{
-    \"namespace\": \"ranks\",
-    \"object\": \"platform_admin\",
-    \"relation\": \"member\",
+    \"namespace\": \"Platform\",
+    \"object\": \"nova\",
+    \"relation\": \"admins\",
     \"subject_id\": \"user:$USER_ID\"
   }")
 
@@ -113,11 +116,10 @@ if [ "$KETO_PUT" != "200" ] && [ "$KETO_PUT" != "201" ] && [ "$KETO_PUT" != "204
   cat /tmp/keto_put.txt 2>/dev/null
   exit 1
 fi
-echo -e "${GREEN}✓ User assigned to platform_admin in Keto${NC}"
+echo -e "${GREEN}✓ User added to Platform:nova#admins in Keto${NC}"
 echo ""
 
-echo -e "${GREEN}✓ Done. $EMAIL now has platform_admin and its permissions.${NC}"
+echo -e "${GREEN}✓ Done. $EMAIL now has platform_admin (Platform:nova#admins).${NC}"
 echo ""
-echo "platform_admin includes: view_users, add_users, edit_users, delete_users,"
-echo "change_permissions, manage_permissions, admin panel access."
+echo "OPL-computed permits: administer, manage_users."
 echo ""

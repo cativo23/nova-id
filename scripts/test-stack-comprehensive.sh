@@ -1,6 +1,6 @@
 #!/bin/bash
 # Comprehensive test script for the entire stack
-# Tests: Kratos, Keto, Hydra, Oathkeeper with all rank permissions
+# Tests: Kratos, Keto, Hydra, Oathkeeper with OPL Platform/App namespaces
 
 set -e
 
@@ -93,11 +93,11 @@ else
   echo "$USERS" | head -5
 fi
 
-# Test 6: Check Permissions Setup
+# Test 6: Check Permissions Setup (OPL namespaces: Platform, App, User)
 echo ""
-echo "6. Testing Keto Permissions..."
-# Check all namespaces
-NAMESPACES=("users" "system" "admin" "nova")
+echo "6. Testing Keto Permissions (OPL model)..."
+# OPL namespaces: Platform (nova-wide admin), App (per-app membership), User (no tuples expected)
+NAMESPACES=("Platform" "App" "User")
 TOTAL_PERMS=0
 for ns in "${NAMESPACES[@]}"; do
   PERMISSIONS=$(curl -s "$KETO_READ_URL/relation-tuples?namespace=$ns" 2>&1)
@@ -111,18 +111,15 @@ for ns in "${NAMESPACES[@]}"; do
 done
 
 if [ "$TOTAL_PERMS" -gt 0 ]; then
-  test_passed "Keto permissions accessible (found $TOTAL_PERMS total relation tuples across all namespaces)"
-  
-  # Check if we have permissions for different ranks
-  RANKS=("General" "Colonel" "Major" "Captain" "Lieutenant" "Sergeant" "Corporal" "Private")
-  for rank in "${RANKS[@]}"; do
-    RANK_USERS=$(curl -s "$KRATOS_ADMIN_URL/admin/identities" | jq -r ".[] | select(.traits.rank == \"$rank\") | .id" | head -1)
-    if [ -n "$RANK_USERS" ]; then
-      test_info "Found user with rank $rank: $RANK_USERS"
-    fi
+  test_passed "Keto accessible (found $TOTAL_PERMS total relation tuples across OPL namespaces)"
+
+  # Check which identities have metadata_public.role == platform_admin in Kratos
+  ADMIN_IDS=$(curl -s "$KRATOS_ADMIN_URL/admin/identities" | jq -r '.[] | select(.metadata_public.role == "platform_admin") | .id')
+  for uid in $ADMIN_IDS; do
+    test_info "Found platform_admin identity: $uid"
   done
 else
-  test_info "No permissions found yet (run ./setup-all-permissions.sh to set up)"
+  test_info "No relation tuples found yet (run ./scripts/seed-permissions.sh to bootstrap)"
 fi
 
 # Test 7: Hydra OAuth Client
@@ -146,24 +143,29 @@ else
   test_failed "OIDC Discovery document not accessible"
 fi
 
-# Test 9: Permission Checks by Rank
+# Test 9: OPL Permission Checks for platform_admin identities
 echo ""
-echo "9. Testing Permission Structure..."
-echo "   Checking if permissions are set up correctly for each rank..."
+echo "9. Testing OPL Permission Structure..."
+echo "   Checking Platform:nova#administer for platform_admin identities..."
 
-# Get a sample user from each rank and check their permissions
-for rank in "General" "Colonel" "Major" "Captain" "Lieutenant" "Sergeant"; do
-  USER_ID=$(curl -s "$KRATOS_ADMIN_URL/admin/identities" | jq -r ".[] | select(.traits.rank == \"$rank\") | .id" | head -1)
-  if [ -n "$USER_ID" ]; then
-    # Check view_users permission in users namespace
-    PERM_CHECK=$(curl -s "$KETO_READ_URL/relation-tuples/check?namespace=users&object=management&relation=view_users&subject_id=user:$USER_ID" 2>&1)
+# Fetch all identities and check the OPL-computed administer permit
+# for those whose metadata_public.role == "platform_admin"
+ALL_IDENTITIES=$(curl -s "$KRATOS_ADMIN_URL/admin/identities" 2>&1)
+ADMIN_IDS=$(echo "$ALL_IDENTITIES" | jq -r '.[] | select(.metadata_public.role == "platform_admin") | .id' 2>/dev/null)
+
+if [ -z "$ADMIN_IDS" ]; then
+  test_info "No platform_admin identities found — skipping OPL permission check"
+else
+  for USER_ID in $ADMIN_IDS; do
+    # OPL: Platform:nova#administer is computed from Platform:nova#admins membership
+    PERM_CHECK=$(curl -s "$KETO_READ_URL/relation-tuples/check?namespace=Platform&object=nova&relation=administer&subject_id=user:$USER_ID" 2>&1)
     if echo "$PERM_CHECK" | jq -e '.allowed == true' > /dev/null 2>&1; then
-      test_passed "$rank ($USER_ID): Has view_users permission"
+      test_passed "platform_admin ($USER_ID): Platform:nova#administer = allowed"
     else
-      test_info "$rank ($USER_ID): No view_users permission (expected for some ranks)"
+      test_info "platform_admin ($USER_ID): Platform:nova#administer not yet granted (run seed-permissions.sh)"
     fi
-  fi
-done
+  done
+fi
 
 # Test 10: Frontend Accessibility
 echo ""
@@ -182,19 +184,14 @@ echo ""
 echo "All core services are running and accessible."
 echo ""
 echo "Next steps:"
-echo "1. Run ./setup-all-permissions.sh to set up permissions for all ranks"
+echo "1. Run ./scripts/seed-permissions.sh to bootstrap platform admin memberships"
+echo "   (permissions are now computed via OPL policy — no separate grant step needed)"
 echo "2. Test the frontend at http://localhost:5173"
-echo "3. Login with different rank users and verify permissions"
+echo "3. Login as a platform_admin and verify admin access"
 echo ""
-echo "Rank Permission Summary (by namespace):"
-echo "  users namespace:"
-echo "    General: view_users, add_users, edit_users, delete_users, change_permissions"
-echo "    Colonel: view_users, add_users, edit_users"
-echo "    Major: view_users, add_users, delete_users, change_permissions"
-echo "    Captain/Lieutenant/Sergeant: view_users, add_users"
-echo "    Corporal/Private: No permissions"
-echo "  system namespace:"
-echo "    General/Colonel/Major: manage_permissions"
-echo "  admin namespace: (for admin panel access)"
-echo "  nova namespace: (for application-specific permissions)"
+echo "OPL Permission Model:"
+echo "  Platform:nova#admins    → grants computed permits: administer, manage_users"
+echo "  App:<appId>#admins      → grants computed permits: administer, access (admin ⊇ member)"
+echo "  App:<appId>#members     → grants computed permit:  access"
+echo "  User:*                  → no tuples (leaf node in OPL graph)"
 echo ""
