@@ -403,29 +403,11 @@ export async function updateUser(identityId, traits) {
       body: JSON.stringify(body)
     })
 
-    // If role changed, sync role membership in Keto (RBAC)
-    const newRole = incomingRole
-    const currentRole = currentIdentity.metadata_public?.role
-    if (newRole != null && newRole !== currentRole) {
-      try {
-        await syncRankPermissions(identityId, newRole)
-      } catch (syncError) {
-        logger.warn('Failed to sync role permissions, but user was updated:', syncError)
-      }
-    }
-
     return updatedIdentity
   } catch (error) {
     logger.error('Error updating user:', error)
     throw error
   }
-}
-
-// RBAC: Sync user's rank membership in Keto based on their rank in Kratos
-// This ensures permissions are automatically updated when rank changes
-export async function syncRankPermissions(userId, newRank) {
-  // Permission writes moved to the BFF admin API (A1). Direct browser Keto writes were removed in A0.3.
-  throw new Error('Permission writes moved to the BFF admin API (A1)')
 }
 
 // Create a new user identity
@@ -462,15 +444,6 @@ export async function createUser(traits, password = null) {
       method: 'POST',
       body: JSON.stringify(payload)
     })
-    
-    // Sync role membership in Keto (RBAC)
-    if (newUser.id && role) {
-      try {
-        await syncRankPermissions(newUser.id, role)
-      } catch (syncError) {
-        logger.warn('Failed to sync role permissions for new user, but user was created:', syncError)
-      }
-    }
     
     return newUser
   } catch (error) {

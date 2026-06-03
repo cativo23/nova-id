@@ -289,13 +289,6 @@ export async function updateUser(identityId, traits) {
   }
 }
 
-// RBAC: Sync user's rank membership in Keto based on their rank in Kratos
-// This ensures permissions are automatically updated when rank changes
-export async function syncRankPermissions(userId, newRank) {
-  // Permission writes moved to the BFF admin API (A1). Direct browser Keto writes were removed in A0.3.
-  throw new Error('Permission writes moved to the BFF admin API (A1)')
-}
-
 // Create a new user identity
 export async function createUser(traits, password = null) {
   try {
