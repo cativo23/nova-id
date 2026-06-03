@@ -436,7 +436,7 @@ export async function createUser(traits, password = null) {
     const schemaId = 'default'
     
     // role is admin-only: set via metadata_public (Admin API), not user-editable traits
-    const role = traits.role ?? traits.rank ?? 'platform_user'
+    const role = traits.role ?? 'platform_user'
 
     const payload = {
       schema_id: schemaId,
