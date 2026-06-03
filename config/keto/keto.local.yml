@@ -1,7 +1,12 @@
-version: v0.11.1
+version: v25.4.0
 
-# DSN for local development (memory)
-dsn: memory
+# DSN for local development (PostgreSQL). Injected via the DSN environment
+# variable from docker-compose (Ory does NOT expand ${VAR} in YAML; the DSN env
+# var overrides this value verbatim at runtime). Kept here — matching
+# keto.production.yml — so the file is honest about the backing store. Was
+# `memory`, which silently dropped every tuple on restart and made the access
+# layer impossible to fail-closed (seeded admins would vanish on restart).
+dsn: postgres://keto_user:${KETO_DB_PASSWORD}@postgres:5432/keto?sslmode=disable&max_conns=20&max_idle_conns=4
 
 namespaces:
   - name: system
