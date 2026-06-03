@@ -54,7 +54,7 @@
       "url": "http://kratos:4434"
     },
     "match": {
-      "url": "<(http|https)://(api\\.cativo\\.dev|oathkeeper(:[0-9]+)?)/admin/recovery/link>",
+      "url": "<(http|https)://(api\\.cativo\\.dev|oathkeeper(:[0-9]+)?)/admin/recovery/link.*>",
       "methods": ["POST"]
     },
     "authenticators": [{ "handler": "cookie_session" }],

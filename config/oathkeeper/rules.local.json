@@ -56,7 +56,7 @@
       "url": "http://kratos:4434"
     },
     "match": {
-      "url": "<(http|https)://(api\\.ory\\.localhost|admin\\.ory\\.localhost|auth\\.ory\\.localhost|app\\.ory\\.localhost|localhost(:[0-9]+)?|oathkeeper(:[0-9]+)?)/api/admin/recovery/link>",
+      "url": "<(http|https)://(api\\.ory\\.localhost|admin\\.ory\\.localhost|auth\\.ory\\.localhost|app\\.ory\\.localhost|localhost(:[0-9]+)?|oathkeeper(:[0-9]+)?)/api/admin/recovery/link.*>",
       "methods": ["POST"]
     },
     "authenticators": [{ "handler": "cookie_session" }],
