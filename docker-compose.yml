@@ -222,11 +222,8 @@ services:
   # gateway) to avoid the chicken-and-egg deadlock: no admin exists yet, so the
   # gateway's admin gate would reject the very write that creates the first admin.
   keto-seed:
-    image: alpine:3.20
-    entrypoint:
-      - /bin/sh
-      - -c
-      - "apk add --no-cache curl jq >/dev/null 2>&1 && sh /seed.sh"
+    build:
+      context: ./config/keto-seed
     volumes:
       - ./scripts/seed-permissions.sh:/seed.sh:ro
     environment:
