@@ -222,7 +222,7 @@ services:
   # gateway) to avoid the chicken-and-egg deadlock: no admin exists yet, so the
   # gateway's admin gate would reject the very write that creates the first admin.
   keto-seed:
-    image: alpine:3
+    image: alpine:3.20
     entrypoint:
       - /bin/sh
       - -c
