@@ -1,17 +1,17 @@
-// Permissions composable using Keto with RBAC
-// Roles: platform_admin (admin dashboard, user mgmt), platform_user (app access only).
-// Permissions granted to roles; users assigned to roles. Keto resolves via subject sets.
-// Namespaces: ranks (role membership), users, system, admin, nova.
+// Permissions composable using Keto with OPL model (A0.7+).
+// OPL model: Platform (object "nova") with computed permits administer / manage_users;
+// App (object = appId) with access / administer; User namespace.
+// Full permission-read migration to /me/permissions BFF deferred to A1.3.
 import { checkPermission } from './useKeto'
 
-// Keto resolves RBAC: user -> role membership -> permission.
-export async function hasPermission(userId, permission, namespace = 'users', object = 'management') {
+// Generic permission check (namespace/object/relation passthrough for the OPL model).
+export async function hasPermission(userId, permission, namespace = 'Platform', object = 'nova') {
   try {
     const allowed = await checkPermission(
       namespace,
       object,
       permission,
-      `user:${userId}` // Keto checks role membership automatically
+      `user:${userId}`
     )
     return allowed
   } catch (error) {
@@ -20,45 +20,50 @@ export async function hasPermission(userId, permission, namespace = 'users', obj
   }
 }
 
-// Permission checkers - User Management (users namespace)
+// Platform-level permissions (OPL: Platform:nova#manage_users)
+// Note: canViewUsers (manage_users) and canChangePermissions (administer) both
+// resolve to Platform:nova#admins in the A0 OPL model — they are functionally
+// identical today. They will diverge when finer-grain permits are added in A1
+// (e.g., a dedicated user-manager role that grants manage_users without administer).
 export async function canViewUsers(userId) {
-  return await hasPermission(userId, 'view_users', 'users', 'management')
+  return await hasPermission(userId, 'manage_users', 'Platform', 'nova')
 }
 
+// OPL: all user-mutation actions require manage_users on Platform:nova.
 export async function canAddUsers(userId) {
-  return await hasPermission(userId, 'add_users', 'users', 'management')
+  return await hasPermission(userId, 'manage_users', 'Platform', 'nova')
 }
 
 export async function canEditUsers(userId) {
-  return await hasPermission(userId, 'edit_users', 'users', 'management')
+  return await hasPermission(userId, 'manage_users', 'Platform', 'nova')
 }
 
 export async function canDeleteUsers(userId) {
-  return await hasPermission(userId, 'delete_users', 'users', 'management')
+  return await hasPermission(userId, 'manage_users', 'Platform', 'nova')
 }
 
 export async function canChangePermissions(userId) {
-  return await hasPermission(userId, 'change_permissions', 'users', 'management')
+  return await hasPermission(userId, 'administer', 'Platform', 'nova')
 }
 
-// System permissions (system namespace)
+// OPL: platform-level admin permit (Platform:nova#administer).
 export async function canManagePermissions(userId) {
-  return await hasPermission(userId, 'manage_permissions', 'system', 'admin')
+  return await hasPermission(userId, 'administer', 'Platform', 'nova')
 }
 
-// Admin permissions (admin namespace)
+// OPL: admin panel access requires Platform:nova#administer.
 export async function canAccessAdmin(userId) {
   try {
-    return await hasPermission(userId, 'access', 'admin', 'panel')
+    return await hasPermission(userId, 'administer', 'Platform', 'nova')
   } catch (error) {
     console.error('canAccessAdmin failed:', error)
     return false
   }
 }
 
-// Application permissions (nova namespace)
+// Application access (OPL: App:<appId>#access). appName is the App object id.
 export async function canAccessApp(userId, appName) {
-  return await hasPermission(userId, 'access', 'nova', appName)
+  return await hasPermission(userId, 'access', 'App', appName)
 }
 
 // Legacy compatibility

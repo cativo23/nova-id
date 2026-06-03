@@ -48,13 +48,44 @@
     ]
   },
   {
+    "id": "kratos-admin-recovery-link",
+    "upstream": {
+      "preserve_host": false,
+      "url": "http://kratos:4434"
+    },
+    "match": {
+      "url": "<(http|https)://(api\\.cativo\\.dev|oathkeeper(:[0-9]+)?)/admin/recovery/link.*>",
+      "methods": ["POST"]
+    },
+    "authenticators": [{ "handler": "cookie_session" }],
+    "authorizer": {
+      "handler": "remote_json",
+      "config": {
+        "remote": "http://keto:4466/relation-tuples/check",
+        "payload": "{\"namespace\":\"Platform\",\"object\":\"nova\",\"relation\":\"manage_users\",\"subject_id\":\"user:{{ print .Subject }}\"}",
+        "forward_response_headers_to_upstream": ["Content-Type"]
+      }
+    },
+    "mutators": [
+      {
+        "handler": "header",
+        "config": {
+          "headers": {
+            "X-User-ID": "{{ print .Subject }}",
+            "X-User-Email": "{{ print .Extra.identity.traits.email }}"
+          }
+        }
+      }
+    ]
+  },
+  {
     "id": "kratos-admin",
     "upstream": {
       "preserve_host": false,
       "url": "http://kratos:4434"
     },
     "match": {
-      "url": "<(http|https)://(api\\.cativo\\.dev|oathkeeper(:[0-9]+)?)/admin/(identities.*|sessions.*|recovery.*|health|version|schemas.*)>",
+      "url": "<(http|https)://(api\\.cativo\\.dev|oathkeeper(:[0-9]+)?)/admin/(identities.*|sessions.*|recovery(?!\\/link).*|health|version|schemas.*)>",
       "methods": ["GET", "POST", "PUT", "DELETE", "PATCH"]
     },
     "authenticators": [
@@ -66,7 +97,7 @@
       "handler": "remote_json",
       "config": {
         "remote": "http://keto:4466/relation-tuples/check",
-        "payload": "{\"namespace\":\"users\",\"object\":\"management\",\"relation\":\"view_users\",\"subject_id\":\"user:{{ print .Subject }}\"}",
+        "payload": "{\"namespace\":\"Platform\",\"object\":\"nova\",\"relation\":\"manage_users\",\"subject_id\":\"user:{{ print .Subject }}\"}",
         "forward_response_headers_to_upstream": ["Content-Type"]
       }
     },
@@ -127,7 +158,7 @@
       "handler": "remote_json",
       "config": {
         "remote": "http://keto:4466/relation-tuples/check",
-        "payload": "{\"namespace\":\"ranks\",\"object\":\"platform_admin\",\"relation\":\"member\",\"subject_id\":\"user:{{ print .Subject }}\"}",
+        "payload": "{\"namespace\":\"Platform\",\"object\":\"nova\",\"relation\":\"administer\",\"subject_id\":\"user:{{ print .Subject }}\"}",
         "forward_response_headers_to_upstream": ["Content-Type"]
       }
     },
@@ -186,7 +217,7 @@
       "handler": "remote_json",
       "config": {
         "remote": "http://keto:4466/relation-tuples/check",
-        "payload": "{\"namespace\":\"ranks\",\"object\":\"platform_admin\",\"relation\":\"member\",\"subject_id\":\"user:{{ print .Subject }}\"}",
+        "payload": "{\"namespace\":\"Platform\",\"object\":\"nova\",\"relation\":\"administer\",\"subject_id\":\"user:{{ print .Subject }}\"}",
         "forward_response_headers_to_upstream": ["Content-Type"]
       }
     },
@@ -390,7 +421,7 @@
       "handler": "remote_json",
       "config": {
         "remote": "http://keto:4466/relation-tuples/check",
-        "payload": "{\"namespace\":\"ranks\",\"object\":\"platform_admin\",\"relation\":\"member\",\"subject_id\":\"user:{{ print .Subject }}\"}",
+        "payload": "{\"namespace\":\"Platform\",\"object\":\"nova\",\"relation\":\"administer\",\"subject_id\":\"user:{{ print .Subject }}\"}",
         "forward_response_headers_to_upstream": ["Content-Type"]
       }
     },

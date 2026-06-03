@@ -215,6 +215,29 @@ services:
         condition: service_completed_successfully
     restart: unless-stopped
 
+  # One-shot seed: writes Platform:nova#admins tuples to Keto for every Kratos
+  # identity whose metadata_public.role == "platform_admin". Runs after keto AND
+  # kratos are healthy. PUT is idempotent — safe to re-run on every `docker compose up`.
+  # The bootstrap seed MUST write directly to keto:4467 (not through the Oathkeeper
+  # gateway) to avoid the chicken-and-egg deadlock: no admin exists yet, so the
+  # gateway's admin gate would reject the very write that creates the first admin.
+  keto-seed:
+    build:
+      context: ./config/keto-seed
+    volumes:
+      - ./scripts/seed-permissions.sh:/seed.sh:ro
+    environment:
+      - KETO_WRITE_URL=http://keto:4467
+      - KRATOS_ADMIN_URL=http://kratos:4434
+    networks:
+      - ory-internal
+    depends_on:
+      keto:
+        condition: service_healthy
+      kratos:
+        condition: service_healthy
+    restart: "no"
+
   # NestJS API service with access control and logging
   # ZERO TRUST: API is on external network; Oathkeeper injects auth headers.
   # API has ory-internal only for Hydra accept-login (OAuth flow completion).

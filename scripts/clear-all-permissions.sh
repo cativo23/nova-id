@@ -1,15 +1,25 @@
 #!/bin/bash
-# Clear all permissions from Keto
-# This script removes all relation tuples from all namespaces
+# Clear all permissions from Keto.
+# This script removes all relation tuples from all namespaces.
+#
+# NETWORK: This script must run on the compose network (nova-id-ory-internal) to reach
+# the internal Keto hostnames. Keto read/write ports are NOT exposed to the host by
+# default (zero-trust). Recommended usage:
+#   docker compose run --rm keto-seed sh /scripts/clear-all-permissions.sh
+# For host-exposed setups, override the URLs via env vars:
+#   KETO_READ_URL=http://localhost:4466 \
+#   KETO_WRITE_URL=http://localhost:4467 \
+#   ./scripts/clear-all-permissions.sh
 
-KETO_READ_URL="${KETO_READ_URL:-http://localhost:4466}"
-KETO_WRITE_URL="${KETO_WRITE_URL:-http://localhost:4467}"
+KETO_READ_URL="${KETO_READ_URL:-http://keto:4466}"
+KETO_WRITE_URL="${KETO_WRITE_URL:-http://keto:4467}"
 
 echo "Clearing all permissions from Keto..."
 echo ""
 
-# Namespaces to clear
-NAMESPACES=("ranks" "users" "system" "admin" "nova" "files")
+# OPL namespaces in use (Platform holds nova membership tuples; App holds per-app tuples;
+# User is included for safety — no tuples expected but cleared for completeness).
+NAMESPACES=("Platform" "App" "User")
 
 TOTAL_DELETED=0
 
@@ -17,8 +27,15 @@ for namespace in "${NAMESPACES[@]}"; do
   echo "Clearing namespace: $namespace"
   
   # Get all relation tuples for this namespace (with pagination if needed)
-  RELATIONS=$(curl -s "$KETO_READ_URL/relation-tuples?namespace=$namespace")
-  
+  RELATIONS_BODY=$(mktemp)
+  RELATIONS_CODE=$(curl -s -o "$RELATIONS_BODY" -w "%{http_code}" "$KETO_READ_URL/relation-tuples?namespace=$namespace" 2>/dev/null || echo "000")
+  RELATIONS=$(cat "$RELATIONS_BODY"); rm -f "$RELATIONS_BODY"
+
+  if [ "$RELATIONS_CODE" = "000" ]; then
+    echo "  Cannot reach Keto at $KETO_READ_URL — run this on the compose network (docker compose run) or expose the port." >&2
+    continue
+  fi
+
   if [ -z "$RELATIONS" ] || [ "$RELATIONS" = "null" ]; then
     echo "  No relations found in namespace: $namespace"
     continue
@@ -65,7 +82,9 @@ for namespace in "${NAMESPACES[@]}"; do
     DELETE_RESPONSE=$(curl -s -w "\n%{http_code}" -X DELETE "$DELETE_URL")
     DELETE_CODE=$(echo "$DELETE_RESPONSE" | tail -n1)
     
-    if [ "$DELETE_CODE" = "200" ] || [ "$DELETE_CODE" = "204" ]; then
+    if [ "$DELETE_CODE" = "000" ]; then
+      echo "    ✗ Cannot reach Keto at $KETO_WRITE_URL — run this on the compose network (docker compose run) or expose the port."
+    elif [ "$DELETE_CODE" = "200" ] || [ "$DELETE_CODE" = "204" ]; then
       DELETED=$((DELETED + 1))
       echo "    ✓ Deleted: $NAMESPACE_VAL:$OBJECT#$RELATION@$SUBJECT"
     else
@@ -84,7 +103,15 @@ done
 # Verify all are cleared
 echo "Verifying all permissions are cleared..."
 for namespace in "${NAMESPACES[@]}"; do
-  COUNT=$(curl -s "$KETO_READ_URL/relation-tuples?namespace=$namespace" | jq -r '.relation_tuples | length' 2>/dev/null || echo "0")
+  VERIFY_BODY=$(mktemp)
+  VERIFY_CODE=$(curl -s -o "$VERIFY_BODY" -w "%{http_code}" "$KETO_READ_URL/relation-tuples?namespace=$namespace" 2>/dev/null || echo "000")
+  if [ "$VERIFY_CODE" = "000" ]; then
+    echo "  ⚠ Cannot reach Keto at $KETO_READ_URL — run this on the compose network (docker compose run) or expose the port."
+    rm -f "$VERIFY_BODY"
+    continue
+  fi
+  COUNT=$(cat "$VERIFY_BODY" | jq -r '.relation_tuples | length' 2>/dev/null || echo "0")
+  rm -f "$VERIFY_BODY"
   if [ "$COUNT" != "0" ] && [ "$COUNT" != "null" ]; then
     echo "  ⚠ Warning: $namespace namespace still has $COUNT relation tuples"
   else
@@ -95,5 +122,5 @@ done
 echo ""
 echo "✓ Permission clearing complete!"
 echo ""
-echo "To set up permissions again, run:"
-echo "  ./setup-all-permissions.sh"
+echo "To reseed platform admin memberships, run:"
+echo "  ./scripts/seed-permissions.sh"

@@ -146,12 +146,14 @@ export async function getNamespaceRelations(namespace) {
   }
 }
 
-// RBAC: Get user's current role (from Keto "ranks" namespace)
+// RBAC: Get user's current role by checking OPL Platform:nova permissions.
+// Returns 'platform_admin' if the user has the Platform:nova#administer permit,
+// 'user' otherwise. (Legacy "ranks" namespace removed in A0.7; full BFF
+// migration to /me/permissions deferred to A1.3.)
 export async function getUserRole(userId) {
   try {
-    const relations = await getSubjectRelations(`user:${userId}`, 'ranks')
-    const roleRelation = relations.find(r => r.namespace === 'ranks' && r.relation === 'member')
-    return roleRelation ? roleRelation.object : null
+    const isPlatformAdmin = await checkPermission('Platform', 'nova', 'administer', `user:${userId}`)
+    return isPlatformAdmin ? 'platform_admin' : 'user'
   } catch (error) {
     console.error('Error getting user role:', error)
     throw error

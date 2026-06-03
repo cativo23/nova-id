@@ -1,22 +1,11 @@
-version: v0.11.1
+version: v25.4.0
 
 # DSN for production (PostgreSQL)
 # Set via environment variable: DSN=postgres://keto_user:${KETO_DB_PASSWORD}@postgres:5432/keto?sslmode=disable&max_conns=20&max_idle_conns=4
 dsn: postgres://keto_user:${KETO_DB_PASSWORD}@postgres:5432/keto?sslmode=disable&max_conns=20&max_idle_conns=4
 
 namespaces:
-  - name: system
-    id: 0
-  - name: users
-    id: 1
-  - name: admin
-    id: 2
-  - name: nova
-    id: 3
-  - name: ranks
-    id: 4
-  - name: roles
-    id: 5
+  location: file:///etc/config/keto/namespaces.keto.ts
 
 serve:
   read:
