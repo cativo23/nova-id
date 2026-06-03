@@ -111,39 +111,70 @@ curl -s -b "ory_kratos_session=..." http://localhost:4455/api/protected | jq .
 
 ## Permissions
 
-### Setup RBAC
+### Bootstrapping the platform admin (OPL model)
+
+Nova ID uses [Ory Keto's OPL model](config/keto/namespaces.keto.ts). The namespaces are `User`, `Platform`, and `App`. Platform-level admin access is granted via the relation tuple `Platform:nova#admins@user:<kratos-id>`.
+
+#### Automatic seed on boot
+
+The `keto-seed` compose service runs automatically after keto and kratos are healthy on every `docker compose up`. It is idempotent and one-shot (`restart: "no"`). It reads all Kratos identities whose `metadata_public.role == "platform_admin"` and writes the corresponding `Platform:nova#admins` tuples to Keto.
+
+> **Note:** `metadata_public.role` is the authoritative field — the identity schema blocks `traits.role` via `additionalProperties: false`. Keto is the source of truth after seeding; `metadata_public.role` is only used for bootstrapping.
+
+#### Manual seed run
 
 ```bash
-./scripts/setup-all-permissions.sh
+# Run the seed script manually (joins the internal network automatically):
+docker compose run --rm keto-seed
+
+# Or with host-exposed ports (only when temporarily debugging with ports exposed):
+KETO_WRITE_URL=http://localhost:4467 \
+KRATOS_ADMIN_URL=http://localhost:4434 \
+docker compose run --rm keto-seed
 ```
 
-Run after a fresh start or after resetting Keto. Grants permissions to `platform_admin` and assigns users from Kratos `traits.role`.
-
-### Reset permissions
-
-```bash
-./scripts/clear-all-permissions.sh
-./scripts/setup-all-permissions.sh
-```
-
-### Assign platform_admin
+#### Grant platform_admin to a user
 
 ```bash
 ./scripts/assign-platform-admin-to-user.sh user@example.com
+# Then re-run the seed to sync the new admin into Keto:
+docker compose run --rm keto-seed
 ```
+
+#### Verify Keto OPL permission check
+
+The correct check endpoint for OPL computed permissions in Keto v25.4.0 uses the legacy GET check endpoint — it fully resolves OPL `permits`:
+
+```bash
+# Check if a user has the computed permission 'administer' on Platform:nova
+# (resolves the OPL permit, not just the direct relation)
+docker run --rm --network nova-id-ory-internal curlimages/curl:latest -s \
+  "http://keto:4466/relation-tuples/check?namespace=Platform&object=nova&relation=administer&subject_id=user:<KRATOS_IDENTITY_ID>"
+# Response: {"allowed":true}  (admin)  or  {"allowed":false}  (non-admin)
+
+# Check manage_users permission:
+docker run --rm --network nova-id-ory-internal curlimages/curl:latest -s \
+  "http://keto:4466/relation-tuples/check?namespace=Platform&object=nova&relation=manage_users&subject_id=user:<KRATOS_IDENTITY_ID>"
+
+# List all Platform tuples:
+docker run --rm --network nova-id-ory-internal curlimages/curl:latest -s \
+  "http://keto:4466/relation-tuples?namespace=Platform" | jq .
+```
+
+> **Task 5 note (Oathkeeper):** The verified endpoint for Oathkeeper's Keto authorizer is:
+> `GET http://keto:4466/relation-tuples/check?namespace=Platform&object=nova&relation=administer&subject_id=user:{subject}` → `{"allowed":true|false}`
 
 ### Verify Keto tuples
 
 ```bash
-# List relation tuples
-curl -s "http://localhost:4466/relation-tuples" | jq .
-
-# By namespace
-curl -s "http://localhost:4466/relation-tuples?namespace=ranks" | jq .
+# List relation tuples (run from host — requires ports temporarily exposed, or use docker run form above)
+docker run --rm --network nova-id-ory-internal curlimages/curl:latest -s \
+  "http://keto:4466/relation-tuples?namespace=Platform" | jq .
 
 # By user
 USER_ID="<kratos-identity-id>"
-curl -s "http://localhost:4466/relation-tuples?subject_id=user:$USER_ID" | jq .
+docker run --rm --network nova-id-ory-internal curlimages/curl:latest -s \
+  "http://keto:4466/relation-tuples?subject_id=user:${USER_ID}" | jq .
 ```
 
 ---
