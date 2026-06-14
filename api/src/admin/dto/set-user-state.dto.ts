@@ -1,8 +1,9 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsIn } from 'class-validator';
+import { IsIn, IsString } from 'class-validator';
 
 export class SetUserStateDto {
   @ApiProperty({ enum: ['active', 'inactive'] })
+  @IsString()
   @IsIn(['active', 'inactive'])
   state!: 'active' | 'inactive';
 }

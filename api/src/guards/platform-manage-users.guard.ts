@@ -1,4 +1,11 @@
-import { CanActivate, ExecutionContext, ForbiddenException, Injectable, Logger } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { KetoService } from '../ory/keto.service';
 
 /**
@@ -25,7 +32,7 @@ export class PlatformManageUsersGuard implements CanActivate {
 
     if (!userId) {
       this.logger.warn('PlatformManageUsersGuard: No authenticated user in request');
-      throw new ForbiddenException('Authentication required');
+      throw new UnauthorizedException('Authentication required');
     }
 
     const allowed = await this.keto.check({

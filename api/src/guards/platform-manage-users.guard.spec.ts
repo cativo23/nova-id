@@ -1,4 +1,4 @@
-import { ExecutionContext, ForbiddenException } from '@nestjs/common';
+import { ExecutionContext, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { PlatformManageUsersGuard } from './platform-manage-users.guard';
 
 function ctx(user: any): ExecutionContext {
@@ -21,10 +21,10 @@ describe('PlatformManageUsersGuard', () => {
     await expect(guard.canActivate(ctx({ userId: 'abc' }))).rejects.toBeInstanceOf(ForbiddenException);
   });
 
-  it('denies when there is no authenticated user (no keto call)', async () => {
+  it('throws UnauthorizedException (not Forbidden) when there is no authenticated user', async () => {
     const keto = { check: jest.fn() };
     const guard = new PlatformManageUsersGuard(keto as any);
-    await expect(guard.canActivate(ctx(undefined))).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(guard.canActivate(ctx(undefined))).rejects.toBeInstanceOf(UnauthorizedException);
     expect(keto.check).not.toHaveBeenCalled();
   });
 });
