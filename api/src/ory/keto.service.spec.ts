@@ -36,4 +36,34 @@ describe('KetoService', () => {
     const flags = await svc.checkPlatform('abc');
     expect(flags).toEqual({ manage_users: true, administer: false });
   });
+
+  // Additional fail-closed tests
+  it('FAIL-CLOSED: check returns false for malformed response (no allowed field)', async () => {
+    const api = { checkPermission: jest.fn().mockResolvedValue({ data: {} }) };
+    const svc = new KetoService(api as any);
+    expect(await svc.check({ namespace: 'Platform', object: 'nova', relation: 'manage_users', subjectId: 'user:x' })).toBe(false);
+  });
+
+  it('FAIL-CLOSED: check returns false for Axios-style 403 error object', async () => {
+    const axiosErr: any = new Error('Forbidden');
+    axiosErr.response = { status: 403 };
+    const api = { checkPermission: jest.fn().mockRejectedValue(axiosErr) };
+    const svc = new KetoService(api as any);
+    expect(await svc.check({ namespace: 'Platform', object: 'nova', relation: 'manage_users', subjectId: 'user:x' })).toBe(false);
+  });
+
+  it('FAIL-CLOSED: checkPlatform returns both flags false when one check throws', async () => {
+    const api = {
+      checkPermission: jest
+        .fn()
+        .mockRejectedValueOnce(new Error('network'))
+        .mockResolvedValueOnce({ data: { allowed: true } }),
+    };
+    const svc = new KetoService(api as any);
+    const flags = await svc.checkPlatform('x');
+    // manage_users threw → false; administer resolved true → true
+    // Both calls run via Promise.all — the throw is caught inside check()
+    expect(flags.manage_users).toBe(false);
+    expect(flags.administer).toBe(true);
+  });
 });

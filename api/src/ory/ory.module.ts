@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { Configuration, IdentityApi, PermissionApi } from '@ory/client';
 import { Configuration as HydraConfiguration, OAuth2Api } from '@ory/hydra-client';
@@ -7,6 +7,7 @@ import { KratosAdminService } from './kratos-admin.service';
 import { KetoService } from './keto.service';
 import { HydraService } from './hydra.service';
 
+@Global()
 @Module({
   imports: [ConfigModule],
   providers: [

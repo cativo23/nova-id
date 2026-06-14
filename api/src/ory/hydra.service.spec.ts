@@ -20,4 +20,16 @@ describe('HydraService', () => {
     expect(api.acceptOAuth2ConsentRequest).toHaveBeenCalledWith(expect.objectContaining({ consentChallenge: 'chal-2' }));
     expect(out.redirect_to).toBe('http://y');
   });
+
+  it('acceptLogin preserves session.id_token through the SDK type-cast', async () => {
+    // Verifies that the AcceptOAuth2LoginRequestWithSession cast does not drop
+    // id_token — the Oathkeeper id_token mutator depends on this field being forwarded.
+    const api = { acceptOAuth2LoginRequest: jest.fn().mockResolvedValue({ data: { redirect_to: 'http://z' } }) };
+    const svc = new HydraService(api as any);
+
+    await svc.acceptLogin('chal-3', { subject: 'u1', session: { id_token: { role: 'platform_admin' } } });
+
+    const passedBody = api.acceptOAuth2LoginRequest.mock.calls[0][0].acceptOAuth2LoginRequest;
+    expect(passedBody.session?.id_token).toEqual({ role: 'platform_admin' });
+  });
 });
