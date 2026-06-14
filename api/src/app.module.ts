@@ -6,6 +6,9 @@ import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { RolesModule } from './roles/roles.module';
 import { LogsModule } from './logs/logs.module';
+import { OryModule } from './ory/ory.module';
+import { AdminModule } from './admin/admin.module';
+import { MeModule } from './me/me.module';
 import { UserRole } from './roles/entities/user-role.entity';
 
 @Module({
@@ -20,6 +23,9 @@ import { UserRole } from './roles/entities/user-role.entity';
     AuthModule,
     RolesModule,
     LogsModule,
+    OryModule,
+    AdminModule,
+    MeModule,
   ],
   controllers: [AppController],
   providers: [AppService],

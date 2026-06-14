@@ -1,150 +1,75 @@
-// Permissions composable using Keto with OPL model (A0.7+).
-// OPL model: Platform (object "nova") with computed permits administer / manage_users;
-// App (object = appId) with access / administer; User namespace.
-// Full permission-read migration to /me/permissions BFF deferred to A1.3.
-import { checkPermission } from './useKeto'
+// Permissions composable — reads from BFF /api/me/permissions (A1.3+).
+// Keto is no longer called directly from the frontend; all permission logic
+// is server-side in the BFF (KetoService).
+//
+// This module is the single source of truth for the cached /me/permissions
+// response: fetchMyPermissions() memoizes into _cachedPermsPromise so that every
+// entry point (main.js route guard, Home.vue, Dashboard.vue, UsersManagement.vue,
+// PermissionsManagement.vue) shares ONE network fetch per page load.
+// usePermissionCache.js delegates here (this is the leaf module → no import cycle).
+const oathkeeperUrl = import.meta.env.VITE_OATHKEEPER_URL || 'http://localhost:4455'
 
-// Generic permission check (namespace/object/relation passthrough for the OPL model).
-export async function hasPermission(userId, permission, namespace = 'Platform', object = 'nova') {
-  try {
-    const allowed = await checkPermission(
-      namespace,
-      object,
-      permission,
-      `user:${userId}`
-    )
-    return allowed
-  } catch (error) {
-    console.error('Error checking permission:', error)
-    return false
+// Module-level memoized promise for the raw /me/permissions response.
+let _cachedPermsPromise = null
+
+async function fetchMyPermissions(forceRefresh = false) {
+  if (forceRefresh) {
+    _cachedPermsPromise = null
   }
+  if (!_cachedPermsPromise) {
+    // Store the promise before it resolves so concurrent callers share one fetch.
+    // On rejection we null out the cache so the next call retries (avoids permanent
+    // negative-caching after transient network errors or 401s).
+    _cachedPermsPromise = (async () => {
+      const res = await fetch(`${oathkeeperUrl}/api/me/permissions`, { credentials: 'include' })
+      if (!res.ok) { _cachedPermsPromise = null; throw new Error(`GET /me/permissions → ${res.status}`) }
+      return res.json()
+    })().catch((e) => { _cachedPermsPromise = null; throw e })
+  }
+  return _cachedPermsPromise
 }
 
-// Platform-level permissions (OPL: Platform:nova#manage_users)
-// Note: canViewUsers (manage_users) and canChangePermissions (administer) both
-// resolve to Platform:nova#admins in the A0 OPL model — they are functionally
-// identical today. They will diverge when finer-grain permits are added in A1
-// (e.g., a dedicated user-manager role that grants manage_users without administer).
-export async function canViewUsers(userId) {
-  return await hasPermission(userId, 'manage_users', 'Platform', 'nova')
-}
-
-// OPL: all user-mutation actions require manage_users on Platform:nova.
-export async function canAddUsers(userId) {
-  return await hasPermission(userId, 'manage_users', 'Platform', 'nova')
-}
-
-export async function canEditUsers(userId) {
-  return await hasPermission(userId, 'manage_users', 'Platform', 'nova')
-}
-
-export async function canDeleteUsers(userId) {
-  return await hasPermission(userId, 'manage_users', 'Platform', 'nova')
-}
-
-export async function canChangePermissions(userId) {
-  return await hasPermission(userId, 'administer', 'Platform', 'nova')
-}
-
-// OPL: platform-level admin permit (Platform:nova#administer).
-export async function canManagePermissions(userId) {
-  return await hasPermission(userId, 'administer', 'Platform', 'nova')
-}
-
-// OPL: admin panel access requires Platform:nova#administer.
-export async function canAccessAdmin(userId) {
+// canAccessAdmin: true if the current user has the Platform:nova#administer permit.
+// Called by main.js route guard and Home.vue with the session userId.
+// The BFF returns canAccessAdmin keyed off the session, so userId is accepted
+// for API compatibility but the BFF ignores it (uses the id_token subject).
+export async function canAccessAdmin(_userId) {
   try {
-    return await hasPermission(userId, 'administer', 'Platform', 'nova')
+    const perms = await fetchMyPermissions()
+    return perms.canAccessAdmin === true
   } catch (error) {
     console.error('canAccessAdmin failed:', error)
     return false
   }
 }
 
-// Application access (OPL: App:<appId>#access). appName is the App object id.
-export async function canAccessApp(userId, appName) {
-  return await hasPermission(userId, 'access', 'App', appName)
-}
-
-// Legacy compatibility
-export async function canManageUsers(userId) {
-  // Can manage users if they can view users (for backward compatibility)
-  return await canViewUsers(userId)
-}
-
-// Get all permissions for a user (RBAC-aware; Keto resolves role membership).
-export async function getUserPermissions(userId) {
+// canManagePermissions: administer (platform admin)
+export async function canManagePermissions(_userId) {
   try {
-    const permissions = []
-    
-    // Check user management permissions (users namespace)
-    if (await canViewUsers(userId)) {
-      permissions.push('View Users')
-    }
-    if (await canAddUsers(userId)) {
-      permissions.push('Add Users')
-    }
-    if (await canEditUsers(userId)) {
-      permissions.push('Edit Users')
-    }
-    if (await canDeleteUsers(userId)) {
-      permissions.push('Delete Users')
-    }
-    if (await canChangePermissions(userId)) {
-      permissions.push('Change Permissions')
-    }
-    
-    // System permissions (system namespace)
-    if (await canManagePermissions(userId)) {
-      permissions.push('Manage Permissions')
-    }
-    
-    // Admin permissions (admin namespace)
-    if (await canAccessAdmin(userId)) {
-      permissions.push('Access Admin Panel')
-    }
-    
-    return permissions
+    const perms = await fetchMyPermissions()
+    return perms.canManagePermissions === true
   } catch (error) {
-    console.error('Error getting user permissions:', error)
-    return []
+    console.error('canManagePermissions failed:', error)
+    return false
   }
 }
 
-// Get all permission flags for a user (RBAC-aware)
-// Uses checkPermission which resolves role membership via Keto.
-// Returns an object with all permission flags
-export async function getAllUserPermissionFlags(userId) {
+// ── Bulk helper used by usePermissionCache ────────────────────────────────────
+
+// Returns all capability flags from the (cached) BFF response in the shape
+// expected by Dashboard.vue, UsersManagement.vue, and PermissionsManagement.vue.
+export async function getAllUserPermissionFlags(_userId, forceRefresh = false) {
   try {
-    // Keto's checkPermission resolves: "Is user a member of a role that has the permission?"
-    
-    // Check all permissions in parallel for better performance
-    const [
-      viewUsers,
-      addUsers,
-      editUsers,
-      deleteUsers,
-      changePerms,
-      managePerms,
-      accessAdmin
-    ] = await Promise.all([
-      canViewUsers(userId),
-      canAddUsers(userId),
-      canEditUsers(userId),
-      canDeleteUsers(userId),
-      canChangePermissions(userId),
-      canManagePermissions(userId),
-      canAccessAdmin(userId)
-    ])
-    
+    const perms = await fetchMyPermissions(forceRefresh)
     return {
-      canViewUsers: viewUsers,
-      canAddUsers: addUsers,
-      canEditUsers: editUsers,
-      canDeleteUsers: deleteUsers,
-      canChangePermissions: changePerms,
-      canManagePermissions: managePerms,
-      canAccessAdmin: accessAdmin
+      canViewUsers: perms.canViewUsers === true,
+      // All user-write operations require manage_users
+      canAddUsers: perms.canManageUsers === true,
+      canEditUsers: perms.canManageUsers === true,
+      canDeleteUsers: perms.canManageUsers === true,
+      canChangePermissions: perms.canManagePermissions === true,
+      canManagePermissions: perms.canManagePermissions === true,
+      canAccessAdmin: perms.canAccessAdmin === true,
     }
   } catch (error) {
     console.error('Error getting user permission flags:', error)
@@ -155,7 +80,15 @@ export async function getAllUserPermissionFlags(userId) {
       canDeleteUsers: false,
       canChangePermissions: false,
       canManagePermissions: false,
-      canAccessAdmin: false
+      canAccessAdmin: false,
     }
   }
+}
+
+// TODO(A1-plan-2): canAccessApp per-app check (App:<appId>#access) — no BFF endpoint
+// yet. Intentionally NOT exported until A1-plan-2 lands, so no caller depends on the
+// always-true stub.
+// eslint-disable-next-line no-unused-vars
+async function canAccessApp(_userId, _appName) {
+  return true
 }

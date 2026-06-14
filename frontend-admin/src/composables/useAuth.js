@@ -20,36 +20,33 @@ const ory = new FrontendApi(
   })
 )
 
-// Helper function to make requests to Kratos Admin API through Oathkeeper
-async function kratosAdminRequest(endpoint, options = {}) {
-  // Oathkeeper rule matches /admin/* paths and forwards them to Kratos Admin API
-  // Kratos Admin API endpoints are at /admin/* (e.g., /admin/identities)
-  // We call Oathkeeper at the same path, and it forwards to Kratos
-  // This works because Oathkeeper forwards the matched path as-is
-  const url = `${oathkeeperUrl}${endpoint}`
-  
-  const response = await fetch(url, {
+// BFF base URL: all admin/me calls go to /api/* through the Oathkeeper gateway.
+// The gateway validates the Kratos session cookie and mints an id_token JWT for the BFF.
+const apiBase = `${oathkeeperUrl}/api`
+
+async function bffRequest(path, options = {}) {
+  const res = await fetch(`${apiBase}${path}`, {
     ...options,
     credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers
-    }
+    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
   })
-  
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ message: response.statusText }))
-    const error = new Error(errorData.error?.message || errorData.message || `HTTP ${response.status}`)
-    error.response = { status: response.status, data: errorData }
+  if (!res.ok) {
+    if (res.status === 401) {
+      // Session expired mid-use — redirect to auth login page.
+      const authBase = import.meta.env.VITE_AUTH_URL || 'http://auth.ory.localhost'
+      window.location.href = `${authBase}/auth/login`
+      // Throw anyway so callers can bail out before the redirect fires.
+      const error = new Error('Session expired. Redirecting to login.')
+      error.response = { status: 401 }
+      throw error
+    }
+    // Do not embed raw body in message — it may contain PHI.
+    // Keep only the HTTP status for diagnostics.
+    const error = new Error(`BFF ${options.method || 'GET'} ${path} → ${res.status}`)
+    error.response = { status: res.status }
     throw error
   }
-  
-  // Handle empty responses
-  const contentType = response.headers.get('content-type')
-  if (contentType && contentType.includes('application/json')) {
-    return await response.json()
-  }
-  return null
+  return res.status === 204 ? null : res.json()
 }
 
 export async function checkSession() {
@@ -254,93 +251,52 @@ export async function updateSettingsFlow(flowId, payload) {
   }
 }
 
-// Parse Link header from Kratos response for pagination
-function parseLinkHeader(linkHeader) {
-  if (!linkHeader) return {}
-  
-  const links = {}
-  const parts = linkHeader.split(',')
-  
-  for (const part of parts) {
-    const section = part.split(';')
-    if (section.length !== 2) continue
-    
-    const url = section[0].trim().replace(/<(.*)>/, '$1')
-    const rel = section[1].trim().replace(/rel="(.*)"/, '$1')
-    
-    // Extract page_token from URL
-    const urlObj = new URL(url, 'http://dummy.com')
-    const pageToken = urlObj.searchParams.get('page_token')
-    
-    links[rel] = {
-      url,
-      pageToken
-    }
-  }
-  
-  return links
-}
+// ── BFF Admin User Management ────────────────────────────────────────────────
+// All functions below call the BFF /api/admin/users endpoints via the
+// Oathkeeper gateway. The gateway validates the Kratos session cookie and
+// forwards an id_token JWT to the BFF (no direct Kratos-Admin access).
 
-// List users from Kratos Admin API (via Oathkeeper) with pagination support
+// List users from the BFF.
+// BFF returns an envelope: { data: UserResponseDto[], nextPageToken: string | null }.
+// Kratos cursor pagination is forward-only; the caller maintains a pageTokenStack for Prev.
+// NOTE: search is client-side over the CURRENT page only — Kratos admin list has no
+// server-side filter. Full cross-page search is deferred (TODO(A1-plan-2)).
 export async function listUsers(options = {}) {
   try {
-    const { pageToken = null, pageSize = 100, searchQuery = '' } = options
-    
-    // Build query parameters
+    const { pageSize = 100, searchQuery = '', pageToken = null } = options
+
     const params = new URLSearchParams()
-    params.append('page_size', pageSize.toString())
+    params.append('pageSize', pageSize.toString())
     if (pageToken) {
-      params.append('page_token', pageToken)
+      params.append('pageToken', pageToken)
     }
-    
-    // Make request and capture response with headers
-    const url = `${oathkeeperUrl}/admin/identities?${params}`
-    const response = await fetch(url, {
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    })
-    
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ message: response.statusText }))
-      const error = new Error(errorData.error?.message || errorData.message || `HTTP ${response.status}`)
-      error.response = { status: response.status, data: errorData }
-      throw error
-    }
-    
-    const data = await response.json()
-    const identities = Array.isArray(data) ? data : (data?.data || [])
-    
-    // Parse Link header for pagination
-    const linkHeader = response.headers.get('link')
-    const links = parseLinkHeader(linkHeader)
-    
-    // Filter by search query if provided (client-side filtering)
-    let filteredIdentities = identities
+
+    const envelope = await bffRequest(`/admin/users?${params}`)
+    // Envelope shape: { data: UserResponseDto[], nextPageToken: string | null }
+    const users = Array.isArray(envelope?.data) ? envelope.data : []
+    const nextPageToken = envelope?.nextPageToken ?? null
+
+    // Client-side search filter (current page only — no server-side filter available).
+    let filtered = users
     if (searchQuery) {
-      const query = searchQuery.toLowerCase()
-      filteredIdentities = identities.filter(identity => {
-        const email = identity.traits?.email?.toLowerCase() || ''
-        const fullName = identity.traits?.full_name?.toLowerCase() || ''
-        const role = identity.metadata_public?.role?.toLowerCase() || ''
-        return email.includes(query) || fullName.includes(query) || role.includes(query)
+      const q = searchQuery.toLowerCase()
+      filtered = users.filter(u => {
+        return (
+          (u.email || '').toLowerCase().includes(q) ||
+          (u.fullName || '').toLowerCase().includes(q) ||
+          (u.role || '').toLowerCase().includes(q)
+        )
       })
     }
-    
+
     return {
-      identities: filteredIdentities,
-      pagination: {
-        hasNext: !!links.next,
-        hasPrev: !!links.prev,
-        nextToken: links.next?.pageToken,
-        prevToken: links.prev?.pageToken,
-        firstToken: links.first?.pageToken
-      }
+      identities: filtered,
+      nextPageToken,
+      hasNext: !!nextPageToken,
     }
   } catch (error) {
-    logger.error('Error listing users:', error)
-    if (error.response?.status === 401 || error.response?.status === 403) {
+    logger.error('Error listing users', { status: error.response?.status })
+    if (error.response?.status === 403) {
       throw new Error('Unauthorized: You do not have permission to list users')
     }
     throw error
@@ -348,167 +304,92 @@ export async function listUsers(options = {}) {
 }
 
 // Get a single user by ID
-export async function getUserById(identityId) {
+export async function getUserById(id) {
   try {
-    return await kratosAdminRequest(`/admin/identities/${identityId}`)
+    return await bffRequest(`/admin/users/${id}`)
   } catch (error) {
-    console.error('Error getting user:', error)
+    logger.error('Error getting user', { status: error.response?.status })
+    throw error
+  }
+}
+
+// Create a new user. Payload: { email, fullName, password, role }
+export async function createUser(payload) {
+  try {
+    return await bffRequest('/admin/users', { method: 'POST', body: JSON.stringify(payload) })
+  } catch (error) {
+    logger.error('Error creating user', { status: error.response?.status })
+    throw error
+  }
+}
+
+// Update a user. Payload: { email?, fullName?, role? }
+export async function updateUser(id, payload) {
+  try {
+    return await bffRequest(`/admin/users/${id}`, { method: 'PATCH', body: JSON.stringify(payload) })
+  } catch (error) {
+    logger.error('Error updating user', { status: error.response?.status })
     throw error
   }
 }
 
 // Set identity state (active | inactive). Inactive identities cannot sign in.
-export async function setIdentityState(identityId, state) {
+export async function setIdentityState(id, state) {
   if (state !== 'active' && state !== 'inactive') {
     throw new Error('Identity state must be "active" or "inactive"')
   }
   try {
-    const currentIdentity = await getUserById(identityId)
-    return await kratosAdminRequest(`/admin/identities/${identityId}`, {
-      method: 'PUT',
-      body: JSON.stringify({
-        schema_id: currentIdentity.schema_id,
-        traits: currentIdentity.traits,
-        state
-      })
-    })
+    return await bffRequest(`/admin/users/${id}/state`, { method: 'PATCH', body: JSON.stringify({ state }) })
   } catch (error) {
-    logger.error('Error setting identity state:', error)
+    logger.error('Error setting identity state', { status: error.response?.status })
     throw error
   }
 }
 
-// Update user identity
-export async function updateUser(identityId, traits) {
+// Create a recovery link for a user (admin-triggered).
+// BFF delegates to Kratos and returns { recovery_link }.
+export async function createRecoveryLink(id) {
   try {
-    // First get the current identity to preserve other fields
-    const currentIdentity = await getUserById(identityId)
-    
-    // role is admin-only: it lives in metadata_public (Admin-API-writable), not user traits.
-    const { role: traitRole, rank: traitRank, ...traitFields } = traits
-    const incomingRole = traitRole ?? traitRank
-    const body = {
-      schema_id: currentIdentity.schema_id,
-      traits: {
-        ...currentIdentity.traits,
-        ...traitFields
-      },
-      state: currentIdentity.state
-    }
-    if (incomingRole != null) {
-      body.metadata_public = { ...(currentIdentity.metadata_public || {}), role: incomingRole }
-    }
-    const updatedIdentity = await kratosAdminRequest(`/admin/identities/${identityId}`, {
-      method: 'PUT',
-      body: JSON.stringify(body)
-    })
-
-    return updatedIdentity
-  } catch (error) {
-    logger.error('Error updating user:', error)
-    throw error
-  }
-}
-
-// Create a new user identity
-export async function createUser(traits, password = null) {
-  try {
-    // Get the default schema ID (usually 'default' or from the identity schema)
-    // We'll use 'default' as it's the standard Kratos schema ID
-    const schemaId = 'default'
-    
-    // role is admin-only: set via metadata_public (Admin API), not user-editable traits
-    const role = traits.role ?? 'platform_user'
-
-    const payload = {
-      schema_id: schemaId,
-      traits: {
-        email: traits.email,
-        full_name: traits.full_name
-      },
-      metadata_public: { role }
-    }
-    
-    // If password is provided, add credentials
-    if (password) {
-      payload.credentials = {
-        password: {
-          config: {
-            password: password
-          }
-        }
-      }
-    }
-    
-    const newUser = await kratosAdminRequest('/admin/identities', {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    })
-    
-    return newUser
-  } catch (error) {
-    logger.error('Error creating user:', error)
-    throw error
-  }
-}
-
-// Create a recovery code/link for a user (admin-triggered)
-// Kratos config uses recovery "use: code" so we must call /admin/recovery/code (not /admin/recovery/link)
-// The code endpoint returns both recovery_link and recovery_code; we use recovery_link for the UI
-export async function createRecoveryLink(identityId, expiresIn = '1h') {
-  try {
-    // Get user info for display
-    const user = await getUserById(identityId)
-    const userEmail = user?.traits?.email
-    
-    if (!userEmail) {
-      throw new Error('User email not found')
-    }
-    
-    logger.log('Creating recovery link for:', userEmail)
-    
-    // Use admin recovery CODE endpoint (required when Kratos recovery flow is "use: code")
-    const recoveryLinkResponse = await kratosAdminRequest('/admin/recovery/code', {
-      method: 'POST',
-      body: JSON.stringify({
-        identity_id: identityId,
-        expires_in: expiresIn
-      })
-    })
-    
-    const recoveryLink = recoveryLinkResponse.recovery_link
-    const recoveryCode = recoveryLinkResponse.recovery_code
-    
+    const result = await bffRequest(`/admin/users/${id}/recovery-link`, { method: 'POST' })
+    const recoveryLink = result?.recovery_link
     if (!recoveryLink) {
-      throw new Error('Failed to create recovery link')
+      throw new Error('BFF did not return a recovery_link')
     }
-    
-    logger.log('Recovery link created successfully', { recovery_code: recoveryCode })
-    
-    // Build full recovery URL (Kratos may return a path; prepend auth base URL if needed)
+    // Normalise to the shape the view expects.
     const authBase = import.meta.env.VITE_KRATOS_BROWSER_URL || 'http://auth.ory.localhost/auth'
-    const recoveryUrl = recoveryLink.startsWith('http') ? recoveryLink : `${authBase.replace(/\/$/, '')}${recoveryLink.startsWith('/') ? '' : '/'}${recoveryLink}`
-    
+    const recoveryUrl = recoveryLink.startsWith('http')
+      ? recoveryLink
+      : `${authBase.replace(/\/$/, '')}${recoveryLink.startsWith('/') ? '' : '/'}${recoveryLink}`
     return {
       success: true,
-      message: `Recovery link created for ${userEmail}`,
       recovery_link: recoveryLink,
       recovery_url: recoveryUrl,
-      recovery_code: recoveryCode ?? null
+      recovery_code: null // BFF recovery-link endpoint does not return a code
     }
   } catch (error) {
-    logger.error('Error creating recovery link:', error)
+    logger.error('Error creating recovery link', { status: error.response?.status })
     throw error
   }
 }
 
-// Resend verification email: use Kratos self-service verification flow (no new tab).
+// Delete a user identity
+export async function deleteUser(id) {
+  try {
+    await bffRequest(`/admin/users/${id}`, { method: 'DELETE' })
+    return true
+  } catch (error) {
+    logger.error('Error deleting user', { status: error.response?.status })
+    throw error
+  }
+}
+
+// Resend verification email: uses Kratos self-service verification flow (Kratos PUBLIC, not admin).
 // Creates a verification flow and submits the user's email so Kratos sends the verification email.
 export async function sendVerificationEmail(identityId) {
-  const identity = await getUserById(identityId)
-  const email = identity?.traits?.email
+  const user = await getUserById(identityId)
+  const email = user?.email
   if (!email) {
-    throw new Error('User has no email in traits')
+    throw new Error('User has no email')
   }
   const returnTo = import.meta.env.VITE_ADMIN_URL || 'http://admin.ory.localhost'
   const { data: flow } = await ory.createBrowserVerificationFlow({ returnTo })
@@ -528,16 +409,3 @@ export async function sendVerificationEmail(identityId) {
 
 // Alias for UI
 export { sendVerificationEmail as markEmailAsVerified }
-
-// Delete user identity
-export async function deleteUser(identityId) {
-  try {
-    await kratosAdminRequest(`/admin/identities/${identityId}`, {
-      method: 'DELETE'
-    })
-    return true
-  } catch (error) {
-    logger.error('Error deleting user:', error)
-    throw error
-  }
-}

@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { WinstonLogger } from './common/logger';
 
@@ -29,6 +30,21 @@ async function bootstrap() {
             forbidNonWhitelisted: true,
         }),
     );
+
+    // Swagger OpenAPI documentation
+    const swaggerConfig = new DocumentBuilder()
+        .setTitle('Nova ID API')
+        .setDescription('Self-hosted central IdP BFF — Ory consolidation layer')
+        .setVersion('1.0')
+        .addBearerAuth(
+            { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
+            'oathkeeper-id-token',
+        )
+        .build();
+    const document = SwaggerModule.createDocument(app, swaggerConfig);
+    SwaggerModule.setup('docs', app, document, {
+        swaggerOptions: { persistAuthorization: true },
+    });
 
     const port = process.env.PORT || 8080;
     await app.listen(port);

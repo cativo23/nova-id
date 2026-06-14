@@ -57,6 +57,12 @@ HYDRA_SYSTEM_SECRET=$(generate_secret)
 # Hydra Admin URL (internal Docker network; never expose publicly)
 HYDRA_ADMIN_URL=http://hydra:4445
 
+# Kratos Admin URL (internal Docker network; never expose publicly)
+KRATOS_ADMIN_URL=http://kratos:4434
+
+# Keto Read URL (internal Docker network; permission checks)
+KETO_READ_URL=http://keto:4466
+
 # OAuth / JWT validation
 OAUTH_ISSUER=http://api.local/
 OAUTH_JWKS_URL=http://oathkeeper:4456/.well-known/jwks.json

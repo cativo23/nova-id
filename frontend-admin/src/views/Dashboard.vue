@@ -283,7 +283,7 @@ const roleChartData = computed(() => {
   if (!users.length) return []
   const counts = {}
   users.forEach((u) => {
-    const role = u.metadata_public?.role || 'platform_user'
+    const role = u.role || 'platform_user'
     counts[role] = (counts[role] || 0) + 1
   })
   const total = users.length
@@ -367,6 +367,7 @@ onMounted(async () => {
         usersChartError.value = null
         try {
           const res = await listUsers({ pageSize: 250 })
+          // BFF returns UserResponseDto[] — listUsers wraps in { identities }
           usersForCharts.value = res.identities || []
         } catch (_) {
           usersChartError.value = 'Could not load users for overview.'

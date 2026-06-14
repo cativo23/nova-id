@@ -56,13 +56,17 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, inject } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { handleOAuthCallback, setStoredTokens } from '../composables/useHydraOAuth'
 
 const router = useRouter()
 const route = useRoute()
 const error = ref(null)
+// App.vue runs refreshAuth() at mount — BEFORE tokens are stored here — so without this
+// re-run isOAuthSession stays false after the OAuth redirect, and the first Logout click
+// takes the cookie-only branch (never clears the stored tokens → user re-authenticates).
+const refreshAuth = inject('refreshAuth', null)
 
 /** OAuth/OIDC: code and consent verifier are single-use. If user hit Back and landed here with "already used", treat as already signed in. */
 function isAlreadyUsedError(msg) {
@@ -102,6 +106,8 @@ onMounted(async () => {
   try {
     const tokens = await handleOAuthCallback(code, state)
     setStoredTokens(tokens)
+    // Sync App.vue's auth state (isOAuthSession) now that tokens exist, so Logout works in one click.
+    if (refreshAuth) await refreshAuth()
     router.replace({ path: '/', query: {} })
   } catch (err) {
     const errMsg = err.message || 'OAuth callback failed'

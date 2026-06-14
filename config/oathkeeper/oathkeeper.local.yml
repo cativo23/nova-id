@@ -16,6 +16,12 @@ serve:
         - http://localhost:5174
         - http://localhost:5175
         - http://localhost:3000
+        # Dev SPAs accessed at their *.ory.localhost host on the Vite dev port keep that
+        # port in the Origin; the OAuth/BFF calls target api.ory.localhost, so the
+        # port-qualified origin must be allowed too (else the token-exchange read 401s on CORS).
+        - http://auth.ory.localhost:5173
+        - http://admin.ory.localhost:5174
+        - http://app.ory.localhost:5175
       allowed_methods:
         - POST
         - GET

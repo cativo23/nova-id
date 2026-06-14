@@ -126,14 +126,17 @@
     </div>
 
     <!-- Search bar and page size selector -->
+    <!-- NOTE: search is client-side over the current page only — Kratos has no server-side filter.
+         TODO(A1-plan-2): full cross-page search requires a BFF search endpoint. -->
     <div v-if="!loading && !error" class="mb-4 flex flex-col sm:flex-row gap-3">
       <div class="flex gap-2 flex-1">
         <input
           v-model="searchQuery"
           type="text"
-          placeholder="Search by email, name, or role..."
+          placeholder="Search by email, name, or role…"
           class="input-base flex-1"
           @keyup.enter="handleSearch"
+          title="Filters the current page only. Cross-page search is not supported."
         />
         <button
           type="button"
@@ -156,6 +159,7 @@
           </svg>
         </button>
       </div>
+      <p v-if="searchQuery" class="w-full text-xs text-cyber-light/50 mt-1">(filters current page only)</p>
       <div class="flex items-center gap-2">
         <label class="text-sm text-cyber-light/70 whitespace-nowrap">Show:</label>
         <select
@@ -193,22 +197,22 @@
               <th>Name</th>
               <th>Role</th>
               <th>Status</th>
-              <th>Email verified</th>
+              <th>Created</th>
               <th class="text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="(user, idx) in users" :key="user.id" class="users-table__row" :style="{ animationDelay: `${idx * 0.02}s` }">
               <td>
-                <span class="font-medium text-cyber-light">{{ user.traits?.email || '—' }}</span>
+                <span class="font-medium text-cyber-light">{{ user.email || '—' }}</span>
               </td>
-              <td class="text-cyber-light/90">{{ user.traits?.full_name || '—' }}</td>
+              <td class="text-cyber-light/90">{{ user.fullName || '—' }}</td>
               <td>
                 <span
                   class="role-badge"
-                  :class="getRoleBadgeClass(user.metadata_public?.role)"
+                  :class="getRoleBadgeClass(user.role)"
                 >
-                  {{ formatRole(user.metadata_public?.role) }}
+                  {{ formatRole(user.role) }}
                 </span>
               </td>
               <td>
@@ -219,14 +223,7 @@
                   {{ user.state === 'active' ? 'Active' : 'Inactive' }}
                 </span>
               </td>
-              <td>
-                <span
-                  class="status-badge"
-                  :class="isEmailVerified(user) ? 'status-badge--active' : 'status-badge--inactive'"
-                >
-                  {{ isEmailVerified(user) ? 'Verified' : 'Unverified' }}
-                </span>
-              </td>
+              <td class="text-cyber-light/70 text-xs">{{ user.createdAt ? new Date(user.createdAt).toLocaleDateString() : '—' }}</td>
               <td class="text-right">
                 <div class="flex flex-wrap justify-end gap-1">
                   <button
@@ -254,7 +251,7 @@
                     </svg>
                   </button>
                   <button
-                    v-if="!isEmailVerified(user)"
+                    v-if="user.state === 'active'"
                     type="button"
                     @click="verifyEmail(user)"
                     :disabled="verifyingEmail === user.id"
@@ -333,15 +330,15 @@
             </svg>
             <span>Showing <strong class="text-cyber-light">{{ users.length }}</strong> {{ users.length === 1 ? 'user' : 'users' }}</span>
           </div>
-          
+
           <!-- Navigation buttons -->
           <div class="flex items-center gap-1">
             <button
               type="button"
               @click="firstPage"
-              :disabled="!currentPageToken"
+              :disabled="pageTokenStack.length === 0 && !currentPageToken"
               class="pagination-btn pagination-btn--icon"
-              :class="{ 'pagination-btn--disabled': !currentPageToken }"
+              :class="{ 'pagination-btn--disabled': pageTokenStack.length === 0 && !currentPageToken }"
               title="First page"
             >
               <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -351,9 +348,9 @@
             <button
               type="button"
               @click="prevPage"
-              :disabled="!pagination.hasPrev"
+              :disabled="pageTokenStack.length === 0"
               class="pagination-btn"
-              :class="{ 'pagination-btn--disabled': !pagination.hasPrev }"
+              :class="{ 'pagination-btn--disabled': pageTokenStack.length === 0 }"
               title="Previous page"
             >
               <svg class="h-4 w-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -367,9 +364,9 @@
             <button
               type="button"
               @click="nextPage"
-              :disabled="!pagination.hasNext"
+              :disabled="!nextPageToken"
               class="pagination-btn"
-              :class="{ 'pagination-btn--disabled': !pagination.hasNext }"
+              :class="{ 'pagination-btn--disabled': !nextPageToken }"
               title="Next page"
             >
               Next
@@ -415,6 +412,7 @@
                     <option value="platform_user">Platform user</option>
                     <option value="platform_admin">Platform admin</option>
                   </select>
+                  <p class="text-xs text-cyber-light/50 mt-1">Sets the platform role claim. Admin-panel permissions are managed separately (coming in a later release).</p>
                 </div>
                 <div class="flex justify-end gap-3 pt-2">
                   <button type="button" @click="editingUser = null" class="btn-secondary">
@@ -463,6 +461,7 @@
                     <option value="platform_user">Platform user</option>
                     <option value="platform_admin">Platform admin</option>
                   </select>
+                  <p class="text-xs text-cyber-light/50 mt-1">Sets the platform role claim. Admin-panel permissions are managed separately (coming in a later release).</p>
                 </div>
                 <div>
                   <label class="block text-sm font-medium text-cyber-light mb-2">Password</label>
@@ -497,7 +496,7 @@
             <div class="card mx-4 w-full max-w-md p-6 shadow-modal">
               <h3 class="text-lg font-semibold text-red-400 mb-4">Delete user</h3>
               <p class="text-cyber-light mb-4">
-                Are you sure you want to delete user <strong>{{ userToDelete.traits?.email }}</strong>?
+                Are you sure you want to delete user <strong>{{ userToDelete.email }}</strong>?
                 This action cannot be undone.
               </p>
               <div class="flex justify-end gap-3 pt-4">
@@ -520,7 +519,7 @@
             <div class="card mx-4 w-full max-w-md p-6 shadow-modal">
               <h3 class="text-lg font-semibold text-cyber-light mb-4">Deactivate user</h3>
               <p class="text-cyber-light mb-4">
-                Deactivate <strong>{{ userToDeactivate.traits?.email }}</strong>? They will not be able to sign in until you activate them again.
+                Deactivate <strong>{{ userToDeactivate.email }}</strong>? They will not be able to sign in until you activate them again.
               </p>
               <div class="flex justify-end gap-3 pt-4">
                 <button type="button" @click="userToDeactivate = null" class="btn-secondary">
@@ -540,9 +539,12 @@
             @click.self="viewingPermissions = null"
           >
             <div class="card mx-4 w-full max-w-md p-6 shadow-modal">
+              <!-- TODO(A1-plan-2): per-user permission lookup needs a BFF endpoint.
+                   For now this shows the current admin session's permissions only. -->
               <h3 class="text-lg font-semibold text-cyber-light mb-4">
-                Permissions for {{ viewingPermissions.traits?.email }}
+                Current session permissions
               </h3>
+              <p class="text-xs text-cyber-light/50 mb-3">Per-user permission lookup is coming in a later release. The list below reflects your own admin session.</p>
               <div v-if="loadingUserPermissions" class="text-cyber-light/70 text-sm">
                 Loading permissions...
               </div>
@@ -603,14 +605,13 @@ const verifyingEmail = ref(null)
 
 // Pagination and search state
 const searchQuery = ref('')
+// Token for the CURRENT page (null = first page).
 const currentPageToken = ref(null)
-const pagination = ref({
-  hasNext: false,
-  hasPrev: false,
-  nextToken: null,
-  prevToken: null,
-  firstToken: null
-})
+// Stack of previously-visited page tokens (for Prev navigation).
+// Kratos cursors are forward-only; we maintain the history ourselves.
+const pageTokenStack = ref([])
+// nextPageToken returned by the most recent listUsers call.
+const nextPageToken = ref(null)
 const pageSize = ref(5)
 
 onMounted(async () => {
@@ -642,7 +643,7 @@ onMounted(async () => {
       return
     }
   } catch (error) {
-    console.error('Error checking permission:', error)
+    console.error('Error checking permission', { status: error?.response?.status })
     router.push('/dashboard')
     return
   }
@@ -660,49 +661,53 @@ const loadUsers = async (pageToken = null) => {
       pageSize: pageSize.value,
       searchQuery: searchQuery.value
     })
-    
-    // Response now contains identities and pagination info
+
     users.value = response.identities || []
-    pagination.value = response.pagination || {
-      hasNext: false,
-      hasPrev: false,
-      nextToken: null,
-      prevToken: null,
-      firstToken: null
-    }
+    nextPageToken.value = response.nextPageToken ?? null
     currentPageToken.value = pageToken
   } catch (err) {
-    console.error('Error loading users:', err)
-    error.value = err.message || 'Failed to load users. Please ensure Kratos Admin API is accessible.'
+    // Do not log err directly — it may carry a BFF body with PHI.
+    const status = err.response?.status
+    error.value = status === 401
+      ? 'Session expired. Redirecting to login…'
+      : err.message || 'Failed to load users.'
   } finally {
     loading.value = false
   }
 }
 
 const nextPage = () => {
-  if (pagination.value.hasNext && pagination.value.nextToken) {
-    loadUsers(pagination.value.nextToken)
+  if (nextPageToken.value) {
+    // Push current token onto the stack so Prev can return here.
+    pageTokenStack.value.push(currentPageToken.value)
+    loadUsers(nextPageToken.value)
   }
 }
 
 const prevPage = () => {
-  if (pagination.value.hasPrev && pagination.value.prevToken) {
-    loadUsers(pagination.value.prevToken)
+  if (pageTokenStack.value.length > 0) {
+    const prev = pageTokenStack.value.pop()
+    loadUsers(prev)
   }
 }
 
 const firstPage = () => {
+  pageTokenStack.value = []
   loadUsers(null)
 }
 
 const handleSearch = () => {
-  // Reset to first page when searching
+  // Reset to first page when searching — clear the Prev history so it can't
+  // navigate back into a pre-filter page with a stale cursor.
+  pageTokenStack.value = []
   currentPageToken.value = null
   loadUsers(null)
 }
 
 const handlePageSizeChange = () => {
-  // Reset to first page when changing page size
+  // Reset to first page when changing page size — clear the Prev history so it
+  // can't navigate back into a pre-resize page with a stale cursor.
+  pageTokenStack.value = []
   currentPageToken.value = null
   loadUsers(null)
 }
@@ -785,30 +790,28 @@ const createUserAction = async () => {
   success.value = null
   
   try {
-    // NOTE: role is intentionally NOT submitted here. Role lives in metadata_public
-    // (admin-only) and is granted via the BFF admin API + Keto (A1). New users default
-    // to platform_user. To set a role at creation, pass `role: addUserForm.value.role`
-    // — createUser() already writes it to metadata_public.role via the Admin API.
-    await createUser(
-      {
-        email: addUserForm.value.email,
-        full_name: addUserForm.value.full_name
-      },
-      addUserForm.value.password
-    )
+    // BFF DTO shape: { email, fullName, password, role }
+    await createUser({
+      email: addUserForm.value.email,
+      fullName: addUserForm.value.full_name,
+      password: addUserForm.value.password,
+      role: addUserForm.value.role || 'platform_user'
+    })
     
     addUserForm.value = {
       email: '',
       full_name: '',
-      password: ''
+      password: '',
+      role: 'platform_user'
     }
     showAddUser.value = false
     success.value = 'User created successfully'
     await loadUsers()
     setTimeout(() => { success.value = null }, 3000)
   } catch (err) {
-    console.error('Error creating user:', err)
-    error.value = err.response?.data?.error?.message || err.message || 'Failed to create user'
+    // Do not log err directly — may carry BFF body with PHI.
+    console.error('Error creating user', { status: err.response?.status })
+    error.value = 'Failed to create user. Please try again.'
   } finally {
     creatingUser.value = false
   }
@@ -835,8 +838,8 @@ const deleteUserAction = async () => {
     await loadUsers()
     setTimeout(() => { success.value = null }, 3000)
   } catch (err) {
-    console.error('Error deleting user:', err)
-    error.value = err.message || 'Failed to delete user'
+    console.error('Error deleting user', { status: err.response?.status })
+    error.value = 'Failed to delete user. Please try again.'
   } finally {
     deleting.value = false
   }
@@ -850,19 +853,19 @@ const sendRecoveryPassword = async (user) => {
   
   try {
     const result = await createRecoveryLink(user.id)
-    console.log('Recovery code created:', result)
-    
-    // Store recovery data for the modal (link + code from Kratos)
+    console.log('Recovery link created')
+
+    // Store recovery data for the modal (link from the BFF)
     recoveryData.value = {
-      userEmail: user.traits?.email || user.id,
+      userEmail: user.email || user.id,
       recovery_url: result.recovery_url || '',
-      recovery_code: result.recovery_code ?? '',
+      recovery_code: result.recovery_code ?? null,
       copiedUrl: false,
       copiedCode: false
     }
   } catch (err) {
-    console.error('Error creating recovery link:', err)
-    error.value = err.response?.data?.error?.message || err.message || 'Failed to send recovery email'
+    console.error('Error creating recovery link', { status: err.response?.status })
+    error.value = 'Failed to create recovery link. Please try again.'
   } finally {
     sendingRecovery.value = null
   }
@@ -919,14 +922,6 @@ const closeRecoveryModal = () => {
   recoveryData.value = null
 }
 
-function isEmailVerified(user) {
-  const email = user?.traits?.email
-  if (!email) return false
-  const addrs = user.verifiable_addresses ?? []
-  const addr = addrs.find((a) => a.value === email)
-  return addr ? (addr.status === 'completed' || addr.verified === true) : false
-}
-
 function formatRole(role) {
   if (!role) return '—'
   return role.replace('platform_', '').replace(/_/g, ' ')
@@ -935,9 +930,9 @@ function formatRole(role) {
 const editUser = (user) => {
   editingUser.value = user
   editForm.value = {
-    email: user.traits?.email || '',
-    full_name: user.traits?.full_name || '',
-    role: user.metadata_public?.role || 'platform_user'
+    email: user.email || '',
+    full_name: user.fullName || '',
+    role: user.role || 'platform_user'
   }
 }
 
@@ -953,22 +948,19 @@ const saveUser = async () => {
   success.value = null
   
   try {
-    // NOTE: role is intentionally NOT submitted here. Role lives in metadata_public
-    // (admin-only) and is granted via the BFF admin API + Keto (A1), not from the
-    // browser. The role <select> is display-only until the A1 admin endpoint lands.
-    // To re-enable from here, pass `role: editForm.value.role` — updateUser() already
-    // writes it to metadata_public.role via the Kratos Admin API.
+    // BFF DTO shape: { email?, fullName?, role? }
     await updateUser(editingUser.value.id, {
       email: editForm.value.email,
-      full_name: editForm.value.full_name
+      fullName: editForm.value.full_name,
+      role: editForm.value.role
     })
     editingUser.value = null
     success.value = 'User updated successfully'
     await loadUsers()
     setTimeout(() => { success.value = null }, 3000)
   } catch (err) {
-    console.error('Error updating user:', err)
-    error.value = err.response?.data?.error?.message || err.message || 'Failed to update user'
+    console.error('Error updating user', { status: err.response?.status })
+    error.value = 'Failed to update user. Please try again.'
   } finally {
     saving.value = false
   }
@@ -981,10 +973,10 @@ const verifyEmail = async (user) => {
 
   try {
     const result = await markEmailAsVerified(user.id)
-    success.value = `Verification email sent to ${result?.userEmail || user.traits?.email}.`
+    success.value = `Verification email sent to ${result?.userEmail || user.email}.`
   } catch (err) {
-    console.error('Error sending verification email:', err)
-    error.value = err.response?.data?.error?.message || err.message || 'Failed to send verification email'
+    console.error('Error sending verification email', { status: err.response?.status })
+    error.value = 'Failed to send verification email. Please try again.'
   } finally {
     verifyingEmail.value = null
   }
@@ -999,7 +991,7 @@ const viewPermissions = async (user) => {
     const { getCachedUserPermissions } = await import('../composables/usePermissionCache')
     userPermissionsList.value = await getCachedUserPermissions(user.id)
   } catch (err) {
-    console.error('Error loading user permissions:', err)
+    console.error('Error loading user permissions', { status: err.response?.status })
     userPermissionsList.value = []
   } finally {
     loadingUserPermissions.value = false

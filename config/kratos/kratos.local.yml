@@ -51,6 +51,15 @@ selfservice:
     - http://localhost:5175
     - http://localhost:4455/admin
     - http://localhost:4455/admin/dashboard
+    # SPAs accessed at their *.ory.localhost host on the Vite dev port use that
+    # port-qualified origin as logout/flow return_to; Kratos matches origin incl.
+    # port, so these must be allowed or self-service logout 400s (session leak).
+    - http://auth.ory.localhost:5173
+    - http://auth.ory.localhost:5173/
+    - http://admin.ory.localhost:5174
+    - http://admin.ory.localhost:5174/
+    - http://app.ory.localhost:5175
+    - http://app.ory.localhost:5175/
 
   methods:
     password:
