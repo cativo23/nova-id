@@ -31,6 +31,9 @@ export class HydraService {
     return data;
   }
 
+  // Unlike the login request, AcceptOAuth2ConsentRequest DOES declare `session`
+  // (AcceptOAuth2ConsentRequestSession with `id_token: any`), so the consent body —
+  // including session.id_token — is type-compatible and needs no cast.
   async acceptConsent(consentChallenge: string, body: AcceptOAuth2ConsentRequest): Promise<OAuth2RedirectTo> {
     const { data } = await this.oauth2Api.acceptOAuth2ConsentRequest({ consentChallenge, acceptOAuth2ConsentRequest: body });
     return data;

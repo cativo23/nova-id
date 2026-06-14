@@ -37,4 +37,49 @@ describe('KratosAdminService', () => {
     expect(api.createRecoveryLinkForIdentity).toHaveBeenCalled();
     expect(link).toBe('http://x/recover');
   });
+
+  it('updateIdentity merges traits and falls back to the current role when none is given', async () => {
+    const current = {
+      id: 'u1',
+      schema_id: 'default',
+      traits: { email: 'old@b.c', full_name: 'Old' },
+      metadata_public: { role: 'platform_admin' },
+      state: 'active',
+    };
+    const api = {
+      getIdentity: jest.fn().mockResolvedValue({ data: current }),
+      updateIdentity: jest.fn().mockResolvedValue({ data: { id: 'u1' } }),
+    };
+    const svc = makeService(api);
+
+    await svc.updateIdentity('u1', { fullName: 'New Name' }); // no email, no role
+
+    expect(api.getIdentity).toHaveBeenCalledWith({ id: 'u1' });
+    const body = api.updateIdentity.mock.calls[0][0].updateIdentityBody;
+    expect(body.traits).toEqual({ email: 'old@b.c', full_name: 'New Name' });
+    expect(body.metadata_public).toEqual({ role: 'platform_admin' }); // fell back to current
+    expect(body.state).toBe('active');
+  });
+
+  it('setIdentityState fetches the identity and updates only its state', async () => {
+    const current = {
+      id: 'u2',
+      schema_id: 'default',
+      traits: { email: 'a@b.c', full_name: 'A' },
+      metadata_public: { role: 'platform_user' },
+      state: 'active',
+    };
+    const api = {
+      getIdentity: jest.fn().mockResolvedValue({ data: current }),
+      updateIdentity: jest.fn().mockResolvedValue({ data: { id: 'u2', state: 'inactive' } }),
+    };
+    const svc = makeService(api);
+
+    await svc.setIdentityState('u2', 'inactive');
+
+    expect(api.getIdentity).toHaveBeenCalledWith({ id: 'u2' });
+    const body = api.updateIdentity.mock.calls[0][0].updateIdentityBody;
+    expect(body.state).toBe('inactive');
+    expect(body.traits).toEqual(current.traits);
+  });
 });

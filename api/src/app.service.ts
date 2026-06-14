@@ -1,15 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { HydraService, AcceptOAuth2LoginRequestWithSession } from './ory/hydra.service';
 
 @Injectable()
 export class AppService {
   private readonly logger = new Logger(AppService.name);
 
-  constructor(
-    private readonly configService: ConfigService,
-    private readonly hydra: HydraService,
-  ) {}
+  constructor(private readonly hydra: HydraService) {}
   getPublicData() {
     return {
       message: 'This is public data - no authentication required',
