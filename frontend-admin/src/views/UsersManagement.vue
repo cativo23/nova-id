@@ -193,22 +193,22 @@
               <th>Name</th>
               <th>Role</th>
               <th>Status</th>
-              <th>Email verified</th>
+              <th>Created</th>
               <th class="text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="(user, idx) in users" :key="user.id" class="users-table__row" :style="{ animationDelay: `${idx * 0.02}s` }">
               <td>
-                <span class="font-medium text-cyber-light">{{ user.traits?.email || '—' }}</span>
+                <span class="font-medium text-cyber-light">{{ user.email || '—' }}</span>
               </td>
-              <td class="text-cyber-light/90">{{ user.traits?.full_name || '—' }}</td>
+              <td class="text-cyber-light/90">{{ user.fullName || '—' }}</td>
               <td>
                 <span
                   class="role-badge"
-                  :class="getRoleBadgeClass(user.metadata_public?.role)"
+                  :class="getRoleBadgeClass(user.role)"
                 >
-                  {{ formatRole(user.metadata_public?.role) }}
+                  {{ formatRole(user.role) }}
                 </span>
               </td>
               <td>
@@ -219,14 +219,7 @@
                   {{ user.state === 'active' ? 'Active' : 'Inactive' }}
                 </span>
               </td>
-              <td>
-                <span
-                  class="status-badge"
-                  :class="isEmailVerified(user) ? 'status-badge--active' : 'status-badge--inactive'"
-                >
-                  {{ isEmailVerified(user) ? 'Verified' : 'Unverified' }}
-                </span>
-              </td>
+              <td class="text-cyber-light/70 text-xs">{{ user.createdAt ? new Date(user.createdAt).toLocaleDateString() : '—' }}</td>
               <td class="text-right">
                 <div class="flex flex-wrap justify-end gap-1">
                   <button
@@ -254,7 +247,7 @@
                     </svg>
                   </button>
                   <button
-                    v-if="!isEmailVerified(user)"
+                    v-if="user.state === 'active'"
                     type="button"
                     @click="verifyEmail(user)"
                     :disabled="verifyingEmail === user.id"
@@ -497,7 +490,7 @@
             <div class="card mx-4 w-full max-w-md p-6 shadow-modal">
               <h3 class="text-lg font-semibold text-red-400 mb-4">Delete user</h3>
               <p class="text-cyber-light mb-4">
-                Are you sure you want to delete user <strong>{{ userToDelete.traits?.email }}</strong>?
+                Are you sure you want to delete user <strong>{{ userToDelete.email }}</strong>?
                 This action cannot be undone.
               </p>
               <div class="flex justify-end gap-3 pt-4">
@@ -520,7 +513,7 @@
             <div class="card mx-4 w-full max-w-md p-6 shadow-modal">
               <h3 class="text-lg font-semibold text-cyber-light mb-4">Deactivate user</h3>
               <p class="text-cyber-light mb-4">
-                Deactivate <strong>{{ userToDeactivate.traits?.email }}</strong>? They will not be able to sign in until you activate them again.
+                Deactivate <strong>{{ userToDeactivate.email }}</strong>? They will not be able to sign in until you activate them again.
               </p>
               <div class="flex justify-end gap-3 pt-4">
                 <button type="button" @click="userToDeactivate = null" class="btn-secondary">
@@ -541,7 +534,7 @@
           >
             <div class="card mx-4 w-full max-w-md p-6 shadow-modal">
               <h3 class="text-lg font-semibold text-cyber-light mb-4">
-                Permissions for {{ viewingPermissions.traits?.email }}
+                Permissions for {{ viewingPermissions.email }}
               </h3>
               <div v-if="loadingUserPermissions" class="text-cyber-light/70 text-sm">
                 Loading permissions...
@@ -785,17 +778,13 @@ const createUserAction = async () => {
   success.value = null
   
   try {
-    // NOTE: role is intentionally NOT submitted here. Role lives in metadata_public
-    // (admin-only) and is granted via the BFF admin API + Keto (A1). New users default
-    // to platform_user. To set a role at creation, pass `role: addUserForm.value.role`
-    // — createUser() already writes it to metadata_public.role via the Admin API.
-    await createUser(
-      {
-        email: addUserForm.value.email,
-        full_name: addUserForm.value.full_name
-      },
-      addUserForm.value.password
-    )
+    // BFF DTO shape: { email, fullName, password, role }
+    await createUser({
+      email: addUserForm.value.email,
+      fullName: addUserForm.value.full_name,
+      password: addUserForm.value.password,
+      role: addUserForm.value.role || 'platform_user'
+    })
     
     addUserForm.value = {
       email: '',
@@ -850,13 +839,13 @@ const sendRecoveryPassword = async (user) => {
   
   try {
     const result = await createRecoveryLink(user.id)
-    console.log('Recovery code created:', result)
-    
-    // Store recovery data for the modal (link + code from Kratos)
+    console.log('Recovery link created')
+
+    // Store recovery data for the modal (link from the BFF)
     recoveryData.value = {
-      userEmail: user.traits?.email || user.id,
+      userEmail: user.email || user.id,
       recovery_url: result.recovery_url || '',
-      recovery_code: result.recovery_code ?? '',
+      recovery_code: result.recovery_code ?? null,
       copiedUrl: false,
       copiedCode: false
     }
@@ -919,14 +908,6 @@ const closeRecoveryModal = () => {
   recoveryData.value = null
 }
 
-function isEmailVerified(user) {
-  const email = user?.traits?.email
-  if (!email) return false
-  const addrs = user.verifiable_addresses ?? []
-  const addr = addrs.find((a) => a.value === email)
-  return addr ? (addr.status === 'completed' || addr.verified === true) : false
-}
-
 function formatRole(role) {
   if (!role) return '—'
   return role.replace('platform_', '').replace(/_/g, ' ')
@@ -935,9 +916,9 @@ function formatRole(role) {
 const editUser = (user) => {
   editingUser.value = user
   editForm.value = {
-    email: user.traits?.email || '',
-    full_name: user.traits?.full_name || '',
-    role: user.metadata_public?.role || 'platform_user'
+    email: user.email || '',
+    full_name: user.fullName || '',
+    role: user.role || 'platform_user'
   }
 }
 
@@ -953,14 +934,11 @@ const saveUser = async () => {
   success.value = null
   
   try {
-    // NOTE: role is intentionally NOT submitted here. Role lives in metadata_public
-    // (admin-only) and is granted via the BFF admin API + Keto (A1), not from the
-    // browser. The role <select> is display-only until the A1 admin endpoint lands.
-    // To re-enable from here, pass `role: editForm.value.role` — updateUser() already
-    // writes it to metadata_public.role via the Kratos Admin API.
+    // BFF DTO shape: { email?, fullName?, role? }
     await updateUser(editingUser.value.id, {
       email: editForm.value.email,
-      full_name: editForm.value.full_name
+      fullName: editForm.value.full_name,
+      role: editForm.value.role
     })
     editingUser.value = null
     success.value = 'User updated successfully'
@@ -981,7 +959,7 @@ const verifyEmail = async (user) => {
 
   try {
     const result = await markEmailAsVerified(user.id)
-    success.value = `Verification email sent to ${result?.userEmail || user.traits?.email}.`
+    success.value = `Verification email sent to ${result?.userEmail || user.email}.`
   } catch (err) {
     console.error('Error sending verification email:', err)
     error.value = err.response?.data?.error?.message || err.message || 'Failed to send verification email'

@@ -1,44 +1,38 @@
-// Permission cache composable
-// NOTE: Caching is disabled - all permissions are checked in real-time
-// This ensures permissions are always up-to-date, especially after role changes.
-import { getAllUserPermissionFlags, getUserPermissions } from './usePermissions'
+// Permission cache composable.
+// The actual memoization lives in usePermissions.js (single source of truth for
+// the /api/me/permissions response). This module is a thin convenience layer that
+// exposes the cached flags and a derived human-readable permission list, so the
+// view-permissions modal and the dashboard never trigger an uncached round-trip.
+import { getAllUserPermissionFlags } from './usePermissions'
 
 /**
- * Get permission flags for a user (real-time, no caching)
- * @param {string} userId - User ID
- * @param {boolean} forceRefresh - Ignored (kept for API compatibility)
+ * Get permission flags (cached per page load via usePermissions.js).
+ * The userId argument is accepted for API compatibility with existing callers
+ * but is not forwarded to the BFF (the gateway derives identity from the cookie).
+ * @param {string} _userId - Ignored; kept for backward compatibility.
+ * @param {boolean} forceRefresh - When true, busts the shared cache.
  * @returns {Promise<Object>} Permission flags object
  */
-export async function getCachedPermissionFlags(userId, _forceRefresh = false) {
-  return await getAllUserPermissionFlags(userId)
+export async function getCachedPermissionFlags(_userId, forceRefresh = false) {
+  return getAllUserPermissionFlags(_userId, forceRefresh)
 }
 
 /**
- * Get user permissions list (real-time, no caching)
- * @param {string} userId - User ID
- * @param {boolean} forceRefresh - Ignored (kept for API compatibility)
+ * Get a human-readable permission list derived from the cached flags.
+ * Reads through getCachedPermissionFlags so no extra BFF fetch is issued.
+ * @param {string} _userId - Ignored; kept for backward compatibility.
+ * @param {boolean} forceRefresh - When true, busts the shared cache.
  * @returns {Promise<Array>} Array of permission strings
  */
-export async function getCachedUserPermissions(userId, _forceRefresh = false) {
-  return await getUserPermissions(userId)
-}
-
-/**
- * Clear cache for a specific user
- * @param {string} userId - User ID (optional, clears all if not provided)
- * @deprecated Caching is disabled - this function does nothing
- */
-export function clearPermissionCache(_userId = null) {
-  // Caching is disabled - no-op
-}
-
-/**
- * Check if cache is valid for a user
- * @param {string} userId - User ID
- * @returns {boolean} Always returns false (caching is disabled)
- * @deprecated Caching is disabled - this function always returns false
- */
-export function isCacheValid(userId) {
-  // Caching is disabled - always return false
-  return false
+export async function getCachedUserPermissions(_userId, forceRefresh = false) {
+  const flags = await getCachedPermissionFlags(_userId, forceRefresh)
+  const permissions = []
+  if (flags.canViewUsers)         permissions.push('View Users')
+  if (flags.canAddUsers)          permissions.push('Add Users')
+  if (flags.canEditUsers)         permissions.push('Edit Users')
+  if (flags.canDeleteUsers)       permissions.push('Delete Users')
+  if (flags.canChangePermissions) permissions.push('Change Permissions')
+  if (flags.canManagePermissions) permissions.push('Manage Permissions')
+  if (flags.canAccessAdmin)       permissions.push('Access Admin Panel')
+  return permissions
 }
