@@ -94,4 +94,18 @@ describe('App (e2e) - Zero Trust JWT Implementation', () => {
       expect(true).toBe(true);
     });
   });
+
+  // A1-plan-1: new BFF-core endpoints. In-process (no gateway), so the controller
+  // paths are reached WITHOUT the `/api` prefix the gateway strips. The global
+  // AuthenticatedGuard must reject every one of them without a Bearer id_token.
+  describe('A1 BFF core endpoints (unauthenticated)', () => {
+    it('GET /admin/users - should reject without a Bearer id_token', () =>
+      request(app.getHttpServer()).get('/admin/users').expect(401));
+
+    it('POST /admin/users - should reject without a Bearer id_token', () =>
+      request(app.getHttpServer()).post('/admin/users').send({}).expect(401));
+
+    it('GET /me/permissions - should reject without a Bearer id_token', () =>
+      request(app.getHttpServer()).get('/me/permissions').expect(401));
+  });
 });
