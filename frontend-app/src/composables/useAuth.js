@@ -29,10 +29,6 @@ function getOryClient() {
 export async function checkSession() {
   try {
     const currentOry = getOryClient() // Get at runtime
-    const currentUrl = getOathkeeperUrl() // Get at runtime
-    console.log('checkSession - VITE_OATHKEEPER_URL:', import.meta.env.VITE_OATHKEEPER_URL)
-    console.log('checkSession - getOathkeeperUrl():', currentUrl)
-    console.log('checkSession - Calling toSession() via Oathkeeper at:', currentUrl)
     const { data } = await currentOry.toSession()
     return data
   } catch (error) {
