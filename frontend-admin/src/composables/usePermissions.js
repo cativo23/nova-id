@@ -17,11 +17,14 @@ async function fetchMyPermissions(forceRefresh = false) {
     _cachedPermsPromise = null
   }
   if (!_cachedPermsPromise) {
+    // Store the promise before it resolves so concurrent callers share one fetch.
+    // On rejection we null out the cache so the next call retries (avoids permanent
+    // negative-caching after transient network errors or 401s).
     _cachedPermsPromise = (async () => {
       const res = await fetch(`${oathkeeperUrl}/api/me/permissions`, { credentials: 'include' })
-      if (!res.ok) throw new Error(`GET /me/permissions → ${res.status}`)
+      if (!res.ok) { _cachedPermsPromise = null; throw new Error(`GET /me/permissions → ${res.status}`) }
       return res.json()
-    })()
+    })().catch((e) => { _cachedPermsPromise = null; throw e })
   }
   return _cachedPermsPromise
 }

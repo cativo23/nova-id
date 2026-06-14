@@ -31,9 +31,19 @@ async function bffRequest(path, options = {}) {
     headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
   })
   if (!res.ok) {
-    const body = await res.text()
-    const error = new Error(`BFF ${options.method || 'GET'} ${path} → ${res.status}: ${body}`)
-    error.response = { status: res.status, data: body }
+    if (res.status === 401) {
+      // Session expired mid-use — redirect to auth login page.
+      const authBase = import.meta.env.VITE_AUTH_URL || 'http://auth.ory.localhost'
+      window.location.href = `${authBase}/auth/login`
+      // Throw anyway so callers can bail out before the redirect fires.
+      const error = new Error('Session expired. Redirecting to login.')
+      error.response = { status: 401 }
+      throw error
+    }
+    // Do not embed raw body in message — it may contain PHI.
+    // Keep only the HTTP status for diagnostics.
+    const error = new Error(`BFF ${options.method || 'GET'} ${path} → ${res.status}`)
+    error.response = { status: res.status }
     throw error
   }
   return res.status === 204 ? null : res.json()
@@ -246,19 +256,27 @@ export async function updateSettingsFlow(flowId, payload) {
 // Oathkeeper gateway. The gateway validates the Kratos session cookie and
 // forwards an id_token JWT to the BFF (no direct Kratos-Admin access).
 
-// List users from the BFF. Returns { users: UserResponseDto[], pagination: {} }.
-// The BFF returns a flat array; pagination is handled server-side (no Link header).
+// List users from the BFF.
+// BFF returns an envelope: { data: UserResponseDto[], nextPageToken: string | null }.
+// Kratos cursor pagination is forward-only; the caller maintains a pageTokenStack for Prev.
+// NOTE: search is client-side over the CURRENT page only — Kratos admin list has no
+// server-side filter. Full cross-page search is deferred (TODO(A1-plan-2)).
 export async function listUsers(options = {}) {
   try {
-    const { pageSize = 100, searchQuery = '' } = options
+    const { pageSize = 100, searchQuery = '', pageToken = null } = options
 
     const params = new URLSearchParams()
     params.append('pageSize', pageSize.toString())
+    if (pageToken) {
+      params.append('pageToken', pageToken)
+    }
 
-    const data = await bffRequest(`/admin/users?${params}`)
-    const users = Array.isArray(data) ? data : []
+    const envelope = await bffRequest(`/admin/users?${params}`)
+    // Envelope shape: { data: UserResponseDto[], nextPageToken: string | null }
+    const users = Array.isArray(envelope?.data) ? envelope.data : []
+    const nextPageToken = envelope?.nextPageToken ?? null
 
-    // Client-side search filter (BFF does not yet expose a search param).
+    // Client-side search filter (current page only — no server-side filter available).
     let filtered = users
     if (searchQuery) {
       const q = searchQuery.toLowerCase()
@@ -273,17 +291,12 @@ export async function listUsers(options = {}) {
 
     return {
       identities: filtered,
-      pagination: {
-        hasNext: false,
-        hasPrev: false,
-        nextToken: null,
-        prevToken: null,
-        firstToken: null
-      }
+      nextPageToken,
+      hasNext: !!nextPageToken,
     }
   } catch (error) {
-    logger.error('Error listing users:', error)
-    if (error.response?.status === 401 || error.response?.status === 403) {
+    logger.error('Error listing users', { status: error.response?.status })
+    if (error.response?.status === 403) {
       throw new Error('Unauthorized: You do not have permission to list users')
     }
     throw error
@@ -295,7 +308,7 @@ export async function getUserById(id) {
   try {
     return await bffRequest(`/admin/users/${id}`)
   } catch (error) {
-    logger.error('Error getting user:', error)
+    logger.error('Error getting user', { status: error.response?.status })
     throw error
   }
 }
@@ -305,7 +318,7 @@ export async function createUser(payload) {
   try {
     return await bffRequest('/admin/users', { method: 'POST', body: JSON.stringify(payload) })
   } catch (error) {
-    logger.error('Error creating user:', error)
+    logger.error('Error creating user', { status: error.response?.status })
     throw error
   }
 }
@@ -313,9 +326,9 @@ export async function createUser(payload) {
 // Update a user. Payload: { email?, fullName?, role? }
 export async function updateUser(id, payload) {
   try {
-    return await bffRequest(`/admin/users/${id}`, { method: 'PUT', body: JSON.stringify(payload) })
+    return await bffRequest(`/admin/users/${id}`, { method: 'PATCH', body: JSON.stringify(payload) })
   } catch (error) {
-    logger.error('Error updating user:', error)
+    logger.error('Error updating user', { status: error.response?.status })
     throw error
   }
 }
@@ -326,9 +339,9 @@ export async function setIdentityState(id, state) {
     throw new Error('Identity state must be "active" or "inactive"')
   }
   try {
-    return await bffRequest(`/admin/users/${id}/state`, { method: 'PUT', body: JSON.stringify({ state }) })
+    return await bffRequest(`/admin/users/${id}/state`, { method: 'PATCH', body: JSON.stringify({ state }) })
   } catch (error) {
-    logger.error('Error setting identity state:', error)
+    logger.error('Error setting identity state', { status: error.response?.status })
     throw error
   }
 }
@@ -354,7 +367,7 @@ export async function createRecoveryLink(id) {
       recovery_code: null // BFF recovery-link endpoint does not return a code
     }
   } catch (error) {
-    logger.error('Error creating recovery link:', error)
+    logger.error('Error creating recovery link', { status: error.response?.status })
     throw error
   }
 }
@@ -365,7 +378,7 @@ export async function deleteUser(id) {
     await bffRequest(`/admin/users/${id}`, { method: 'DELETE' })
     return true
   } catch (error) {
-    logger.error('Error deleting user:', error)
+    logger.error('Error deleting user', { status: error.response?.status })
     throw error
   }
 }

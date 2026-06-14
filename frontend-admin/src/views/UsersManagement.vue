@@ -126,14 +126,17 @@
     </div>
 
     <!-- Search bar and page size selector -->
+    <!-- NOTE: search is client-side over the current page only — Kratos has no server-side filter.
+         TODO(A1-plan-2): full cross-page search requires a BFF search endpoint. -->
     <div v-if="!loading && !error" class="mb-4 flex flex-col sm:flex-row gap-3">
       <div class="flex gap-2 flex-1">
         <input
           v-model="searchQuery"
           type="text"
-          placeholder="Search by email, name, or role..."
+          placeholder="Search by email, name, or role…"
           class="input-base flex-1"
           @keyup.enter="handleSearch"
+          title="Filters the current page only. Cross-page search is not supported."
         />
         <button
           type="button"
@@ -156,6 +159,7 @@
           </svg>
         </button>
       </div>
+      <p v-if="searchQuery" class="w-full text-xs text-cyber-light/50 mt-1">(filters current page only)</p>
       <div class="flex items-center gap-2">
         <label class="text-sm text-cyber-light/70 whitespace-nowrap">Show:</label>
         <select
@@ -326,15 +330,15 @@
             </svg>
             <span>Showing <strong class="text-cyber-light">{{ users.length }}</strong> {{ users.length === 1 ? 'user' : 'users' }}</span>
           </div>
-          
+
           <!-- Navigation buttons -->
           <div class="flex items-center gap-1">
             <button
               type="button"
               @click="firstPage"
-              :disabled="!currentPageToken"
+              :disabled="pageTokenStack.length === 0 && !currentPageToken"
               class="pagination-btn pagination-btn--icon"
-              :class="{ 'pagination-btn--disabled': !currentPageToken }"
+              :class="{ 'pagination-btn--disabled': pageTokenStack.length === 0 && !currentPageToken }"
               title="First page"
             >
               <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -344,9 +348,9 @@
             <button
               type="button"
               @click="prevPage"
-              :disabled="!pagination.hasPrev"
+              :disabled="pageTokenStack.length === 0"
               class="pagination-btn"
-              :class="{ 'pagination-btn--disabled': !pagination.hasPrev }"
+              :class="{ 'pagination-btn--disabled': pageTokenStack.length === 0 }"
               title="Previous page"
             >
               <svg class="h-4 w-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -360,9 +364,9 @@
             <button
               type="button"
               @click="nextPage"
-              :disabled="!pagination.hasNext"
+              :disabled="!nextPageToken"
               class="pagination-btn"
-              :class="{ 'pagination-btn--disabled': !pagination.hasNext }"
+              :class="{ 'pagination-btn--disabled': !nextPageToken }"
               title="Next page"
             >
               Next
@@ -408,6 +412,7 @@
                     <option value="platform_user">Platform user</option>
                     <option value="platform_admin">Platform admin</option>
                   </select>
+                  <p class="text-xs text-cyber-light/50 mt-1">Sets the platform role claim. Admin-panel permissions are managed separately (coming in a later release).</p>
                 </div>
                 <div class="flex justify-end gap-3 pt-2">
                   <button type="button" @click="editingUser = null" class="btn-secondary">
@@ -456,6 +461,7 @@
                     <option value="platform_user">Platform user</option>
                     <option value="platform_admin">Platform admin</option>
                   </select>
+                  <p class="text-xs text-cyber-light/50 mt-1">Sets the platform role claim. Admin-panel permissions are managed separately (coming in a later release).</p>
                 </div>
                 <div>
                   <label class="block text-sm font-medium text-cyber-light mb-2">Password</label>
@@ -533,9 +539,12 @@
             @click.self="viewingPermissions = null"
           >
             <div class="card mx-4 w-full max-w-md p-6 shadow-modal">
+              <!-- TODO(A1-plan-2): per-user permission lookup needs a BFF endpoint.
+                   For now this shows the current admin session's permissions only. -->
               <h3 class="text-lg font-semibold text-cyber-light mb-4">
-                Permissions for {{ viewingPermissions.email }}
+                Current session permissions
               </h3>
+              <p class="text-xs text-cyber-light/50 mb-3">Per-user permission lookup is coming in a later release. The list below reflects your own admin session.</p>
               <div v-if="loadingUserPermissions" class="text-cyber-light/70 text-sm">
                 Loading permissions...
               </div>
@@ -596,14 +605,13 @@ const verifyingEmail = ref(null)
 
 // Pagination and search state
 const searchQuery = ref('')
+// Token for the CURRENT page (null = first page).
 const currentPageToken = ref(null)
-const pagination = ref({
-  hasNext: false,
-  hasPrev: false,
-  nextToken: null,
-  prevToken: null,
-  firstToken: null
-})
+// Stack of previously-visited page tokens (for Prev navigation).
+// Kratos cursors are forward-only; we maintain the history ourselves.
+const pageTokenStack = ref([])
+// nextPageToken returned by the most recent listUsers call.
+const nextPageToken = ref(null)
 const pageSize = ref(5)
 
 onMounted(async () => {
@@ -635,7 +643,7 @@ onMounted(async () => {
       return
     }
   } catch (error) {
-    console.error('Error checking permission:', error)
+    console.error('Error checking permission', { status: error?.response?.status })
     router.push('/dashboard')
     return
   }
@@ -653,49 +661,53 @@ const loadUsers = async (pageToken = null) => {
       pageSize: pageSize.value,
       searchQuery: searchQuery.value
     })
-    
-    // Response now contains identities and pagination info
+
     users.value = response.identities || []
-    pagination.value = response.pagination || {
-      hasNext: false,
-      hasPrev: false,
-      nextToken: null,
-      prevToken: null,
-      firstToken: null
-    }
+    nextPageToken.value = response.nextPageToken ?? null
     currentPageToken.value = pageToken
   } catch (err) {
-    console.error('Error loading users:', err)
-    error.value = err.message || 'Failed to load users. Please ensure Kratos Admin API is accessible.'
+    // Do not log err directly — it may carry a BFF body with PHI.
+    const status = err.response?.status
+    error.value = status === 401
+      ? 'Session expired. Redirecting to login…'
+      : err.message || 'Failed to load users.'
   } finally {
     loading.value = false
   }
 }
 
 const nextPage = () => {
-  if (pagination.value.hasNext && pagination.value.nextToken) {
-    loadUsers(pagination.value.nextToken)
+  if (nextPageToken.value) {
+    // Push current token onto the stack so Prev can return here.
+    pageTokenStack.value.push(currentPageToken.value)
+    loadUsers(nextPageToken.value)
   }
 }
 
 const prevPage = () => {
-  if (pagination.value.hasPrev && pagination.value.prevToken) {
-    loadUsers(pagination.value.prevToken)
+  if (pageTokenStack.value.length > 0) {
+    const prev = pageTokenStack.value.pop()
+    loadUsers(prev)
   }
 }
 
 const firstPage = () => {
+  pageTokenStack.value = []
   loadUsers(null)
 }
 
 const handleSearch = () => {
-  // Reset to first page when searching
+  // Reset to first page when searching — clear the Prev history so it can't
+  // navigate back into a pre-filter page with a stale cursor.
+  pageTokenStack.value = []
   currentPageToken.value = null
   loadUsers(null)
 }
 
 const handlePageSizeChange = () => {
-  // Reset to first page when changing page size
+  // Reset to first page when changing page size — clear the Prev history so it
+  // can't navigate back into a pre-resize page with a stale cursor.
+  pageTokenStack.value = []
   currentPageToken.value = null
   loadUsers(null)
 }
@@ -789,15 +801,17 @@ const createUserAction = async () => {
     addUserForm.value = {
       email: '',
       full_name: '',
-      password: ''
+      password: '',
+      role: 'platform_user'
     }
     showAddUser.value = false
     success.value = 'User created successfully'
     await loadUsers()
     setTimeout(() => { success.value = null }, 3000)
   } catch (err) {
-    console.error('Error creating user:', err)
-    error.value = err.response?.data?.error?.message || err.message || 'Failed to create user'
+    // Do not log err directly — may carry BFF body with PHI.
+    console.error('Error creating user', { status: err.response?.status })
+    error.value = 'Failed to create user. Please try again.'
   } finally {
     creatingUser.value = false
   }
@@ -824,8 +838,8 @@ const deleteUserAction = async () => {
     await loadUsers()
     setTimeout(() => { success.value = null }, 3000)
   } catch (err) {
-    console.error('Error deleting user:', err)
-    error.value = err.message || 'Failed to delete user'
+    console.error('Error deleting user', { status: err.response?.status })
+    error.value = 'Failed to delete user. Please try again.'
   } finally {
     deleting.value = false
   }
@@ -850,8 +864,8 @@ const sendRecoveryPassword = async (user) => {
       copiedCode: false
     }
   } catch (err) {
-    console.error('Error creating recovery link:', err)
-    error.value = err.response?.data?.error?.message || err.message || 'Failed to send recovery email'
+    console.error('Error creating recovery link', { status: err.response?.status })
+    error.value = 'Failed to create recovery link. Please try again.'
   } finally {
     sendingRecovery.value = null
   }
@@ -945,8 +959,8 @@ const saveUser = async () => {
     await loadUsers()
     setTimeout(() => { success.value = null }, 3000)
   } catch (err) {
-    console.error('Error updating user:', err)
-    error.value = err.response?.data?.error?.message || err.message || 'Failed to update user'
+    console.error('Error updating user', { status: err.response?.status })
+    error.value = 'Failed to update user. Please try again.'
   } finally {
     saving.value = false
   }
@@ -961,8 +975,8 @@ const verifyEmail = async (user) => {
     const result = await markEmailAsVerified(user.id)
     success.value = `Verification email sent to ${result?.userEmail || user.email}.`
   } catch (err) {
-    console.error('Error sending verification email:', err)
-    error.value = err.response?.data?.error?.message || err.message || 'Failed to send verification email'
+    console.error('Error sending verification email', { status: err.response?.status })
+    error.value = 'Failed to send verification email. Please try again.'
   } finally {
     verifyingEmail.value = null
   }
@@ -977,7 +991,7 @@ const viewPermissions = async (user) => {
     const { getCachedUserPermissions } = await import('../composables/usePermissionCache')
     userPermissionsList.value = await getCachedUserPermissions(user.id)
   } catch (err) {
-    console.error('Error loading user permissions:', err)
+    console.error('Error loading user permissions', { status: err.response?.status })
     userPermissionsList.value = []
   } finally {
     loadingUserPermissions.value = false

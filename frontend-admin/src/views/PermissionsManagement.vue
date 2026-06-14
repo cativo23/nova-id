@@ -48,8 +48,7 @@
           <div class="bg-cyber-bg border border-cyber-accent/20 rounded p-6">
             <h3 class="text-xl font-semibold text-cyber-accent mb-4">Grant Permission</h3>
             <p class="text-cyber-light/60 text-sm">
-              Granting and revoking permissions is unavailable in this release. A BFF
-              endpoint for writing Platform/App relations will be added in plan A1-2.
+              Granting and revoking permissions is unavailable in this release. This feature is coming in a later release.
             </p>
           </div>
 
@@ -58,8 +57,7 @@
           <div class="bg-cyber-bg border border-cyber-accent/20 rounded p-6">
             <h3 class="text-xl font-semibold text-cyber-accent mb-4">Current Permissions</h3>
             <p class="text-cyber-light/60 text-sm">
-              Relation listing is unavailable in this release. A BFF endpoint for browsing
-              Platform/App relation tuples will be added in plan A1-2.
+              Relation listing is unavailable in this release. This feature is coming in a later release.
             </p>
           </div>
         </div>
@@ -71,7 +69,7 @@
             <h3 class="text-xl font-semibold text-amber-400 mb-2">Test Permission Check</h3>
             <p class="text-cyber-light/60 text-sm">
               Direct Keto permission checks have been removed from the frontend.
-              A BFF endpoint for arbitrary permission checks will be added in plan A1-2.
+              An arbitrary permission check endpoint is coming in a later release.
             </p>
           </div>
         </div>
@@ -213,7 +211,7 @@ onMounted(async () => {
       return
     }
   } catch (error) {
-    console.error('Error checking permission:', error)
+    console.error('Error checking permission', { status: error?.response?.status })
     router.push('/dashboard')
     return
   }
