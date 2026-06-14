@@ -346,7 +346,7 @@
       "url": "http://api:8080"
     },
     "match": {
-      "url": "<(http|https)://(api\\.cativo\\.dev|oathkeeper(:[0-9]+)?)/api/(protected|user-demo|admin-demo|me|data|logs|nova-id-session)(/.*)?>",
+      "url": "<(http|https)://(api\\.cativo\\.dev|oathkeeper(:[0-9]+)?)/api/(protected|user-demo|admin-demo|admin|me|data|logs|nova-id-session)(/.*)?>",
       "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
     },
     "authenticators": [
