@@ -7,6 +7,7 @@ import { AuthModule } from './auth/auth.module';
 import { RolesModule } from './roles/roles.module';
 import { LogsModule } from './logs/logs.module';
 import { OryModule } from './ory/ory.module';
+import { AdminModule } from './admin/admin.module';
 import { UserRole } from './roles/entities/user-role.entity';
 
 @Module({
@@ -22,6 +23,7 @@ import { UserRole } from './roles/entities/user-role.entity';
     RolesModule,
     LogsModule,
     OryModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [AppService],
