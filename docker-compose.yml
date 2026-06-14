@@ -260,6 +260,8 @@ services:
       - OATHKEEPER_URL=http://oathkeeper:4455
       # API reaches Hydra Admin directly on the ory-internal network; no gateway hop.
       - HYDRA_ADMIN_URL=http://hydra:4445
+      - KRATOS_ADMIN_URL=http://kratos:4434
+      - KETO_READ_URL=http://keto:4466
     networks:
       - apps
       - ory-internal
