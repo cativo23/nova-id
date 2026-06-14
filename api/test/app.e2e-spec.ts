@@ -85,16 +85,6 @@ describe('App (e2e) - Zero Trust JWT Implementation', () => {
     });
   });
 
-  describe('Zero Trust Validation', () => {
-    it('should not have Ory service dependencies', () => {
-      expect(true).toBe(true);
-    });
-
-    it('should validate JWT tokens locally', () => {
-      expect(true).toBe(true);
-    });
-  });
-
   // A1-plan-1: new BFF-core endpoints. In-process (no gateway), so the controller
   // paths are reached WITHOUT the `/api` prefix the gateway strips. The global
   // AuthenticatedGuard must reject every one of them without a Bearer id_token.
