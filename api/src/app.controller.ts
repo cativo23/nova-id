@@ -9,7 +9,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AppService } from './app.service';
-import { RolesService } from './roles/roles.service';
+import { RolesService } from './demo/roles/roles.service';
 import { Public } from './decorators/public.decorator';
 import { GetUser } from './decorators/get-user.decorator';
 import { RequireRole } from './decorators/require-role.decorator';

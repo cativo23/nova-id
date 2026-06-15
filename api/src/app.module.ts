@@ -4,12 +4,12 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
-import { RolesModule } from './roles/roles.module';
+import { DemoModule } from './demo/demo.module';
 import { LogsModule } from './logs/logs.module';
 import { OryModule } from './ory/ory.module';
 import { AdminModule } from './admin/admin.module';
 import { MeModule } from './me/me.module';
-import { UserRole } from './roles/entities/user-role.entity';
+import { UserRole } from './demo/roles/entities/user-role.entity';
 
 @Module({
   imports: [
@@ -21,7 +21,7 @@ import { UserRole } from './roles/entities/user-role.entity';
       synchronize: true,
     }),
     AuthModule,
-    RolesModule,
+    DemoModule,
     LogsModule,
     OryModule,
     AdminModule,

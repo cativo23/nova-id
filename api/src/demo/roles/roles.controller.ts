@@ -10,13 +10,13 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { RolesService } from './roles.service';
-import { AuthenticatedGuard } from '../guards/authenticated.guard';
-import { AppAdminGuard } from '../guards/app-admin.guard';
-import { RoleGuard } from '../guards/role.guard';
-import { RequireRole } from '../decorators/require-role.decorator';
-import { Public } from '../decorators/public.decorator';
-import { GetUser } from '../decorators/get-user.decorator';
-import { LogAccess } from '../decorators/log-access.decorator';
+import { AuthenticatedGuard } from '../../guards/authenticated.guard';
+import { AppAdminGuard } from '../../guards/app-admin.guard';
+import { RoleGuard } from '../../guards/role.guard';
+import { RequireRole } from '../../decorators/require-role.decorator';
+import { Public } from '../../decorators/public.decorator';
+import { GetUser } from '../../decorators/get-user.decorator';
+import { LogAccess } from '../../decorators/log-access.decorator';
 
 @Controller('roles')
 @UseGuards(AuthenticatedGuard)
