@@ -55,18 +55,18 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted, inject } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { handleOAuthCallback } from '../composables/useHydraOAuth'
 
 const router = useRouter()
 const route = useRoute()
-const error = ref(null)
-const refreshAuth = inject('refreshAuth', null)
+const error = ref<string | null>(null)
+const refreshAuth = inject<(() => Promise<void>) | null>('refreshAuth', null)
 
 /** OAuth/OIDC: code and consent verifier are single-use. If user hit Back and landed here with "already used", treat as already signed in. */
-function isAlreadyUsedError(msg) {
+function isAlreadyUsedError(msg: string | null | undefined) {
   if (!msg || typeof msg !== 'string') return false
   const lower = msg.toLowerCase()
   return (
@@ -84,9 +84,9 @@ onMounted(async () => {
   const oauthErrorDesc = route.query.error_description
 
   if (oauthError || oauthErrorDesc) {
-    const msg = oauthErrorDesc
+    const msg: string = oauthErrorDesc
       ? decodeURIComponent(String(oauthErrorDesc).replace(/\+/g, ' '))
-      : oauthError || 'OAuth error'
+      : (oauthError ? String(oauthError) : 'OAuth error')
     if (isAlreadyUsedError(msg)) {
       router.replace({ path: '/', query: {} })
       return
@@ -105,7 +105,7 @@ onMounted(async () => {
     if (refreshAuth) await refreshAuth()
     router.replace({ path: '/', query: {} })
   } catch (err) {
-    const errMsg = err.message || 'OAuth callback failed'
+    const errMsg = (err instanceof Error ? err.message : '') || 'OAuth callback failed'
     if (isAlreadyUsedError(errMsg)) {
       router.replace({ path: '/', query: {} })
       return

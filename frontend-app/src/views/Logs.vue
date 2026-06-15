@@ -84,7 +84,7 @@
 
       <!-- Charts (solo si hay datos) -->
       <div
-        v-if="stats.totalRequests > 0 && (chartMethodEntries.length > 0 || chartStatusEntries.length > 0)"
+        v-if="(stats.totalRequests ?? 0) > 0 && (chartMethodEntries.length > 0 || chartStatusEntries.length > 0)"
         class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8"
       >
         <div class="bg-cyber-dark/80 border border-cyber-accent/20 rounded-xl p-6 shadow-lg animate-fade-in-up" style="animation-delay: 0.08s">
@@ -259,16 +259,17 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getApiTestBaseUrl } from '../composables/useApiTest'
+import type { LogEntry, LogStats, MeResponse, DemoUser } from '../types'
 
 const router = useRouter()
 const allowed = ref(false)
 const loading = ref(false)
-const logs = ref([])
-const stats = ref({})
+const logs = ref<LogEntry[]>([])
+const stats = ref<LogStats>({})
 const limit = ref(100)
 const frontend = ref('')
 const methodFilter = ref('')
@@ -284,7 +285,7 @@ const chartMethodEntries = computed(() => {
   const entries = Object.entries(byMethod).map(([label, count]) => ({ label, count: Number(count) }))
   if (entries.length === 0) return []
   const max = Math.max(...entries.map((e) => e.count), 1)
-  const methodColors = {
+  const methodColors: Record<string, string> = {
     GET: 'bg-emerald-500/70',
     POST: 'bg-amber-500/70',
     PUT: 'bg-blue-500/70',
@@ -306,7 +307,7 @@ const chartStatusEntries = computed(() => {
   const entries = Object.entries(byStatus).map(([label, count]) => ({ label, count: Number(count) }))
   if (entries.length === 0) return []
   const max = Math.max(...entries.map((e) => e.count), 1)
-  const statusColor = (code) => {
+  const statusColor = (code: string) => {
     const n = parseInt(code, 10)
     if (n >= 200 && n < 300) return 'bg-emerald-500/70'
     if (n >= 400 && n < 500) return 'bg-amber-500/70'
@@ -323,7 +324,7 @@ const chartStatusEntries = computed(() => {
     }))
 })
 
-function methodClass(method) {
+function methodClass(method: string) {
   if (method === 'GET') return 'bg-emerald-500/20 text-emerald-400'
   if (method === 'POST') return 'bg-amber-500/20 text-amber-400'
   if (method === 'PUT' || method === 'PATCH') return 'bg-blue-500/20 text-blue-400'
@@ -331,7 +332,7 @@ function methodClass(method) {
   return 'bg-cyber-accent/20 text-cyber-accent'
 }
 
-function statusClass(code) {
+function statusClass(code: number) {
   if (!code) return 'bg-cyber-accent/20 text-cyber-accent'
   if (code >= 200 && code < 300) return 'bg-emerald-500/20 text-emerald-400'
   if (code >= 400 && code < 500) return 'bg-amber-500/20 text-amber-400'
@@ -339,7 +340,7 @@ function statusClass(code) {
   return 'bg-cyber-accent/20 text-cyber-accent'
 }
 
-function formatTime(ts) {
+function formatTime(ts: string) {
   if (!ts) return '—'
   try {
     const d = new Date(ts)
@@ -353,8 +354,8 @@ async function ensureAllowed() {
   try {
     const res = await fetch(`${getApiTestBaseUrl()}/me`, { credentials: 'include' })
     if (res.ok) {
-      const me = await res.json()
-      const user = me?.user || me
+      const me = await res.json() as MeResponse
+      const user: DemoUser = me.user ?? (me as unknown as DemoUser)
       // app_admin (SQLite) is the sole gate — platform_admin alone is not sufficient (ADR-0003)
       allowed.value = user?.appRole === 'app_admin'
     } else {
@@ -378,7 +379,7 @@ async function loadLogs() {
     if (methodFilter.value) params.set('method', methodFilter.value)
     if (statusFilter.value) params.set('status', statusFilter.value)
     const logUrl = `${baseUrl}/logs?${params.toString()}`
-    const opts = {
+    const opts: RequestInit = {
       credentials: 'include',
       headers: { 'Content-Type': 'application/json', 'X-Frontend-Source': 'frontend-app' },
     }
@@ -388,8 +389,8 @@ async function loadLogs() {
     ])
     if (!logsRes.ok) throw new Error(`Logs: ${logsRes.status} ${logsRes.statusText}`)
     if (!statsRes.ok) throw new Error(`Stats: ${statsRes.status} ${statsRes.statusText}`)
-    logs.value = await logsRes.json()
-    stats.value = await statsRes.json()
+    logs.value = await logsRes.json() as LogEntry[]
+    stats.value = await statsRes.json() as LogStats
   } catch (err) {
     logs.value = []
     stats.value = {}

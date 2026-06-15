@@ -1,4 +1,19 @@
 import { Configuration, FrontendApi } from '@ory/client'
+import type {
+  UpdateLoginFlowBody,
+  UpdateRegistrationFlowBody,
+  UpdateRecoveryFlowBody,
+  UpdateSettingsFlowBody
+} from '@ory/client'
+
+/** Narrow an unknown caught error to one carrying an HTTP response status. */
+function responseStatus(error: unknown): number | undefined {
+  if (error && typeof error === 'object' && 'response' in error) {
+    const response = (error as { response?: { status?: number } }).response
+    return response?.status
+  }
+  return undefined
+}
 
 // ZERO TRUST: All requests must go through Oathkeeper
 // Frontends cannot directly access Kratos - must use Oathkeeper gateway
@@ -32,14 +47,14 @@ export async function checkSession() {
     const { data } = await currentOry.toSession()
     return data
   } catch (error) {
-    if (error.response?.status === 401) {
+    if (responseStatus(error) === 401) {
       return null
     }
     throw error
   }
 }
 
-export async function getLoginFlow(flowId) {
+export async function getLoginFlow(flowId: string) {
   try {
     const currentOry = getOryClient() // Get at runtime
     const { data } = await currentOry.getLoginFlow({ id: flowId })
@@ -61,7 +76,7 @@ export async function createLoginFlow() {
   }
 }
 
-export async function updateLoginFlow(flowId, payload) {
+export async function updateLoginFlow(flowId: string, payload: UpdateLoginFlowBody) {
   try {
     const currentOry = getOryClient() // Get at runtime
     const { data } = await currentOry.updateLoginFlow({
@@ -74,7 +89,7 @@ export async function updateLoginFlow(flowId, payload) {
   }
 }
 
-export async function getRegistrationFlow(flowId) {
+export async function getRegistrationFlow(flowId: string) {
   try {
     const currentOry = getOryClient() // Get at runtime
     const { data } = await currentOry.getRegistrationFlow({ id: flowId })
@@ -94,7 +109,7 @@ export async function createRegistrationFlow() {
   }
 }
 
-export async function updateRegistrationFlow(flowId, payload) {
+export async function updateRegistrationFlow(flowId: string, payload: UpdateRegistrationFlowBody) {
   try {
     const currentOry = getOryClient() // Get at runtime
     const { data } = await currentOry.updateRegistrationFlow({
@@ -107,7 +122,7 @@ export async function updateRegistrationFlow(flowId, payload) {
   }
 }
 
-export async function logout(returnTo = null) {
+export async function logout(returnTo: string | null = null) {
   try {
     const currentOry = getOryClient() // Get at runtime
     const params = returnTo ? { returnTo } : {}
@@ -119,7 +134,7 @@ export async function logout(returnTo = null) {
 }
 
 // Recovery flow functions
-export async function getRecoveryFlow(flowId) {
+export async function getRecoveryFlow(flowId: string) {
   try {
     const currentOry = getOryClient() // Get at runtime
     const { data } = await currentOry.getRecoveryFlow({ id: flowId })
@@ -141,7 +156,7 @@ export async function createRecoveryFlow() {
   }
 }
 
-export async function updateRecoveryFlow(flowId, payload) {
+export async function updateRecoveryFlow(flowId: string, payload: UpdateRecoveryFlowBody) {
   try {
     const currentOry = getOryClient() // Get at runtime
     const { data } = await currentOry.updateRecoveryFlow({
@@ -155,7 +170,7 @@ export async function updateRecoveryFlow(flowId, payload) {
 }
 
 // Settings flow functions
-export async function getSettingsFlow(flowId) {
+export async function getSettingsFlow(flowId: string) {
   try {
     const currentOry = getOryClient() // Get at runtime
     const { data } = await currentOry.getSettingsFlow({
@@ -167,7 +182,7 @@ export async function getSettingsFlow(flowId) {
   }
 }
 
-export async function updateSettingsFlow(flowId, payload) {
+export async function updateSettingsFlow(flowId: string, payload: UpdateSettingsFlowBody) {
   try {
     const currentOry = getOryClient() // Get at runtime
     const { data } = await currentOry.updateSettingsFlow({

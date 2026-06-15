@@ -296,27 +296,47 @@
   </div>
 </template>
 
-<script setup>
-import { ref, computed, onMounted, watch, inject } from 'vue'
+<script setup lang="ts">
+import { ref, computed, onMounted, watch, inject, type Ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import NovaLogoIcon from '../components/NovaLogoIcon.vue'
 import { checkSession } from '../composables/useAuth'
 import { initiateOAuthFlow } from '../composables/useHydraOAuth'
 import { getApiTestBaseUrl } from '../composables/useApiTest'
+import type { DemoUser, MeResponse, LogEntry } from '../types'
+
+/** A demo session shape derived from /api-test/me (mirrors the bits Home reads). */
+interface DemoSession {
+  identity: {
+    id?: string
+    traits?: { email?: string; full_name?: string; appRole?: string | null }
+    metadata_public?: { role?: string | null } | null
+  }
+}
+
+/** An API explorer endpoint card. */
+interface Endpoint {
+  key: string
+  method: string
+  path: string
+  level: 'public' | 'auth' | 'admin' | 'app-admin'
+  borderClass: string
+  btnClass: string
+}
 
 const router = useRouter()
 const route = useRoute()
-const session = ref(null)
+const session = ref<DemoSession | null>(null)
 const sessionLoading = ref(true)
-const apiResponse = ref(null)
-const apiError = ref(null)
-const loadingKey = ref(null)
-const lastTested = ref(null)
+const apiResponse = ref<({ user?: DemoUser } & Record<string, unknown>) | null>(null)
+const apiError = ref<string | null>(null)
+const loadingKey = ref<string | null>(null)
+const lastTested = ref<string | null>(null)
 const lastEndpoint = ref('')
 const lastMethod = ref('')
-const recentLogs = ref([])
+const recentLogs = ref<LogEntry[]>([])
 const recentLogsLoading = ref(false)
-const userFromMe = inject('userFromMe', null)
+const userFromMe = inject<Ref<DemoUser | null> | null>('userFromMe', null)
 
 const isAdmin = computed(() => {
   const s = session.value
@@ -335,7 +355,7 @@ const appUrl = import.meta.env.VITE_APP_URL || (typeof window !== 'undefined' ? 
 const oauthClientId = import.meta.env.VITE_NOVA_ID_CLIENT_ID || 'nova-id-test-app'
 const oauthRedirectUri = `${appUrl}/callback`
 
-const endpoints = [
+const endpoints: Endpoint[] = [
   { key: 'GET:/api-test/health', method: 'GET', path: '/api-test/health', level: 'public', borderClass: 'border-green-500/30 bg-green-500/5', btnClass: 'bg-green-500/20 text-green-400 hover:bg-green-500/30 border border-green-500/40' },
   { key: 'GET:/api-test/public', method: 'GET', path: '/api-test/public', level: 'public', borderClass: 'border-green-500/30 bg-green-500/5', btnClass: 'bg-green-500/20 text-green-400 hover:bg-green-500/30 border border-green-500/40' },
   { key: 'GET:/api-test/nova-id-session', method: 'GET', path: '/api-test/nova-id-session', level: 'auth', borderClass: 'border-cyber-accent/30 bg-cyber-accent/5', btnClass: 'bg-cyber-accent/20 text-cyber-accent hover:bg-cyber-accent/30 border border-cyber-accent/40' },
@@ -352,13 +372,13 @@ const endpoints = [
   { key: 'POST:/api-test/app-admin/configure', method: 'POST', path: '/api-test/app-admin/configure', level: 'app-admin', borderClass: 'border-orange-500/30 bg-orange-500/5', btnClass: 'bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 border border-orange-500/40' }
 ]
 
-async function sessionFromApiMe() {
+async function sessionFromApiMe(): Promise<DemoSession | null> {
   const url = `${getApiTestBaseUrl()}/me`
   try {
     const res = await fetch(url, { credentials: 'include' })
     if (!res.ok) return null
-    const me = await res.json()
-    const u = me?.user || me
+    const me = await res.json() as MeResponse
+    const u: DemoUser = me.user ?? (me as unknown as DemoUser)
     if (!u?.id) return null
     return {
       identity: {
@@ -383,12 +403,12 @@ async function loadRecentLogs() {
   recentLogsLoading.value = true
   try {
     const baseUrl = getApiTestBaseUrl()
-    const opts = {
+    const opts: RequestInit = {
       credentials: 'include',
       headers: { 'Content-Type': 'application/json', 'X-Frontend-Source': 'frontend-app' },
     }
     const res = await fetch(`${baseUrl}/logs?limit=3`, opts)
-    if (res.ok) recentLogs.value = await res.json()
+    if (res.ok) recentLogs.value = await res.json() as LogEntry[]
     else recentLogs.value = []
   } catch {
     recentLogs.value = []
@@ -409,7 +429,15 @@ onMounted(async () => {
       return
     }
     const sessionData = await checkSession()
-    session.value = sessionData || null
+    session.value = sessionData?.identity
+      ? {
+          identity: {
+            id: sessionData.identity.id,
+            traits: (sessionData.identity.traits ?? {}) as DemoSession['identity']['traits'],
+            metadata_public: (sessionData.identity.metadata_public ?? null) as DemoSession['identity']['metadata_public']
+          }
+        }
+      : null
     if (isAdmin.value) loadRecentLogs()
   } catch {
     session.value = null
@@ -421,15 +449,16 @@ onMounted(async () => {
 // Enrich session with full_name and role/appRole when App finishes loading /me; load logs if admin
 watch(
   () => (userFromMe && typeof userFromMe === 'object' && 'value' in userFromMe ? userFromMe.value : null),
-  (user) => {
+  (user: DemoUser | null) => {
     if (!user || !session.value?.identity?.traits) return
     const traits = session.value.identity.traits
     if (user.email) traits.email = user.email
     if (user.full_name || user.name) traits.full_name = user.full_name ?? user.name ?? traits.full_name ?? ''
     // role lives in metadata_public, not user-editable traits
     if (user.role != null) {
-      if (!session.value.identity.metadata_public) session.value.identity.metadata_public = {}
-      session.value.identity.metadata_public.role = user.role
+      const meta = session.value.identity.metadata_public ?? {}
+      meta.role = user.role
+      session.value.identity.metadata_public = meta
     }
     traits.appRole = user.appRole ?? traits.appRole ?? 'app_user'
     // app_admin (SQLite) is the sole gate — platform_admin alone is not sufficient (ADR-0003)
@@ -443,11 +472,11 @@ async function startOAuth() {
   try {
     await initiateOAuthFlow(oauthClientId, oauthRedirectUri)
   } catch (err) {
-    apiError.value = err.message || 'Failed to start Login with Nova ID'
+    apiError.value = (err instanceof Error ? err.message : '') || 'Failed to start Login with Nova ID'
   }
 }
 
-async function runTest(ep) {
+async function runTest(ep: Endpoint) {
   loadingKey.value = ep.key
   lastTested.value = ep.key
   apiError.value = null
@@ -460,14 +489,15 @@ async function runTest(ep) {
     const url = ep.path.startsWith('/api-test') ? `${getApiTestBaseUrl()}${ep.path.replace(/^\/api-test/, '')}` : ep.path
     const isSimpleGet = ep.method === 'GET' && (ep.path === '/api-test/health' || ep.path === '/api-test/public')
     // Always use the Kratos cookie session; the gateway's api-test rule accepts cookie_session (ADR-0002).
-    const options = {
+    const headers: Record<string, string> = {}
+    const options: RequestInit = {
       method: ep.method,
       credentials: 'include',
-      headers: {}
+      headers
     }
     if (!isSimpleGet) {
-      options.headers['Content-Type'] = 'application/json'
-      options.headers['X-Frontend-Source'] = 'frontend-app'
+      headers['Content-Type'] = 'application/json'
+      headers['X-Frontend-Source'] = 'frontend-app'
     }
     if (ep.method === 'POST' || ep.method === 'PUT') {
       options.body = JSON.stringify({ timestamp: new Date().toISOString(), source: 'frontend-app' })
@@ -480,7 +510,7 @@ async function runTest(ep) {
     }
     apiResponse.value = await response.json()
   } catch (err) {
-    apiError.value = err.message || 'Failed to call API'
+    apiError.value = (err instanceof Error ? err.message : '') || 'Failed to call API'
   } finally {
     loadingKey.value = null
   }

@@ -1,5 +1,5 @@
 import { createApp } from 'vue'
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import '../style.css'
 import App from './App.vue'
 import Home from './views/Home.vue'
@@ -8,7 +8,7 @@ import Callback from './views/Callback.vue'
 import About from './views/About.vue'
 import Architecture from './views/Architecture.vue'
 
-const routes = [
+const routes: RouteRecordRaw[] = [
   { path: '/', name: 'Home', component: Home },
   { path: '/callback', name: 'OAuthCallback', component: Callback },
   { path: '/about', name: 'About', component: About },

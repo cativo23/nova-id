@@ -6,6 +6,8 @@
 // role/appRole are now read from /api-test/me under the Kratos cookie session the gateway honors.
 // Only the transient PKCE/state/nonce handshake entries remain in sessionStorage.
 
+import type { IdTokenClaims, TokenResponse } from '../types'
+
 function getHydraPublicUrl() {
   if (import.meta.env.VITE_HYDRA_PUBLIC_URL) return import.meta.env.VITE_HYDRA_PUBLIC_URL
   if (typeof window !== 'undefined' && /\.ory\.localhost$/i.test(window.location.hostname)) {
@@ -29,7 +31,7 @@ function generateRandomString(length = 43) {
   return result
 }
 
-async function generateCodeChallenge(verifier) {
+async function generateCodeChallenge(verifier: string) {
   const encoder = new TextEncoder()
   const data = encoder.encode(verifier)
   const digest = await crypto.subtle.digest('SHA-256', data)
@@ -39,7 +41,7 @@ async function generateCodeChallenge(verifier) {
     .replace(/=/g, '')
 }
 
-export async function initiateOAuthFlow(clientId, redirectUri, scopes = ['openid', 'profile', 'email', 'offline_access']) {
+export async function initiateOAuthFlow(clientId: string, redirectUri: string, scopes: string[] = ['openid', 'profile', 'email', 'offline_access']) {
   const codeVerifier = generateRandomString()
   const codeChallenge = await generateCodeChallenge(codeVerifier)
   const state = generateRandomString()
@@ -65,7 +67,7 @@ export async function initiateOAuthFlow(clientId, redirectUri, scopes = ['openid
   window.location.href = `${getHydraPublicUrl()}/oauth2/auth?${params.toString()}`
 }
 
-export async function handleOAuthCallback(code, state) {
+export async function handleOAuthCallback(code: string, state: string): Promise<TokenResponse> {
   const storedState = sessionStorage.getItem(OAUTH_STORAGE_PREFIX + 'state')
   if (state !== storedState) {
     throw new Error('Invalid state parameter - possible CSRF attack')
@@ -93,11 +95,11 @@ export async function handleOAuthCallback(code, state) {
   })
 
   if (!tokenResponse.ok) {
-    const errorData = await tokenResponse.json().catch(() => ({}))
+    const errorData = await tokenResponse.json().catch(() => ({})) as { error_description?: string }
     throw new Error(errorData.error_description || `Token exchange failed: ${tokenResponse.statusText}`)
   }
 
-  const tokens = await tokenResponse.json()
+  const tokens = await tokenResponse.json() as TokenResponse
 
   const storedNonce = sessionStorage.getItem(OAUTH_STORAGE_PREFIX + 'nonce')
   if (tokens.id_token) {
@@ -122,7 +124,7 @@ export async function handleOAuthCallback(code, state) {
   return tokens
 }
 
-export function decodeIdToken(idToken) {
+export function decodeIdToken(idToken: string): IdTokenClaims {
   const parts = idToken.split('.')
   if (parts.length !== 3) throw new Error('Invalid ID token format')
   return JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')))
@@ -130,10 +132,10 @@ export function decodeIdToken(idToken) {
 
 /**
  * Validate id_token claims (exp, iat) per OIDC. Optional clock skew applied.
- * @param {object} claims - Decoded id_token payload
- * @param {number} [clockSkewSec=60] - Allowed skew in seconds
+ * @param claims - Decoded id_token payload
+ * @param clockSkewSec - Allowed skew in seconds (default 60)
  */
-export function validateIdTokenClaims(claims, clockSkewSec = ID_TOKEN_CLOCK_SKEW_SEC) {
+export function validateIdTokenClaims(claims: IdTokenClaims, clockSkewSec: number = ID_TOKEN_CLOCK_SKEW_SEC) {
   if (!claims || typeof claims !== 'object') throw new Error('Invalid id_token claims')
   const now = Math.floor(Date.now() / 1000)
   if (claims.exp != null) {
