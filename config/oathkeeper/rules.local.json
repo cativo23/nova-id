@@ -432,7 +432,12 @@
       }
     ],
     "authorizer": {
-      "handler": "allow"
+      "handler": "remote_json",
+      "config": {
+        "remote": "http://keto:4466/relation-tuples/check",
+        "payload": "{\"namespace\":\"App\",\"object\":\"nova-id-test-app\",\"relation\":\"access\",\"subject_id\":\"user:{{ print .Subject }}\"}",
+        "forward_response_headers_to_upstream": ["Content-Type"]
+      }
     },
     "mutators": [
       {
@@ -491,7 +496,12 @@
       }
     ],
     "authorizer": {
-      "handler": "allow"
+      "handler": "remote_json",
+      "config": {
+        "remote": "http://keto:4466/relation-tuples/check",
+        "payload": "{\"namespace\":\"Platform\",\"object\":\"nova\",\"relation\":\"administer\",\"subject_id\":\"user:{{ print .Subject }}\"}",
+        "forward_response_headers_to_upstream": ["Content-Type"]
+      }
     },
     "mutators": [
       {
