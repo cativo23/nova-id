@@ -1,0 +1,585 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/hydra-accept-login": {
+      "post": {
+        "operationId": "acceptHydraLogin",
+        "summary": "Accept a Hydra login challenge for the signed-in user",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/hydra-accept-consent": {
+      "post": {
+        "operationId": "acceptHydraConsent",
+        "summary": "Accept a Hydra consent challenge for the signed-in user",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/admin/users": {
+      "get": {
+        "operationId": "AdminUsersController_list",
+        "summary": "List all platform users (cursor-paginated)",
+        "parameters": [
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 500,
+              "default": 100,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageToken",
+            "required": false,
+            "in": "query",
+            "description": "Opaque Kratos pagination token",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Page of users + optional next-page cursor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedUsersDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid Bearer id_token"
+          },
+          "403": {
+            "description": "Caller lacks Platform:nova#manage_users in Keto"
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "oathkeeper-id-token": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "AdminUsersController_create",
+        "summary": "Create a new platform user identity",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Identity created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid Bearer id_token"
+          },
+          "403": {
+            "description": "Caller lacks Platform:nova#manage_users in Keto"
+          },
+          "409": {
+            "description": "Email already registered"
+          },
+          "422": {
+            "description": "Validation failed"
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "oathkeeper-id-token": []
+          }
+        ]
+      }
+    },
+    "/admin/users/{id}": {
+      "get": {
+        "operationId": "AdminUsersController_get",
+        "summary": "Get a single user by Kratos identity id",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid Bearer id_token"
+          },
+          "403": {
+            "description": "Caller lacks Platform:nova#manage_users in Keto"
+          },
+          "404": {
+            "description": "Identity not found"
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "oathkeeper-id-token": []
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "AdminUsersController_remove",
+        "summary": "Delete a user identity permanently",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Identity deleted"
+          },
+          "401": {
+            "description": "Missing or invalid Bearer id_token"
+          },
+          "403": {
+            "description": "Caller lacks Platform:nova#manage_users in Keto"
+          },
+          "404": {
+            "description": "Identity not found"
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "oathkeeper-id-token": []
+          }
+        ]
+      },
+      "patch": {
+        "operationId": "AdminUsersController_update",
+        "summary": "Partially update user traits / role",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid Bearer id_token"
+          },
+          "403": {
+            "description": "Caller lacks Platform:nova#manage_users in Keto"
+          },
+          "404": {
+            "description": "Identity not found"
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "oathkeeper-id-token": []
+          }
+        ]
+      }
+    },
+    "/admin/users/{id}/state": {
+      "patch": {
+        "operationId": "AdminUsersController_setState",
+        "summary": "Activate or deactivate a user identity",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetUserStateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid Bearer id_token"
+          },
+          "403": {
+            "description": "Caller lacks Platform:nova#manage_users in Keto"
+          },
+          "404": {
+            "description": "Identity not found"
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "oathkeeper-id-token": []
+          }
+        ]
+      }
+    },
+    "/admin/users/{id}/recovery-link": {
+      "post": {
+        "operationId": "AdminUsersController_recoveryLink",
+        "summary": "Generate a recovery link for a user",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Recovery link generated"
+          },
+          "401": {
+            "description": "Missing or invalid Bearer id_token"
+          },
+          "403": {
+            "description": "Caller lacks Platform:nova#manage_users in Keto"
+          },
+          "404": {
+            "description": "Identity not found"
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "oathkeeper-id-token": []
+          }
+        ]
+      }
+    },
+    "/me/permissions": {
+      "get": {
+        "operationId": "MeController_permissions",
+        "summary": "Resolve the caller's Platform-level Keto permissions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PermissionsResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid Bearer id_token"
+          }
+        },
+        "tags": [
+          "me"
+        ],
+        "security": [
+          {
+            "oathkeeper-id-token": []
+          }
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "Nova ID API",
+    "description": "Self-hosted central IdP BFF — Ory consolidation layer",
+    "version": "1.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "oathkeeper-id-token": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http"
+      }
+    },
+    "schemas": {
+      "UserResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "550e8400-e29b-41d4-a716-446655440000"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "alice@example.com"
+          },
+          "fullName": {
+            "type": "string",
+            "example": "Alice Smith"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "platform_admin",
+              "platform_user"
+            ],
+            "example": "platform_user",
+            "description": "JWT `role` claim (read by Oathkeeper id_token mutator from metadata_public.role). Gates RoleGuard / log access. Does NOT grant Platform admin (manage_users/administer); those live in Keto."
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "active",
+              "inactive"
+            ],
+            "example": "active"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2024-01-15T10:00:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "fullName",
+          "state",
+          "createdAt"
+        ]
+      },
+      "PaginatedUsersDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "description": "Page of user records",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserResponseDto"
+            }
+          },
+          "nextPageToken": {
+            "type": "string",
+            "description": "Opaque Kratos cursor for the next page; null when there are no further pages.",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "CreateUserDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "fullName": {
+            "type": "string",
+            "minLength": 1
+          },
+          "password": {
+            "type": "string",
+            "minLength": 8,
+            "description": "Initial password for the identity"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "platform_admin",
+              "platform_user"
+            ],
+            "default": "platform_user",
+            "description": "Sets the JWT `role` claim (via Oathkeeper id_token mutator reading metadata_public.role). Does NOT grant Platform admin (manage_users/administer) — that lives in Keto (A1-plan-2)."
+          }
+        },
+        "required": [
+          "email",
+          "fullName",
+          "password"
+        ]
+      },
+      "UpdateUserDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "fullName": {
+            "type": "string",
+            "minLength": 1
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "platform_admin",
+              "platform_user"
+            ],
+            "description": "Sets the JWT `role` claim (via Oathkeeper id_token mutator reading metadata_public.role). Does NOT grant Platform admin (manage_users/administer) — that lives in Keto (A1-plan-2)."
+          }
+        }
+      },
+      "SetUserStateDto": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "active",
+              "inactive"
+            ]
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "PermissionsResponseDto": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string"
+          },
+          "administer": {
+            "type": "boolean",
+            "description": "Platform-level admin: can administer the IdP"
+          },
+          "manageUsers": {
+            "type": "boolean",
+            "description": "Platform-level: can manage users in the shared pool"
+          },
+          "canViewUsers": {
+            "type": "boolean"
+          },
+          "canManageUsers": {
+            "type": "boolean"
+          },
+          "canManagePermissions": {
+            "type": "boolean"
+          },
+          "canAccessAdmin": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "userId",
+          "administer",
+          "manageUsers",
+          "canViewUsers",
+          "canManageUsers",
+          "canManagePermissions",
+          "canAccessAdmin"
+        ]
+      }
+    }
+  }
+}
