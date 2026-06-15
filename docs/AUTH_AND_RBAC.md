@@ -197,7 +197,7 @@ The BFF is a **modular monolith** (one process, explicit module boundaries). All
 ## Audit notes
 
 - **`keto-read` access:** Querying the Keto relation tuples API (including for audit) is now gated behind the platform `administer` permission (`Platform:nova#admins`). This closes the previously-public `keto-read` browser route.
-- **Legacy `kratos-admin` rule:** The pre-A1 Oathkeeper rule that exposed Kratos admin endpoints to platform admins has been superseded by the A1.2 BFF `/api/admin/*` paths, which are guarded via the same `Platform:nova#admins` membership but offer a curated, type-safe API surface.
+- **Legacy `kratos-admin` rule:** The pre-A1 Oathkeeper rule that proxies Kratos admin endpoints directly (gated by `Platform:nova#admins`) still exists and still routes its matched sub-paths. It is now complemented by — and superseded *in preference* by — the A1.2 BFF `/api/admin/*` paths, which are guarded via the same `Platform:nova#admins` membership but offer a curated, type-safe API surface. Removing the direct rule is an audit follow-up.
 
 ---
 
@@ -205,10 +205,11 @@ The BFF is a **modular monolith** (one process, explicit module boundaries). All
 
 **A1.4 / A1.5 live verification PASSED (2026-06-14):**
 - **API level (5/5):**
-  - Cookie session → `/api-test/me` returns 200 with user metadata
-  - Cookie session → `/api-test/logs` returns 200 with access logs
-  - Bearer token (non-member) → gateway denies with 403 (per-request Keto check)
-  - Keto down → gateway denies with 403 (fail-closed)
+  - Cookie session (admin) → `/api-test/me` returns 200 (`role: platform_admin`)
+  - Cookie session (admin) → `/api-test/logs` returns 200 — confirms the ADR-0002 platform-role-on-access-token fix (was 403)
+  - Cookie session (member `user@nova.test`) → `/api-test/me` returns 200 (per-request Keto check allows)
+  - Cookie session (non-member `outsider@nova.test`) → gateway denies with 403 (per-request Keto check)
+  - Keto down → gateway denies (fail-closed: the `remote_json` authorizer cannot reach Keto, returns 500 — not a pass-through); restored to 200 after Keto restart
 - **Browser OAuth happy-path:**
   - Login flow completes; consent screen presented
   - Accept consent: user authenticated, logs visible
