@@ -528,7 +528,7 @@
       "url": "http://api:8080"
     },
     "match": {
-      "url": "<(http|https)://(api\\.ory\\.localhost|admin\\.ory\\.localhost|auth\\.ory\\.localhost|app\\.ory\\.localhost|localhost(:[0-9]+)?|oathkeeper(:[0-9]+)?)/api/(me/permissions|admin)(/.*)?>",
+      "url": "<(http|https)://(api\\.ory\\.localhost|admin\\.ory\\.localhost|auth\\.ory\\.localhost|app\\.ory\\.localhost|localhost(:[0-9]+)?|oathkeeper(:[0-9]+)?)/api/(me/permissions|admin(?!-))(/.*)?>",
       "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
     },
     "authenticators": [
