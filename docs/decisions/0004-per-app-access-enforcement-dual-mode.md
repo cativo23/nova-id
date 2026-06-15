@@ -165,6 +165,14 @@ flowchart TD
   Provisioning the seed tuples is a deployment prerequisite, not an optional step.
 - The `App` object id being the Hydra `client_id` couples the two namespaces by convention; this is
   intentional so that Mode A and Mode B key off the same identifier.
+- **Keto unreachable produces HTTP 500, not 403 — this is intentional.** When Keto is down, the
+  `remote_json` authorizer cannot connect and Oathkeeper returns 500. This is fail-closed (the
+  request is denied), which is the correct security posture. Mapping the connection failure to 403
+  would require configuring `internal_server_error` as a `forbidden` alias in the Oathkeeper error
+  handlers — which Oathkeeper v25.4.0 does not support cleanly (`when.error` accepts only
+  `unauthorized` and `forbidden`); any workaround would mask genuine 5xx errors. The 500 is
+  therefore kept as-is. Operators should treat a sustained `500` on gated routes as a Keto health
+  signal, not a permission denial.
 
 ## Trade-offs
 
