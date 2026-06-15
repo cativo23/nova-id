@@ -58,19 +58,19 @@
   </header>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { checkSession, logout } from '../composables/useAuth'
 
 const router = useRouter()
 const route = useRoute()
-const menuRef = ref(null)
+const menuRef = ref<HTMLElement | null>(null)
 const open = ref(false)
 const userEmail = ref('')
 const userName = ref('')
 
-const routeTitles = {
+const routeTitles: Record<string, { title: string; subtitle: string }> = {
   '/dashboard': { title: 'Dashboard', subtitle: 'Session and overview' },
   '/users': { title: 'User Management', subtitle: 'Identities, roles, and access' },
   '/permissions': { title: 'Permissions', subtitle: 'Keto & OAuth clients' },
@@ -79,8 +79,8 @@ const routeTitles = {
 const pageTitle = computed(() => routeTitles[route.path]?.title ?? 'Admin')
 const pageSubtitle = computed(() => routeTitles[route.path]?.subtitle ?? '')
 
-function handleClickOutside(e) {
-  if (menuRef.value && !menuRef.value.contains(e.target)) {
+function handleClickOutside(e: MouseEvent) {
+  if (menuRef.value && !menuRef.value.contains(e.target as Node)) {
     open.value = false
   }
 }
@@ -88,8 +88,7 @@ function handleClickOutside(e) {
 async function handleLogout() {
   open.value = false
   try {
-    const returnTo = window.location.origin + '/'
-    const data = await logout(returnTo)
+    const data = await logout()
     if (data.logout_url) {
       window.location.href = data.logout_url
     } else {

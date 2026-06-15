@@ -5,19 +5,19 @@
 const isProd = import.meta.env.PROD
 
 export const logger = {
-  debug (...args) {
+  debug (...args: unknown[]) {
     if (!isProd) console.debug('[admin]', ...args)
   },
-  log (...args) {
+  log (...args: unknown[]) {
     if (!isProd) console.log('[admin]', ...args)
   },
-  info (...args) {
+  info (...args: unknown[]) {
     if (!isProd) console.info('[admin]', ...args)
   },
-  warn (...args) {
+  warn (...args: unknown[]) {
     if (!isProd) console.warn('[admin]', ...args)
   },
-  error (...args) {
+  error (...args: unknown[]) {
     console.error('[admin]', ...args)
   }
 }

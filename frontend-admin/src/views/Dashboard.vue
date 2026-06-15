@@ -34,7 +34,7 @@
           </div>
           <div class="flex justify-between gap-2">
             <dt class="text-cyber-light/50">Expires</dt>
-            <dd class="font-medium text-cyber-light truncate" :title="new Date(session.expires_at).toLocaleString()">
+            <dd class="font-medium text-cyber-light truncate" :title="session.expires_at ? new Date(session.expires_at).toLocaleString() : ''">
               {{ formatExpiry(session.expires_at) }}
             </dd>
           </div>
@@ -55,20 +55,20 @@
           <h2 class="text-base font-semibold text-cyber-light">Identity</h2>
         </div>
         <div class="space-y-2 text-sm">
-          <p v-if="session.identity?.traits?.email" class="truncate">
+          <p v-if="identityTraits?.email" class="truncate">
             <span class="text-cyber-light/50">Email</span>
-            <span class="ml-2 font-medium text-cyber-light">{{ session.identity.traits.email }}</span>
+            <span class="ml-2 font-medium text-cyber-light">{{ identityTraits.email }}</span>
           </p>
-          <p v-if="session.identity?.traits?.full_name" class="truncate">
+          <p v-if="identityTraits?.full_name" class="truncate">
             <span class="text-cyber-light/50">Name</span>
-            <span class="ml-2 font-medium text-cyber-light">{{ session.identity.traits.full_name }}</span>
+            <span class="ml-2 font-medium text-cyber-light">{{ identityTraits.full_name }}</span>
           </p>
-          <div v-if="session.identity?.metadata_public?.role" class="pt-1">
+          <div v-if="identityRole" class="pt-1">
             <span
               class="inline-flex rounded-badge border px-2 py-0.5 text-xs font-semibold"
-              :class="getRoleBadgeClass(session.identity.metadata_public.role)"
+              :class="getRoleBadgeClass(identityRole)"
             >
-              {{ (session.identity.metadata_public.role || '').replace('platform_', '') }}
+              {{ (identityRole || '').replace('platform_', '') }}
             </span>
           </div>
         </div>
@@ -215,13 +215,13 @@
       <p class="text-sm text-cyber-light/60 mb-4">Permission-based access for your account</p>
       <p v-if="loadingPermissions" class="text-sm text-cyber-light/50">Loading…</p>
       <div v-else class="space-y-3">
-        <p v-if="session.identity?.metadata_public?.role" class="text-sm text-cyber-light/70 mb-2">
+        <p v-if="identityRole" class="text-sm text-cyber-light/70 mb-2">
           Identity role:
           <span
             class="ml-2 inline-flex rounded-badge border px-2 py-0.5 text-xs font-semibold"
-            :class="getRoleBadgeClass(session.identity.metadata_public.role)"
+            :class="getRoleBadgeClass(identityRole)"
           >
-            {{ (session.identity.metadata_public.role || '').replace('platform_', '') }}
+            {{ (identityRole || '').replace('platform_', '') }}
           </span>
         </p>
         <ul v-if="userPermissions.length > 0" class="grid gap-2 sm:grid-cols-2">
@@ -256,24 +256,27 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { checkSession, listUsers } from '../composables/useAuth'
+import { checkSession } from '../composables/useAuth'
+import { adminUsersControllerList } from '@nova-id/api-client'
+import type { Session } from '@ory/client'
+import type { UserResponseDto } from '@nova-id/api-client'
 import { getRoleBadgeClass } from '../utils/roleColors'
 
 const router = useRouter()
-const session = ref(null)
-const userPermissions = ref([])
+const session = ref<Session | null>(null)
+const userPermissions = ref<string[]>([])
 const canViewUsersPermission = ref(false)
 const canManagePermissionsPermission = ref(false)
 const loadingPermissions = ref(true)
 
-const usersForCharts = ref([])
+const usersForCharts = ref<UserResponseDto[]>([])
 const loadingUsers = ref(false)
-const usersChartError = ref(null)
+const usersChartError = ref<string | null>(null)
 
-const roleColorsMap = {
+const roleColorsMap: Record<string, string> = {
   platform_admin: 'rgba(168, 85, 247, 0.7)',
   platform_user: 'rgba(125, 207, 255, 0.6)'
 }
@@ -281,7 +284,7 @@ const roleColorsMap = {
 const roleChartData = computed(() => {
   const users = usersForCharts.value
   if (!users.length) return []
-  const counts = {}
+  const counts: Record<string, number> = {}
   users.forEach((u) => {
     const role = u.role || 'platform_user'
     counts[role] = (counts[role] || 0) + 1
@@ -312,18 +315,24 @@ const statusChartData = computed(() => {
   }
 })
 
+// Typed accessors over the loosely-typed Kratos identity payload (traits and
+// metadata_public are `object` in @ory/client). Used by the template.
+const identityTraits = computed(() => session.value?.identity?.traits as { full_name?: string; email?: string } | undefined)
+const identityRole = computed(() => (session.value?.identity?.metadata_public as { role?: string } | undefined)?.role)
+
 const welcomeTitle = computed(() => {
-  if (!session.value?.identity?.traits) return 'Dashboard'
-  const name = session.value.identity.traits.full_name || session.value.identity.traits.email?.split('@')[0]
+  const traits = identityTraits.value
+  if (!traits) return 'Dashboard'
+  const name = traits.full_name || traits.email?.split('@')[0]
   if (name) return `Hi, ${name}`
   return 'Dashboard'
 })
 
-function formatExpiry(expiresAt) {
+function formatExpiry(expiresAt?: string) {
   if (!expiresAt) return '—'
   const d = new Date(expiresAt)
   const now = new Date()
-  const diff = d - now
+  const diff = d.getTime() - now.getTime()
   const days = Math.floor(diff / (24 * 60 * 60 * 1000))
   if (days < 0) return 'Expired'
   if (days === 0) return 'Today'
@@ -366,9 +375,10 @@ onMounted(async () => {
         loadingUsers.value = true
         usersChartError.value = null
         try {
-          const res = await listUsers({ pageSize: 250 })
-          // BFF returns UserResponseDto[] — listUsers wraps in { identities }
-          usersForCharts.value = res.identities || []
+          // Generated api-client plain fn (non-hook) — onMounted runs outside a
+          // query scope. Returns PaginatedUsersDto { data, nextPageToken }.
+          const res = await adminUsersControllerList({ pageSize: 250 })
+          usersForCharts.value = res.data || []
         } catch (_) {
           usersChartError.value = 'Could not load users for overview.'
         } finally {

@@ -6,9 +6,9 @@ const isProd = import.meta.env.PROD
 
 const requiredInProd = [
   'VITE_OATHKEEPER_URL'
-]
+] as const
 
-export function validateEnv () {
+export function validateEnv (): void {
   if (!isProd) return
 
   const missing = requiredInProd.filter(key => {
@@ -24,7 +24,7 @@ export function validateEnv () {
   }
 }
 
-export function getEnv (key, fallback = '') {
+export function getEnv (key: string, fallback = ''): string {
   const v = import.meta.env[key]
   return v !== undefined && v !== '' ? v : fallback
 }

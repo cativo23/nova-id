@@ -1,18 +1,26 @@
-// Permissions composable — reads from BFF /api/me/permissions (A1.3+).
+// Permissions helper — reads from BFF /api/me/permissions (A1.3+).
 // Keto is no longer called directly from the frontend; all permission logic
 // is server-side in the BFF (KetoService).
 //
+// These are plain async functions (NOT Vue composables) because they are called
+// from the router navigation guard (main.ts) and from view onMounted hooks — i.e.
+// outside a component setup() where TanStack Query hooks cannot run. They consume
+// the generated api-client's plain `meControllerPermissions` function, which routes
+// through the shared axios mutator (baseURL '/api', withCredentials). Components that
+// render permission state should prefer the `useMeControllerPermissions` query hook.
+//
 // This module is the single source of truth for the cached /me/permissions
 // response: fetchMyPermissions() memoizes into _cachedPermsPromise so that every
-// entry point (main.js route guard, Home.vue, Dashboard.vue, UsersManagement.vue,
+// entry point (main.ts route guard, Home.vue, Dashboard.vue, UsersManagement.vue,
 // PermissionsManagement.vue) shares ONE network fetch per page load.
-// usePermissionCache.js delegates here (this is the leaf module → no import cycle).
-const oathkeeperUrl = import.meta.env.VITE_OATHKEEPER_URL || 'http://localhost:4455'
+// usePermissionCache.ts delegates here (this is the leaf module → no import cycle).
+import { meControllerPermissions } from '@nova-id/api-client'
+import type { PermissionsResponseDto } from '@nova-id/api-client'
 
 // Module-level memoized promise for the raw /me/permissions response.
-let _cachedPermsPromise = null
+let _cachedPermsPromise: Promise<PermissionsResponseDto> | null = null
 
-async function fetchMyPermissions(forceRefresh = false) {
+async function fetchMyPermissions(forceRefresh = false): Promise<PermissionsResponseDto> {
   if (forceRefresh) {
     _cachedPermsPromise = null
   }
@@ -20,20 +28,19 @@ async function fetchMyPermissions(forceRefresh = false) {
     // Store the promise before it resolves so concurrent callers share one fetch.
     // On rejection we null out the cache so the next call retries (avoids permanent
     // negative-caching after transient network errors or 401s).
-    _cachedPermsPromise = (async () => {
-      const res = await fetch(`${oathkeeperUrl}/api/me/permissions`, { credentials: 'include' })
-      if (!res.ok) { _cachedPermsPromise = null; throw new Error(`GET /me/permissions → ${res.status}`) }
-      return res.json()
-    })().catch((e) => { _cachedPermsPromise = null; throw e })
+    _cachedPermsPromise = meControllerPermissions().catch((e) => {
+      _cachedPermsPromise = null
+      throw e
+    })
   }
   return _cachedPermsPromise
 }
 
 // canAccessAdmin: true if the current user has the Platform:nova#administer permit.
-// Called by main.js route guard and Home.vue with the session userId.
+// Called by main.ts route guard and Home.vue with the session userId.
 // The BFF returns canAccessAdmin keyed off the session, so userId is accepted
 // for API compatibility but the BFF ignores it (uses the id_token subject).
-export async function canAccessAdmin(_userId) {
+export async function canAccessAdmin(_userId?: string): Promise<boolean> {
   try {
     const perms = await fetchMyPermissions()
     return perms.canAccessAdmin === true
@@ -44,7 +51,7 @@ export async function canAccessAdmin(_userId) {
 }
 
 // canManagePermissions: administer (platform admin)
-export async function canManagePermissions(_userId) {
+export async function canManagePermissions(_userId?: string): Promise<boolean> {
   try {
     const perms = await fetchMyPermissions()
     return perms.canManagePermissions === true
@@ -56,9 +63,19 @@ export async function canManagePermissions(_userId) {
 
 // ── Bulk helper used by usePermissionCache ────────────────────────────────────
 
+export interface PermissionFlags {
+  canViewUsers: boolean
+  canAddUsers: boolean
+  canEditUsers: boolean
+  canDeleteUsers: boolean
+  canChangePermissions: boolean
+  canManagePermissions: boolean
+  canAccessAdmin: boolean
+}
+
 // Returns all capability flags from the (cached) BFF response in the shape
 // expected by Dashboard.vue, UsersManagement.vue, and PermissionsManagement.vue.
-export async function getAllUserPermissionFlags(_userId, forceRefresh = false) {
+export async function getAllUserPermissionFlags(_userId?: string, forceRefresh = false): Promise<PermissionFlags> {
   try {
     const perms = await fetchMyPermissions(forceRefresh)
     return {
@@ -83,12 +100,4 @@ export async function getAllUserPermissionFlags(_userId, forceRefresh = false) {
       canAccessAdmin: false,
     }
   }
-}
-
-// TODO(A1-plan-2): canAccessApp per-app check (App:<appId>#access) — no BFF endpoint
-// yet. Intentionally NOT exported until A1-plan-2 lands, so no caller depends on the
-// always-true stub.
-// eslint-disable-next-line no-unused-vars
-async function canAccessApp(_userId, _appName) {
-  return true
 }

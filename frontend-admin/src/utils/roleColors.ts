@@ -1,5 +1,12 @@
 // Role color utilities for UI (platform_admin / platform_user)
-export const roleColors = {
+interface RoleColor {
+  bg: string
+  text: string
+  border: string
+  badge: string
+}
+
+export const roleColors: Record<string, RoleColor> = {
   platform_admin: {
     bg: 'bg-purple-500/20',
     text: 'text-purple-400',
@@ -14,11 +21,11 @@ export const roleColors = {
   }
 }
 
-export function getRoleColors(role) {
-  return roleColors[role] || roleColors['platform_user']
+export function getRoleColors(role?: string | null): RoleColor {
+  return (role && roleColors[role]) || roleColors['platform_user']
 }
 
-export function getRoleBadgeClass(role) {
+export function getRoleBadgeClass(role?: string | null): string {
   const colors = getRoleColors(role)
   return `px-2 py-1 rounded text-sm font-semibold border ${colors.badge}`
 }

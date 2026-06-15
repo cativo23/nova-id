@@ -525,7 +525,7 @@
                 <button type="button" @click="userToDeactivate = null" class="btn-secondary">
                   Cancel
                 </button>
-                <button type="button" @click="deactivateUserAction" :disabled="togglingState" class="btn-primary disabled:opacity-50">
+                <button type="button" @click="deactivateUserAction" :disabled="!!togglingState" class="btn-primary disabled:opacity-50">
                   {{ togglingState ? 'Updating…' : 'Deactivate' }}
                 </button>
               </div>
@@ -571,23 +571,34 @@
   </div>
 </template>
 
-<script setup>
-import { ref, onMounted } from 'vue'
+<script setup lang="ts">
+import { ref, computed, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { checkSession, listUsers, updateUser, deleteUser, createUser, createRecoveryLink, markEmailAsVerified, setIdentityState } from '../composables/useAuth'
+import { useQueryClient } from '@tanstack/vue-query'
+import {
+  useAdminUsersControllerList,
+  useAdminUsersControllerCreate,
+  useAdminUsersControllerUpdate,
+  useAdminUsersControllerSetState,
+  useAdminUsersControllerRemove,
+  useAdminUsersControllerRecoveryLink,
+  getAdminUsersControllerListQueryKey,
+} from '@nova-id/api-client'
+import type { UserResponseDto, CreateUserDto, UpdateUserDto } from '@nova-id/api-client'
+import { checkSession, markEmailAsVerified } from '../composables/useAuth'
 import { getRoleBadgeClass } from '../utils/roleColors'
-// Note: Individual permission checkers are no longer imported
-// We use getAllUserPermissionFlags() for optimized single API call
+import type { Identity } from '@ory/client'
+
 const router = useRouter()
-const users = ref([])
-const loading = ref(true)
-const error = ref(null)
-const success = ref(null)
-const editingUser = ref(null)
-const viewingPermissions = ref(null)
+const qc = useQueryClient()
+
+const error = ref<string | null>(null)
+const success = ref<string | null>(null)
+const editingUser = ref<UserResponseDto | null>(null)
+const viewingPermissions = ref<UserResponseDto | null>(null)
 const saving = ref(false)
 const deleting = ref(false)
-const currentUser = ref(null)
+const currentUser = ref<Identity | null>(null)
 const permissions = ref({
   canView: false,
   canAdd: false,
@@ -597,25 +608,71 @@ const permissions = ref({
 })
 const editForm = ref({
   email: '',
-  full_name: ''
+  full_name: '',
+  role: 'platform_user'
 })
 const loadingUserPermissions = ref(false)
-const userPermissionsList = ref([])
-const verifyingEmail = ref(null)
+const userPermissionsList = ref<string[]>([])
+const verifyingEmail = ref<string | null>(null)
 
-// Pagination and search state
+// Gates rendering of the users table until the permission check completes.
+const checkingAccess = ref(true)
+
+// ── Pagination and search state ──────────────────────────────────────────────
 const searchQuery = ref('')
-// Token for the CURRENT page (null = first page).
-const currentPageToken = ref(null)
+// Token for the CURRENT page (undefined = first page).
+const currentPageToken = ref<string | undefined>(undefined)
 // Stack of previously-visited page tokens (for Prev navigation).
 // Kratos cursors are forward-only; we maintain the history ourselves.
-const pageTokenStack = ref([])
-// nextPageToken returned by the most recent listUsers call.
-const nextPageToken = ref(null)
+const pageTokenStack = ref<(string | undefined)[]>([])
 const pageSize = ref(5)
 
+// Reactive query params drive the generated useQuery list hook. Mutating these
+// (via pagination/page-size handlers) refetches the list automatically.
+const listParams = reactive<{ pageSize: number; pageToken?: string }>({
+  pageSize: pageSize.value,
+  pageToken: undefined,
+})
+
+// GET /admin/users via the generated TanStack Query hook. `enabled` defers the
+// request until the permission check confirms the caller can view users.
+const usersQuery = useAdminUsersControllerList(listParams, {
+  query: { enabled: computed(() => permissions.value.canView) },
+})
+
+// Loading covers both the initial permission check and the list query.
+const loading = computed(() => checkingAccess.value || usersQuery.isLoading.value)
+
+// nextPageToken from the most recent list response.
+const nextPageToken = computed<string | null>(() => usersQuery.data.value?.nextPageToken ?? null)
+
+// Client-side search filter over the CURRENT page only — Kratos admin list has no
+// server-side filter. Full cross-page search is deferred (TODO(A1-plan-2)).
+const users = computed<UserResponseDto[]>(() => {
+  const page = usersQuery.data.value?.data ?? []
+  const q = searchQuery.value.trim().toLowerCase()
+  if (!q) return page
+  return page.filter((u) =>
+    (u.email || '').toLowerCase().includes(q) ||
+    (u.fullName || '').toLowerCase().includes(q) ||
+    (u.role || '').toLowerCase().includes(q)
+  )
+})
+
+// ── List mutations (generated useMutation hooks) ─────────────────────────────
+const createMutation = useAdminUsersControllerCreate()
+const updateMutation = useAdminUsersControllerUpdate()
+const setStateMutation = useAdminUsersControllerSetState()
+const removeMutation = useAdminUsersControllerRemove()
+const recoveryLinkMutation = useAdminUsersControllerRecoveryLink()
+
+// Invalidate the cached users list so the table refetches after a write.
+function invalidateUsers() {
+  return qc.invalidateQueries({ queryKey: getAdminUsersControllerListQueryKey() })
+}
+
 onMounted(async () => {
-  // Check if user has permission to view users (via Keto)
+  // Check if user has permission to view users (via the BFF /me/permissions).
   const session = await checkSession()
   if (!session || !session.identity?.id) {
     router.push('/dashboard')
@@ -626,10 +683,9 @@ onMounted(async () => {
 
   try {
     const userId = session.identity.id
-    // Use optimized function with caching
     const { getCachedPermissionFlags } = await import('../composables/usePermissionCache')
     const permissionFlags = await getCachedPermissionFlags(userId)
-    
+
     permissions.value = {
       canView: permissionFlags.canViewUsers,
       canAdd: permissionFlags.canAddUsers,
@@ -642,83 +698,70 @@ onMounted(async () => {
       router.push('/dashboard')
       return
     }
-  } catch (error) {
-    console.error('Error checking permission', { status: error?.response?.status })
+  } catch (err) {
+    console.error('Error checking permission', { status: (err as { response?: { status?: number } })?.response?.status })
     router.push('/dashboard')
     return
+  } finally {
+    checkingAccess.value = false
   }
-
-  await loadUsers()
+  // The list query fires automatically once permissions.canView flips true.
 })
 
-const loadUsers = async (pageToken = null) => {
-  loading.value = true
-  error.value = null
-  success.value = null
-  try {
-    const response = await listUsers({
-      pageToken,
-      pageSize: pageSize.value,
-      searchQuery: searchQuery.value
-    })
-
-    users.value = response.identities || []
-    nextPageToken.value = response.nextPageToken ?? null
-    currentPageToken.value = pageToken
-  } catch (err) {
-    // Do not log err directly — it may carry a BFF body with PHI.
-    const status = err.response?.status
-    error.value = status === 401
-      ? 'Session expired. Redirecting to login…'
-      : err.message || 'Failed to load users.'
-  } finally {
-    loading.value = false
-  }
+// Apply the current page token to the reactive query params (triggers refetch).
+function applyPage(pageToken?: string) {
+  currentPageToken.value = pageToken
+  listParams.pageToken = pageToken
+  listParams.pageSize = pageSize.value
 }
 
 const nextPage = () => {
   if (nextPageToken.value) {
     // Push current token onto the stack so Prev can return here.
     pageTokenStack.value.push(currentPageToken.value)
-    loadUsers(nextPageToken.value)
+    applyPage(nextPageToken.value)
   }
 }
 
 const prevPage = () => {
   if (pageTokenStack.value.length > 0) {
     const prev = pageTokenStack.value.pop()
-    loadUsers(prev)
+    applyPage(prev)
   }
 }
 
 const firstPage = () => {
   pageTokenStack.value = []
-  loadUsers(null)
+  applyPage(undefined)
 }
 
 const handleSearch = () => {
   // Reset to first page when searching — clear the Prev history so it can't
   // navigate back into a pre-filter page with a stale cursor.
   pageTokenStack.value = []
-  currentPageToken.value = null
-  loadUsers(null)
+  applyPage(undefined)
 }
 
 const handlePageSizeChange = () => {
   // Reset to first page when changing page size — clear the Prev history so it
   // can't navigate back into a pre-resize page with a stale cursor.
   pageTokenStack.value = []
-  currentPageToken.value = null
-  loadUsers(null)
+  applyPage(undefined)
 }
 
 const showAddUser = ref(false)
-const userToDelete = ref(null)
-const userToDeactivate = ref(null)
+const userToDelete = ref<UserResponseDto | null>(null)
+const userToDeactivate = ref<UserResponseDto | null>(null)
 const creatingUser = ref(false)
-const togglingState = ref(null)
-const sendingRecovery = ref(null)
-const recoveryData = ref(null)
+const togglingState = ref<string | null>(null)
+const sendingRecovery = ref<string | null>(null)
+const recoveryData = ref<{
+  userEmail: string
+  recovery_url: string
+  recovery_code: string | null
+  copiedUrl: boolean
+  copiedCode: boolean
+} | null>(null)
 const addUserForm = ref({
   email: '',
   full_name: '',
@@ -726,11 +769,11 @@ const addUserForm = ref({
   role: 'platform_user'
 })
 
-const confirmDelete = (user) => {
+const confirmDelete = (user: UserResponseDto) => {
   userToDelete.value = user
 }
 
-const confirmDeactivate = (user) => {
+const confirmDeactivate = (user: UserResponseDto) => {
   userToDeactivate.value = user
 }
 
@@ -746,19 +789,19 @@ const deactivateUserAction = async () => {
   error.value = null
   success.value = null
   try {
-    await setIdentityState(id, 'inactive')
+    await setStateMutation.mutateAsync({ id, data: { state: 'inactive' } })
     userToDeactivate.value = null
     success.value = 'User deactivated'
-    await loadUsers()
+    await invalidateUsers()
     setTimeout(() => { success.value = null }, 3000)
   } catch (err) {
-    error.value = err.message || 'Failed to deactivate user'
+    error.value = (err as Error).message || 'Failed to deactivate user'
   } finally {
     togglingState.value = null
   }
 }
 
-const activateUser = async (user) => {
+const activateUser = async (user: UserResponseDto) => {
   if (!permissions.value.canEdit) {
     error.value = 'You do not have permission to edit users'
     return
@@ -767,12 +810,12 @@ const activateUser = async (user) => {
   error.value = null
   success.value = null
   try {
-    await setIdentityState(user.id, 'active')
+    await setStateMutation.mutateAsync({ id: user.id, data: { state: 'active' } })
     success.value = 'User activated'
-    await loadUsers()
+    await invalidateUsers()
     setTimeout(() => { success.value = null }, 3000)
   } catch (err) {
-    error.value = err.message || 'Failed to activate user'
+    error.value = (err as Error).message || 'Failed to activate user'
   } finally {
     togglingState.value = null
   }
@@ -784,20 +827,21 @@ const createUserAction = async () => {
     error.value = 'You do not have permission to add users'
     return
   }
-  
+
   creatingUser.value = true
   error.value = null
   success.value = null
-  
+
   try {
-    // BFF DTO shape: { email, fullName, password, role }
-    await createUser({
-      email: addUserForm.value.email,
-      fullName: addUserForm.value.full_name,
-      password: addUserForm.value.password,
-      role: addUserForm.value.role || 'platform_user'
+    await createMutation.mutateAsync({
+      data: {
+        email: addUserForm.value.email,
+        fullName: addUserForm.value.full_name,
+        password: addUserForm.value.password,
+        role: (addUserForm.value.role || 'platform_user') as CreateUserDto['role']
+      }
     })
-    
+
     addUserForm.value = {
       email: '',
       full_name: '',
@@ -806,11 +850,11 @@ const createUserAction = async () => {
     }
     showAddUser.value = false
     success.value = 'User created successfully'
-    await loadUsers()
+    await invalidateUsers()
     setTimeout(() => { success.value = null }, 3000)
   } catch (err) {
     // Do not log err directly — may carry BFF body with PHI.
-    console.error('Error creating user', { status: err.response?.status })
+    console.error('Error creating user', { status: (err as { response?: { status?: number } })?.response?.status })
     error.value = 'Failed to create user. Please try again.'
   } finally {
     creatingUser.value = false
@@ -819,59 +863,67 @@ const createUserAction = async () => {
 
 const deleteUserAction = async () => {
   if (!userToDelete.value) return
-  
+
   // Check permission before deleting
   if (!permissions.value.canDelete) {
     error.value = 'You do not have permission to delete users'
     userToDelete.value = null
     return
   }
-  
+
   deleting.value = true
   error.value = null
   success.value = null
-  
+
   try {
-    await deleteUser(userToDelete.value.id)
+    await removeMutation.mutateAsync({ id: userToDelete.value.id })
     userToDelete.value = null
     success.value = 'User deleted successfully'
-    await loadUsers()
+    await invalidateUsers()
     setTimeout(() => { success.value = null }, 3000)
   } catch (err) {
-    console.error('Error deleting user', { status: err.response?.status })
+    console.error('Error deleting user', { status: (err as { response?: { status?: number } })?.response?.status })
     error.value = 'Failed to delete user. Please try again.'
   } finally {
     deleting.value = false
   }
 }
 
-const sendRecoveryPassword = async (user) => {
+const sendRecoveryPassword = async (user: UserResponseDto) => {
   sendingRecovery.value = user.id
   error.value = null
   success.value = null
   recoveryData.value = null
-  
-  try {
-    const result = await createRecoveryLink(user.id)
-    console.log('Recovery link created')
 
-    // Store recovery data for the modal (link from the BFF)
+  try {
+    // BFF returns { recovery_link } — normalise to an absolute URL for the modal.
+    // The OpenAPI op types the body as void, so cast through unknown to read it.
+    const result = await recoveryLinkMutation.mutateAsync({ id: user.id }) as unknown as { recovery_link?: string }
+    const recoveryLink = result?.recovery_link
+    if (!recoveryLink) {
+      throw new Error('BFF did not return a recovery_link')
+    }
+    const authBase = import.meta.env.VITE_KRATOS_BROWSER_URL || 'http://auth.ory.localhost/auth'
+    const recoveryUrl = recoveryLink.startsWith('http')
+      ? recoveryLink
+      : `${authBase.replace(/\/$/, '')}${recoveryLink.startsWith('/') ? '' : '/'}${recoveryLink}`
+
     recoveryData.value = {
       userEmail: user.email || user.id,
-      recovery_url: result.recovery_url || '',
-      recovery_code: result.recovery_code ?? null,
+      recovery_url: recoveryUrl,
+      recovery_code: null, // BFF recovery-link endpoint does not return a code
       copiedUrl: false,
       copiedCode: false
     }
   } catch (err) {
-    console.error('Error creating recovery link', { status: err.response?.status })
+    console.error('Error creating recovery link', { status: (err as { response?: { status?: number } })?.response?.status })
     error.value = 'Failed to create recovery link. Please try again.'
   } finally {
     sendingRecovery.value = null
   }
 }
 
-const copyToClipboard = async (text, type) => {
+const copyToClipboard = async (text: string, type: 'url' | 'code') => {
   try {
     await navigator.clipboard.writeText(text)
     if (type === 'url' && recoveryData.value) {
@@ -896,14 +948,14 @@ const copyToClipboard = async (text, type) => {
     textArea.select()
     try {
       document.execCommand('copy')
-      if (type === 'code') {
+      if (type === 'code' && recoveryData.value) {
         recoveryData.value.copiedCode = true
         setTimeout(() => {
           if (recoveryData.value) {
             recoveryData.value.copiedCode = false
           }
         }, 2000)
-      } else if (type === 'url') {
+      } else if (type === 'url' && recoveryData.value) {
         recoveryData.value.copiedUrl = true
         setTimeout(() => {
           if (recoveryData.value) {
@@ -922,12 +974,12 @@ const closeRecoveryModal = () => {
   recoveryData.value = null
 }
 
-function formatRole(role) {
+function formatRole(role?: string | null) {
   if (!role) return '—'
   return role.replace('platform_', '').replace(/_/g, ' ')
 }
 
-const editUser = (user) => {
+const editUser = (user: UserResponseDto) => {
   editingUser.value = user
   editForm.value = {
     email: user.email || '',
@@ -937,52 +989,57 @@ const editUser = (user) => {
 }
 
 const saveUser = async () => {
+  if (!editingUser.value) return
   // Check permission before saving
   if (!permissions.value.canEdit) {
     error.value = 'You do not have permission to edit users'
     return
   }
-  
+
   saving.value = true
   error.value = null
   success.value = null
-  
+
   try {
-    // BFF DTO shape: { email?, fullName?, role? }
-    await updateUser(editingUser.value.id, {
-      email: editForm.value.email,
-      fullName: editForm.value.full_name,
-      role: editForm.value.role
+    await updateMutation.mutateAsync({
+      id: editingUser.value.id,
+      data: {
+        email: editForm.value.email,
+        fullName: editForm.value.full_name,
+        role: editForm.value.role as UpdateUserDto['role']
+      }
     })
     editingUser.value = null
     success.value = 'User updated successfully'
-    await loadUsers()
+    await invalidateUsers()
     setTimeout(() => { success.value = null }, 3000)
   } catch (err) {
-    console.error('Error updating user', { status: err.response?.status })
+    console.error('Error updating user', { status: (err as { response?: { status?: number } })?.response?.status })
     error.value = 'Failed to update user. Please try again.'
   } finally {
     saving.value = false
   }
 }
 
-const verifyEmail = async (user) => {
+const verifyEmail = async (user: UserResponseDto) => {
   verifyingEmail.value = user.id
   error.value = null
   success.value = null
 
   try {
-    const result = await markEmailAsVerified(user.id)
+    // Kratos self-service verification flow (PUBLIC, not admin). Pass the email
+    // we already hold so no BFF getUserById round-trip is needed.
+    const result = await markEmailAsVerified(user.email)
     success.value = `Verification email sent to ${result?.userEmail || user.email}.`
   } catch (err) {
-    console.error('Error sending verification email', { status: err.response?.status })
+    console.error('Error sending verification email', { status: (err as { response?: { status?: number } })?.response?.status })
     error.value = 'Failed to send verification email. Please try again.'
   } finally {
     verifyingEmail.value = null
   }
 }
 
-const viewPermissions = async (user) => {
+const viewPermissions = async (user: UserResponseDto) => {
   viewingPermissions.value = user
   loadingUserPermissions.value = true
   userPermissionsList.value = []
@@ -991,7 +1048,7 @@ const viewPermissions = async (user) => {
     const { getCachedUserPermissions } = await import('../composables/usePermissionCache')
     userPermissionsList.value = await getCachedUserPermissions(user.id)
   } catch (err) {
-    console.error('Error loading user permissions', { status: err.response?.status })
+    console.error('Error loading user permissions', { status: (err as { response?: { status?: number } })?.response?.status })
     userPermissionsList.value = []
   } finally {
     loadingUserPermissions.value = false

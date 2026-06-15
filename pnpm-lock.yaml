@@ -10,9 +10,18 @@ importers:
 
   frontend-admin:
     dependencies:
+      '@nova-id/api-client':
+        specifier: workspace:*
+        version: link:../packages/api-client
       '@ory/client':
         specifier: ^1.5.0
         version: 1.22.37
+      '@tanstack/vue-query':
+        specifier: ^5.101.0
+        version: 5.101.0(vue@3.5.38(typescript@5.9.3))
+      axios:
+        specifier: ^1.18.0
+        version: 1.18.0
       vue:
         specifier: ^3.4.21
         version: 3.5.38(typescript@5.9.3)
@@ -23,6 +32,9 @@ importers:
       '@vitejs/plugin-vue':
         specifier: ^5.0.4
         version: 5.2.4(vite@5.4.21)(vue@3.5.38(typescript@5.9.3))
+      '@vue/tsconfig':
+        specifier: ^0.9.1
+        version: 0.9.1(typescript@5.9.3)(vue@3.5.38(typescript@5.9.3))
       autoprefixer:
         specifier: ^10.4.18
         version: 10.5.0(postcss@8.5.15)
@@ -32,9 +44,15 @@ importers:
       tailwindcss:
         specifier: ^3.4.1
         version: 3.4.19(yaml@2.9.0)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
       vite:
         specifier: ^5.2.0
         version: 5.4.21
+      vue-tsc:
+        specifier: ^2.2.12
+        version: 2.2.12(typescript@5.9.3)
 
   frontend-app:
     dependencies:
@@ -780,6 +798,17 @@ packages:
 
   '@vue/shared@3.5.38':
     resolution: {integrity: sha512-FTW0AFZNaK5/mOqvGBwVfUlNLU38TiQn4+DQgIFUnrBBJQ1crMJ82yeGQLV5jyKFsO8yRukpbuP7x+nRbH6aug==}
+
+  '@vue/tsconfig@0.9.1':
+    resolution: {integrity: sha512-buvjm+9NzLCJL29KY1j1991YYJ5e6275OiK+G4jtmfIb+z4POywbdm0wXusT9adVWqe0xqg70TbI7+mRx4uU9w==}
+    peerDependencies:
+      typescript: '>= 5.8'
+      vue: ^3.4.0
+    peerDependenciesMeta:
+      typescript:
+        optional: true
+      vue:
+        optional: true
 
   acorn@8.17.0:
     resolution: {integrity: sha512-xRQbDb9BnwDafYNn6Vwl839DYVjqXYb1XVGtWAZ1kcDc6iwAL4hg3B1dZlRiuENFeO2H53gFG3in621AdERVAg==}
@@ -2188,6 +2217,11 @@ snapshots:
       vue: 3.5.38(typescript@5.9.3)
 
   '@vue/shared@3.5.38': {}
+
+  '@vue/tsconfig@0.9.1(typescript@5.9.3)(vue@3.5.38(typescript@5.9.3))':
+    optionalDependencies:
+      typescript: 5.9.3
+      vue: 3.5.38(typescript@5.9.3)
 
   acorn@8.17.0: {}
 
