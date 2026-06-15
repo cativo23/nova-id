@@ -229,13 +229,17 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted, inject } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import type { LocationQuery, LocationQueryValue } from 'vue-router'
+import type { UpdateLoginFlowBody } from '@ory/client'
 import NovaLogoIcon from '../components/NovaLogoIcon.vue'
 import { createLoginFlow, getLoginFlow, updateLoginFlow } from '../composables/useAuth'
+import type { FlowLike, HttpErrorLike, ContinueWithLike } from '../types/flow'
+import type { UiNodeLike } from '../utils/uiNodes'
 
-const refreshAuth = inject('refreshAuth', null)
+const refreshAuth = inject<(() => Promise<void>) | null>('refreshAuth', null)
 import {
   getNodeValue,
   getNodeName,
@@ -247,21 +251,27 @@ import {
   hasNodeErrors
 } from '../utils/uiNodes'
 
+/** Kratos query params may be string | string[] | null — normalize to a single string. */
+function firstQuery(v: LocationQueryValue | LocationQueryValue[] | undefined): string | undefined {
+  const val = Array.isArray(v) ? v[0] : v
+  return val ?? undefined
+}
+
 const router = useRouter()
 const route = useRoute()
-const flow = ref(null)
+const flow = ref<FlowLike | null>(null)
 const loading = ref(false)
 const showPassword = ref(false)
 const passwordValue = ref('')
 // When we have login_challenge, we must redirect here after login (Kratos may not echo return_to)
-const intendedReturnUrl = ref(null)
+const intendedReturnUrl = ref<string | null>(null)
 
 onMounted(async () => {
   try {
-    const flowId = route.query.flow
-    const loginChallenge = route.query.login_challenge
+    const flowId = firstQuery(route.query.flow)
+    const loginChallenge = firstQuery(route.query.login_challenge)
     // Get return_to from query params (for redirects from other frontends)
-    const returnTo = route.query.return_to || route.query.returnTo
+    const returnTo = firstQuery(route.query.return_to) || firstQuery(route.query.returnTo)
 
     if (flowId) {
       flow.value = await getLoginFlow(flowId)
@@ -284,26 +294,26 @@ onMounted(async () => {
   }
 })
 
-const handleInput = (node, event) => {
+const handleInput = (node: UiNodeLike, event: Event) => {
   if (node.attributes?.value !== undefined) {
-    node.attributes.value = event.target.value
+    node.attributes.value = (event.target as HTMLInputElement).value
   }
 }
 
-const updatePasswordValue = (event) => {
-  passwordValue.value = event.target.value
+const updatePasswordValue = (event: Event) => {
+  passwordValue.value = (event.target as HTMLInputElement).value
   // Also update the node value for form submission
   const passwordNode = flow.value?.ui?.nodes?.find(
     n => getNodeType(n) === 'password'
   )
   if (passwordNode && passwordNode.attributes) {
-    passwordNode.attributes.value = event.target.value
+    passwordNode.attributes.value = (event.target as HTMLInputElement).value
   }
 }
 
 /** Preserve return_to, login_challenge (OAuth), flow when linking to other auth pages */
-const preservedQuery = computed(() => {
-  const q = {}
+const preservedQuery = computed<LocationQuery>(() => {
+  const q: LocationQuery = {}
   if (route.query.return_to) q.return_to = route.query.return_to
   if (route.query.returnTo) q.returnTo = route.query.returnTo
   if (route.query.login_challenge) q.login_challenge = route.query.login_challenge
@@ -316,29 +326,31 @@ const registrationLink = computed(() => ({ path: '/registration', query: { ...pr
 const recoveryLink = computed(() => ({ path: '/recovery', query: { ...preservedQuery.value } }))
 
 /** Get continue_with array from a login response (success or error body) */
-function getContinueWith(response) {
+function getContinueWith(response: FlowLike | null | undefined): ContinueWithLike[] {
   if (!response) return []
+  const err = response.error as { details?: { continue_with?: ContinueWithLike[] } } | undefined
+  const details = response.details as { continue_with?: ContinueWithLike[] } | undefined
   return (
-    response?.error?.details?.continue_with ??
-    response?.details?.continue_with ??
-    response?.continue_with ??
+    err?.details?.continue_with ??
+    details?.continue_with ??
+    response.continue_with ??
     []
   )
 }
 
 /** Check if the response indicates verification is required (unverified email) */
-function isVerificationRequiredResponse(response) {
+function isVerificationRequiredResponse(response: FlowLike | null | undefined): boolean {
   if (!response) return false
-  const err = response?.error ?? response
-  const id = err?.id ?? response?.error_id
+  const err = (response.error ?? response) as { id?: string; reason?: string; message?: string }
+  const id = err?.id ?? response.error_id
   if (id === 'session_verified_address_required') return true
   const msg = (err?.reason ?? err?.message ?? '').toLowerCase()
   return msg.includes('not verified') || msg.includes('no verificad') || msg.includes('email or phone address')
 }
 
 /** Redirect to verification page with optional flow id, preserving return_to and login_challenge */
-function redirectToVerification(verificationFlowId = null) {
-  const q = { ...preservedQuery.value }
+function redirectToVerification(verificationFlowId: string | null = null) {
+  const q: LocationQuery = { ...preservedQuery.value }
   if (verificationFlowId) q.flow = verificationFlowId
   router.push({ path: '/verification', query: q })
 }
@@ -348,45 +360,46 @@ const verificationLink = computed(() => ({ path: '/verification', query: { ...pr
 /** True when the current flow state indicates email verification is required */
 const isVerificationRequired = computed(() => {
   if (!flow.value) return false
-  const err = flow.value?.error ?? flow.value
-  const id = err?.id ?? flow.value?.error_id
+  const err = (flow.value.error ?? flow.value) as { id?: string; reason?: string; message?: string }
+  const id = err?.id ?? flow.value.error_id
   if (id === 'session_verified_address_required') return true
   const msg = (err?.reason ?? err?.message ?? '').toLowerCase()
   if (msg.includes('not verified') || msg.includes('no verificad') || msg.includes('email or phone address')) return true
-  const uiMsg = flow.value?.ui?.messages?.find(m => m.type === 'error')?.text ?? ''
+  const uiMsg = flow.value.ui?.messages?.find(m => m.type === 'error')?.text ?? ''
   return (uiMsg || '').toLowerCase().includes('not verified') || (uiMsg || '').toLowerCase().includes('verify')
 })
 
 /** True when the current flow state indicates account is disabled (401 identity is disabled) */
 const isAccountDisabled = computed(() => {
   if (!flow.value?.error) return false
-  const msg = (flow.value.error.reason ?? flow.value.error.message ?? '').toLowerCase()
+  const err = flow.value.error as { reason?: string; message?: string }
+  const msg = (err.reason ?? err.message ?? '').toLowerCase()
   return msg.includes('disabled')
 })
 
 /** List of error texts to show (from ui.messages or from error object reason/message) */
-const flowErrorDisplayList = computed(() => {
+const flowErrorDisplayList = computed<string[]>(() => {
   if (!flow.value) return []
-  const uiErrors = flow.value?.ui?.messages?.filter(m => m.type === 'error').map(m => m.text) ?? []
+  const uiErrors = flow.value.ui?.messages?.filter(m => m.type === 'error').map(m => m.text ?? '') ?? []
   if (uiErrors.length) return uiErrors
-  const err = flow.value?.error ?? flow.value
+  const err = (flow.value.error ?? flow.value) as { reason?: string; message?: string }
   const text = err?.reason ?? err?.message
   return text ? [text] : []
 })
 
 const flowErrorDisplayText = computed(() => flowErrorDisplayList.value.length > 0 && !isAccountDisabled.value)
 
-const getMethodValue = () => {
+const getMethodValue = (): string => {
   const methodNode = flow.value?.ui?.nodes?.find(
     node => node.attributes?.name === 'method' && node.type === 'input'
   )
-  return methodNode?.attributes?.value || 'password'
+  return (methodNode?.attributes?.value as string) || 'password'
 }
 
-const handleSubmit = async (event) => {
+const handleSubmit = async (event: Event) => {
   loading.value = true
   try {
-    const formData = new FormData(event.target)
+    const formData = new FormData(event.target as HTMLFormElement)
     
     // Always ensure password value is set in formData (use stored value)
     // This is critical because password fields don't always submit their value correctly
@@ -396,7 +409,7 @@ const handleSubmit = async (event) => {
       // Fallback: try to get from formData
       const formPassword = formData.get('password')
       if (formPassword) {
-        passwordValue.value = formPassword
+        passwordValue.value = String(formPassword)
       }
     }
     
@@ -416,21 +429,21 @@ const handleSubmit = async (event) => {
     }
     
     const payload = Object.fromEntries(formData.entries())
-    const data = await updateLoginFlow(flow.value.id, payload)
-    
+    const data = (await updateLoginFlow(flow.value!.id!, payload as unknown as UpdateLoginFlowBody)) as unknown as FlowLike
+
     // For browser-based login, if we get here without an error, login succeeded
     // Session is set as a cookie, not in the response body
     // Check if there are any errors in the response
     const hasErrors = data?.ui?.messages?.some(msg => msg.type === 'error')
-    
+
     if (!hasErrors) {
       // Login successful - refresh auth state and redirect
       if (refreshAuth) {
         await refreshAuth()
       }
-      
+
       // Prefer intended return URL (OAuth hydra-callback), then flow/query
-      const returnTo = intendedReturnUrl.value || flow.value?.return_to || route.query.return_to || route.query.returnTo
+      const returnTo = intendedReturnUrl.value || flow.value?.return_to || firstQuery(route.query.return_to) || firstQuery(route.query.returnTo)
 
       if (returnTo) {
         window.location.href = decodeURIComponent(returnTo)
@@ -443,8 +456,8 @@ const handleSubmit = async (event) => {
       const continueWith = getContinueWith(data)
       const verificationItem = continueWith.find(c => c.action === 'show_verification_ui')
       if (verificationItem) {
-        const verificationFlowId = verificationItem.flow?.id ?? verificationItem.flow
-        redirectToVerification(verificationFlowId)
+        const verificationFlowId = typeof verificationItem.flow === 'string' ? verificationItem.flow : verificationItem.flow?.id
+        redirectToVerification(verificationFlowId ?? null)
         return
       }
       if (isVerificationRequiredResponse(data)) {
@@ -454,13 +467,14 @@ const handleSubmit = async (event) => {
       flow.value = data
     }
   } catch (error) {
-    if (error.response?.status === 400) {
-      const body = error.response.data || {}
+    const e = error as HttpErrorLike
+    if (e.response?.status === 400) {
+      const body: FlowLike = e.response.data || {}
       const continueWith = getContinueWith(body)
       const verificationItem = continueWith.find(c => c.action === 'show_verification_ui')
       if (verificationItem) {
-        const verificationFlowId = verificationItem.flow?.id ?? verificationItem.flow
-        redirectToVerification(verificationFlowId)
+        const verificationFlowId = typeof verificationItem.flow === 'string' ? verificationItem.flow : verificationItem.flow?.id
+        redirectToVerification(verificationFlowId ?? null)
         return
       }
       if (isVerificationRequiredResponse(body)) {
@@ -468,13 +482,13 @@ const handleSubmit = async (event) => {
         redirectToVerification()
         return
       }
-      const err = body?.error ?? body
+      const err = (body.error ?? body) as FlowLike & { id?: string }
       flow.value = err?.id ? { ...err, error_id: err.id } : err
     } else {
-      const body = error.response?.data ?? error.body ?? {}
-      const err = body?.error ?? body
+      const body: FlowLike = e.response?.data ?? e.body ?? {}
+      const err = (body.error ?? body) as { id?: string; message?: string; reason?: string }
       // 401 Unauthorized: account disabled (Kratos "identity is disabled")
-      if (error.response?.status === 401) {
+      if (e.response?.status === 401) {
         const msg = (err?.message ?? err?.reason ?? '').toLowerCase()
         const isDisabled = msg.includes('disabled') || (err?.reason && String(err.reason).toLowerCase().includes('disabled'))
         if (isDisabled) {
@@ -491,7 +505,7 @@ const handleSubmit = async (event) => {
         redirectToVerification()
         return
       }
-      const errId = body?.error?.id ?? body?.id ?? body?.error_id
+      const errId = (body.error as { id?: string } | undefined)?.id ?? body.id ?? body.error_id
       if (errId) {
         router.push({ path: '/error', query: { id: errId, ...(route.query.return_to && { return_to: route.query.return_to }) } })
       } else {

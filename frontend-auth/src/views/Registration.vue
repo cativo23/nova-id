@@ -55,11 +55,11 @@
                 <option value="">Select {{ getNodeLabel(node) }}</option>
                 <option
                   v-for="option in (node.attributes?.options || [])"
-                  :key="option.value || option"
-                  :value="option.value || option"
-                  :selected="(option.value || option) === getFieldValue(node)"
+                  :key="option.value"
+                  :value="option.value"
+                  :selected="option.value === getFieldValue(node)"
                 >
-                  {{ option.label || option.value || option }}
+                  {{ option.label || option.value }}
                 </option>
               </select>
               <div
@@ -214,11 +214,15 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted, inject, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import type { LocationQuery, LocationQueryValue } from 'vue-router'
+import type { UpdateRegistrationFlowBody } from '@ory/client'
 import NovaLogoIcon from '../components/NovaLogoIcon.vue'
 import { createRegistrationFlow, getRegistrationFlow, updateRegistrationFlow } from '../composables/useAuth'
+import type { FlowLike, HttpErrorLike, ContinueWithLike } from '../types/flow'
+import type { UiNodeLike } from '../utils/uiNodes'
 import {
   getNodeValue,
   getNodeName,
@@ -230,18 +234,24 @@ import {
   hasNodeErrors
 } from '../utils/uiNodes'
 
+/** Kratos query params may be string | string[] | null — normalize to a single string. */
+function firstQuery(v: LocationQueryValue | LocationQueryValue[] | undefined): string | undefined {
+  const val = Array.isArray(v) ? v[0] : v
+  return val ?? undefined
+}
+
 const router = useRouter()
 const route = useRoute()
-const refreshAuth = inject('refreshAuth', null)
-const flow = ref(null)
+const refreshAuth = inject<(() => Promise<void>) | null>('refreshAuth', null)
+const flow = ref<FlowLike | null>(null)
 const loading = ref(false)
 const passwordValue = ref('')
 const passwordConfirm = ref('')
 const passwordMismatch = ref(false)
-const returnTo = ref(route.query.return_to || route.query.returnTo || '')
+const returnTo = ref<string>(firstQuery(route.query.return_to) || firstQuery(route.query.returnTo) || '')
 
 // Store all field values separately to prevent them from being cleared
-const fieldValues = ref({})
+const fieldValues = ref<Record<string, string>>({})
 
 // Password validation rules
 const passwordRules = computed(() => {
@@ -286,8 +296,8 @@ const unmetPasswordRules = computed(() => {
 })
 
 // Update password value and check match (used in template)
-const updatePasswordValue = (event) => {
-  passwordValue.value = event.target.value
+const updatePasswordValue = (event: Event) => {
+  passwordValue.value = (event.target as HTMLInputElement).value
   // Don't update the node value here - it will be set from passwordValue on form submission
   // This prevents other fields from being cleared when typing password
   checkPasswordMatch()
@@ -307,8 +317,8 @@ const roleOptions = [
   { value: 'platform_admin', label: 'Platform Admin' }
 ]
 
-const preservedQuery = computed(() => {
-  const q = {}
+const preservedQuery = computed<LocationQuery>(() => {
+  const q: LocationQuery = {}
   if (route.query.return_to) q.return_to = route.query.return_to
   if (route.query.returnTo) q.returnTo = route.query.returnTo
   if (route.query.login_challenge) q.login_challenge = route.query.login_challenge
@@ -320,8 +330,8 @@ const loginLink = computed(() => ({ path: '/login', query: { ...preservedQuery.v
 
 onMounted(async () => {
   try {
-    returnTo.value = route.query.return_to || route.query.returnTo || returnTo.value
-    const flowId = route.query.flow
+    returnTo.value = firstQuery(route.query.return_to) || firstQuery(route.query.returnTo) || returnTo.value
+    const flowId = firstQuery(route.query.flow)
     if (flowId) {
       flow.value = await getRegistrationFlow(flowId)
     } else {
@@ -333,14 +343,14 @@ onMounted(async () => {
         const nodeName = getNodeName(node)
         const nodeType = getNodeType(node)
         const nodeValue = getNodeValue(node, null)
-        
+
         if (nodeName === 'traits.role') {
-          const roleValue = nodeValue || 'platform_user'
+          const roleValue = (nodeValue as string) || 'platform_user'
           fieldValues.value[nodeName] = roleValue
           if (node.attributes) node.attributes.value = roleValue
         } else if (nodeName && nodeType !== 'hidden' && nodeType !== 'submit' && nodeType !== 'password' && nodeValue) {
           // Only store non-hidden, non-submit, non-password fields with actual values
-          fieldValues.value[nodeName] = nodeValue
+          fieldValues.value[nodeName] = String(nodeValue)
         }
       })
     }
@@ -350,33 +360,33 @@ onMounted(async () => {
   }
 })
 
-const getMethodValue = () => {
+const getMethodValue = (): string | null => {
   const methodNode = flow.value?.ui?.nodes?.find(
     node => node.attributes?.name === 'method' && node.type === 'input'
   )
-  return methodNode?.attributes?.value || null
+  return (methodNode?.attributes?.value as string) || null
 }
 
 // Get field value safely
-const getFieldValue = (node) => {
+const getFieldValue = (node: UiNodeLike): string => {
   const nodeName = getNodeName(node)
   if (nodeName === 'password') {
     // For password, always return passwordValue.value (which should be empty initially)
     return passwordValue.value || ''
   }
   // Check if we have a stored value
-  if (fieldValues.value && nodeName && fieldValues.value.hasOwnProperty(nodeName)) {
+  if (fieldValues.value && nodeName && Object.prototype.hasOwnProperty.call(fieldValues.value, nodeName)) {
     const storedValue = fieldValues.value[nodeName]
     // Return stored value, even if it's empty string (user cleared it)
     return storedValue !== undefined ? storedValue : ''
   }
   // Fall back to node value, but only if it's actually set (not the default empty string)
   const nodeValue = getNodeValue(node, null)
-  return nodeValue !== null ? nodeValue : ''
+  return nodeValue !== null ? String(nodeValue) : ''
 }
 
-const handleInput = (node, event) => {
-  const value = event.target.value
+const handleInput = (node: UiNodeLike, event: Event) => {
+  const value = (event.target as HTMLInputElement).value
   const nodeName = getNodeName(node)
   
   // Store value in fieldValues to prevent it from being cleared
@@ -392,22 +402,22 @@ const handleInput = (node, event) => {
   }
 }
 
-const handleSubmit = async (event) => {
+const handleSubmit = async (event: Event) => {
   loading.value = true
   passwordMismatch.value = false
-  
+
   try {
-    const formData = new FormData(event.target)
-    
+    const formData = new FormData(event.target as HTMLFormElement)
+
     // Ensure password value is set in formData (in case it's not from the form)
     if (passwordValue.value) {
       formData.set('password', passwordValue.value)
     }
-    
+
     // Validate password confirmation
     const password = passwordValue.value || formData.get('password') || ''
     const confirm = passwordConfirm.value || formData.get('password_confirm') || ''
-    
+
     if (password && confirm && password !== confirm) {
       passwordMismatch.value = true
       loading.value = false
@@ -430,16 +440,16 @@ const handleSubmit = async (event) => {
     }
     
     const payload = Object.fromEntries(formData.entries())
-    
-    const data = await updateRegistrationFlow(flow.value.id, payload)
-    
+
+    const data = (await updateRegistrationFlow(flow.value!.id!, payload as unknown as UpdateRegistrationFlowBody)) as unknown as FlowLike
+
     // Handle multi-step flow: if we get a new flow back, update and continue
-    if (data && data.id && data.id !== flow.value.id) {
+    if (data && data.id && data.id !== flow.value!.id) {
       flow.value = data
       // Flow will update and show next step (password fields)
       return
     }
-    
+
     const redirectAfter = () => {
       if (returnTo.value) {
         window.location.href = decodeURIComponent(returnTo.value)
@@ -453,9 +463,9 @@ const handleSubmit = async (event) => {
       if (refreshAuth) await refreshAuth()
       redirectAfter()
     } else if (data && data.continue_with) {
-      const verificationFlow = data.continue_with?.find(cw => cw.action === 'show_verification_ui')
+      const verificationFlow = data.continue_with.find((cw: ContinueWithLike) => cw.action === 'show_verification_ui')
       if (verificationFlow) {
-        const flowId = verificationFlow.flow?.id ?? verificationFlow.flow
+        const flowId = typeof verificationFlow.flow === 'string' ? verificationFlow.flow : verificationFlow.flow?.id
         const q = returnTo.value ? `&return_to=${encodeURIComponent(returnTo.value)}` : ''
         router.push(`/verification?flow=${flowId}${q}`)
       } else {
@@ -470,9 +480,10 @@ const handleSubmit = async (event) => {
       flow.value = data
     }
   } catch (error) {
-    if (error.response?.status === 400) {
+    const e = error as HttpErrorLike
+    if (e.response?.status === 400) {
       // Update flow with error response (includes new flow state)
-      flow.value = error.response.data
+      flow.value = e.response.data ?? null
     } else {
       console.error('Registration error:', error)
       router.push('/error')

@@ -35,12 +35,13 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
+import { acceptHydraLogin } from '@nova-id/api-client'
 
 const route = useRoute()
-const error = ref(null)
+const error = ref<string | null>(null)
 
 onMounted(async () => {
   const loginChallenge = route.query.login_challenge
@@ -50,25 +51,27 @@ onMounted(async () => {
   }
 
   try {
-    const apiBase = import.meta.env.VITE_OATHKEEPER_URL || '/api'
-    const res = await fetch(`${apiBase}/hydra-accept-login`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ login_challenge: loginChallenge })
-    })
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}))
-      throw new Error(data.message || data.error?.message || `Request failed: ${res.status}`)
-    }
-    const data = await res.json()
-    if (data.redirect_to) {
+    // The generated client posts to /hydra-accept-login through the shared axios
+    // mutator (baseURL '/api', withCredentials). The BFF body is the login challenge;
+    // the OpenAPI spec leaves it undocumented, so the generated fn takes no body
+    // param — we pass it via the request `data` option. The generated return type
+    // is `void` (response body undocumented), but the BFF returns { redirect_to },
+    // so we cast the resolved value to read it.
+    const data = (await acceptHydraLogin({
+      data: { login_challenge: loginChallenge },
+    })) as { redirect_to?: string } | undefined
+    if (data?.redirect_to) {
       window.location.href = data.redirect_to
       return
     }
     error.value = 'No redirect URL returned'
   } catch (err) {
-    error.value = err.message || 'Failed to complete sign in'
+    const e = err as { response?: { data?: { message?: string; error?: { message?: string } }; status?: number }; message?: string }
+    error.value =
+      e.response?.data?.message ||
+      e.response?.data?.error?.message ||
+      e.message ||
+      'Failed to complete sign in'
   }
 })
 </script>

@@ -37,9 +37,10 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted, provide, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import type { LocationQuery } from 'vue-router'
 import NovaLogoIcon from './components/NovaLogoIcon.vue'
 import { checkSession, logout } from './composables/useAuth'
 
@@ -48,8 +49,8 @@ const route = useRoute()
 const isAuthenticated = ref(false)
 
 // Preserve return_to, login_challenge (OAuth), flow in nav links so they are not lost when switching login/register
-const preservedQuery = computed(() => {
-  const q = {}
+const preservedQuery = computed<LocationQuery>(() => {
+  const q: LocationQuery = {}
   if (route.query.return_to) q.return_to = route.query.return_to
   if (route.query.returnTo) q.returnTo = route.query.returnTo
   if (route.query.login_challenge) q.login_challenge = route.query.login_challenge

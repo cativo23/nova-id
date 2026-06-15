@@ -1,5 +1,6 @@
 import { createApp } from 'vue'
 import { createRouter, createWebHistory } from 'vue-router'
+import type { RouteRecordRaw } from 'vue-router'
 import '../style.css'
 import App from './App.vue'
 import Login from './views/Login.vue'
@@ -11,7 +12,7 @@ import Consent from './views/Consent.vue'
 import Error from './views/Error.vue'
 import HydraCallback from './views/HydraCallback.vue'
 
-const routes = [
+const routes: RouteRecordRaw[] = [
   { path: '/', redirect: '/login' },
   { path: '/login', name: 'Login', component: Login },
   { path: '/hydra-callback', name: 'HydraCallback', component: HydraCallback },
@@ -21,7 +22,7 @@ const routes = [
   {
     path: '/self-service/verification',
     name: 'VerificationRedirect',
-    redirect: (to) => ({ path: '/verification', query: to.query })
+    redirect: (to) => ({ path: '/verification', query: to.query }),
   },
   { path: '/verification', name: 'Verification', component: Verification },
   { path: '/settings', name: 'Settings', component: Settings },

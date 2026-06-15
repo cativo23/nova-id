@@ -93,9 +93,15 @@ importers:
 
   frontend-auth:
     dependencies:
+      '@nova-id/api-client':
+        specifier: workspace:*
+        version: link:../packages/api-client
       '@ory/client':
         specifier: ^1.5.0
         version: 1.22.37
+      axios:
+        specifier: ^1.18.0
+        version: 1.18.0
       vue:
         specifier: ^3.4.21
         version: 3.5.38(typescript@5.9.3)
@@ -106,6 +112,9 @@ importers:
       '@vitejs/plugin-vue':
         specifier: ^5.0.4
         version: 5.2.4(vite@5.4.21)(vue@3.5.38(typescript@5.9.3))
+      '@vue/tsconfig':
+        specifier: ^0.9.1
+        version: 0.9.1(typescript@5.9.3)(vue@3.5.38(typescript@5.9.3))
       autoprefixer:
         specifier: ^10.4.18
         version: 10.5.0(postcss@8.5.15)
@@ -115,9 +124,15 @@ importers:
       tailwindcss:
         specifier: ^3.4.1
         version: 3.4.19(yaml@2.9.0)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
       vite:
         specifier: ^5.2.0
         version: 5.4.21
+      vue-tsc:
+        specifier: ^2.2.12
+        version: 2.2.12(typescript@5.9.3)
 
   packages/api-client:
     dependencies:
