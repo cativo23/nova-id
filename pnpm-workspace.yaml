@@ -3,8 +3,12 @@ packages:
   - 'frontend-auth'
   - 'frontend-admin'
   - 'frontend-app'
-
 # pnpm 10+ blocks dependency build scripts by default. esbuild (Vite's bundler)
 # needs its postinstall to fetch/build its native binary — allow only that one.
 onlyBuiltDependencies:
   - esbuild
+
+# pnpm re-runs `install` before every `pnpm run` script; the native build-script
+# gate (esbuild/vue-demi) makes that precheck exit non-zero even when node_modules
+# is complete, breaking `pnpm run generate` / `typecheck`. Disable the precheck.
+verifyDepsBeforeRun: false
