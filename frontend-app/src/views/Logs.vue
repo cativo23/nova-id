@@ -262,12 +262,9 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { checkSession } from '../composables/useAuth'
-import { getStoredTokens, decodeIdToken, getAccessToken, validateIdTokenClaims } from '../composables/useHydraOAuth'
 import { getApiTestBaseUrl } from '../composables/useApiTest'
 
 const router = useRouter()
-const session = ref(null)
 const allowed = ref(false)
 const loading = ref(false)
 const logs = ref([])
@@ -354,48 +351,15 @@ function formatTime(ts) {
 
 async function ensureAllowed() {
   try {
-    const tokens = getStoredTokens()
-    if (tokens?.access_token) {
-      let role = null
-      let appRole = null
-      try {
-        if (tokens.id_token) {
-          const claims = decodeIdToken(tokens.id_token)
-          validateIdTokenClaims(claims)
-          role = claims.role || claims['https://claims.example.com/role']
-          appRole = claims.appRole
-        }
-      } catch {}
-      if (role === undefined || role === null || appRole === undefined || appRole === null) {
-        const res = await fetch(`${getApiTestBaseUrl()}/me`, {
-          credentials: 'omit',
-          headers: { Authorization: `Bearer ${tokens.access_token}`, 'Content-Type': 'application/json' }
-        })
-        if (res.ok) {
-          const me = await res.json()
-          const user = me?.user || me
-          if (role === undefined || role === null) {
-            role = user?.role
-          }
-          if (appRole === undefined || appRole === null) {
-            appRole = user?.appRole
-          }
-        }
-      }
-      // Allow access if platform_admin OR app_admin
-      allowed.value = role === 'platform_admin' || appRole === 'app_admin'
+    const res = await fetch(`${getApiTestBaseUrl()}/me`, { credentials: 'include' })
+    if (res.ok) {
+      const me = await res.json()
+      const user = me?.user || me
+      allowed.value = user?.role === 'platform_admin' || user?.appRole === 'app_admin'
     } else {
-      const data = await checkSession()
-      session.value = data || null
-      const role = data?.identity?.metadata_public?.role
-      const appRole = data?.identity?.traits?.appRole
-      // Allow access if platform_admin OR app_admin
-      allowed.value = role === 'platform_admin' || appRole === 'app_admin'
+      allowed.value = false
     }
-    if (!allowed.value) {
-      router.replace('/')
-      return
-    }
+    if (!allowed.value) { router.replace('/'); return }
   } catch {
     allowed.value = false
     router.replace('/')
@@ -413,12 +377,10 @@ async function loadLogs() {
     if (methodFilter.value) params.set('method', methodFilter.value)
     if (statusFilter.value) params.set('status', statusFilter.value)
     const logUrl = `${baseUrl}/logs?${params.toString()}`
-    const accessToken = getAccessToken()
     const opts = {
-      credentials: accessToken ? 'omit' : 'include',
-      headers: { 'Content-Type': 'application/json', 'X-Frontend-Source': 'frontend-app' }
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', 'X-Frontend-Source': 'frontend-app' },
     }
-    if (accessToken) opts.headers['Authorization'] = `Bearer ${accessToken}`
     const [logsRes, statsRes] = await Promise.all([
       fetch(logUrl, opts),
       fetch(`${baseUrl}/logs/stats`, opts)

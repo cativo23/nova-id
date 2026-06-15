@@ -267,30 +267,14 @@
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
                 </svg>
-                Debug (tokens)
+                Debug (session)
               </h2>
               <div class="space-y-4 text-sm">
-                <div class="flex flex-wrap items-center gap-3">
-                  <button
-                    type="button"
-                    @click="copyAccessToken"
-                    class="px-3 py-2 rounded-lg bg-cyber-accent/10 text-cyber-accent border border-cyber-accent/30 hover:bg-cyber-accent/20 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-cyber-accent/50"
-                  >
-                    {{ copyTokenFeedback === 'access' ? 'Copiado' : 'Copiar access_token' }}
-                  </button>
-                  <button
-                    type="button"
-                    @click="copyIdToken"
-                    class="px-3 py-2 rounded-lg bg-cyber-accent/10 text-cyber-accent border border-cyber-accent/30 hover:bg-cyber-accent/20 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-cyber-accent/50"
-                  >
-                    {{ copyTokenFeedback === 'id' ? 'Copiado' : 'Copiar id_token' }}
-                  </button>
+                <div v-if="session" class="rounded-xl bg-cyber-bg/80 border border-cyber-accent/10 p-4 overflow-auto max-h-48">
+                  <p class="text-xs text-cyber-light/50 mb-2 uppercase tracking-wider">Kratos session identity</p>
+                  <pre class="text-xs font-mono text-cyber-light/90 whitespace-pre-wrap break-all">{{ JSON.stringify(session?.identity, null, 2) }}</pre>
                 </div>
-                <div v-if="idTokenClaims" class="rounded-xl bg-cyber-bg/80 border border-cyber-accent/10 p-4 overflow-auto max-h-48">
-                  <p class="text-xs text-cyber-light/50 mb-2 uppercase tracking-wider">id_token claims</p>
-                  <pre class="text-xs font-mono text-cyber-light/90 whitespace-pre-wrap break-all">{{ idTokenClaims }}</pre>
-                </div>
-                <p v-else class="text-cyber-light/50 text-xs">Inicia sesión con Nova ID (OAuth) para ver claims del id_token.</p>
+                <p v-else class="text-cyber-light/50 text-xs">No active session. Sign in with Nova ID to inspect identity claims.</p>
               </div>
             </section>
           </div>
@@ -317,13 +301,7 @@ import { ref, computed, onMounted, watch, inject } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import NovaLogoIcon from '../components/NovaLogoIcon.vue'
 import { checkSession } from '../composables/useAuth'
-import {
-  initiateOAuthFlow,
-  getStoredTokens,
-  decodeIdToken,
-  getAccessToken,
-  validateIdTokenClaims
-} from '../composables/useHydraOAuth'
+import { initiateOAuthFlow } from '../composables/useHydraOAuth'
 import { getApiTestBaseUrl } from '../composables/useApiTest'
 
 const router = useRouter()
@@ -338,7 +316,6 @@ const lastEndpoint = ref('')
 const lastMethod = ref('')
 const recentLogs = ref([])
 const recentLogsLoading = ref(false)
-const copyTokenFeedback = ref(null)
 const userFromMe = inject('userFromMe', null)
 
 const isAdmin = computed(() => {
@@ -350,18 +327,6 @@ const isAdmin = computed(() => {
 const showDebug = computed(() => {
   if (import.meta.env.DEV) return true
   return route.query.debug === '1' || route.query.debug === 'true'
-})
-
-const idTokenClaims = computed(() => {
-  const tokens = getStoredTokens()
-  if (!tokens?.id_token) return null
-  try {
-    const claims = decodeIdToken(tokens.id_token)
-    validateIdTokenClaims(claims)
-    return JSON.stringify(claims, null, 2)
-  } catch (e) {
-    return e?.message ? `(invalid or expired: ${e.message})` : null
-  }
 })
 
 const appUrl = import.meta.env.VITE_APP_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5175')
@@ -385,37 +350,10 @@ const endpoints = [
   { key: 'POST:/api-test/app-admin/configure', method: 'POST', path: '/api-test/app-admin/configure', level: 'app-admin', borderClass: 'border-orange-500/30 bg-orange-500/5', btnClass: 'bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 border border-orange-500/40' }
 ]
 
-function sessionFromOAuth() {
-  const tokens = getStoredTokens()
-  if (!tokens?.id_token) return null
-  try {
-    const claims = decodeIdToken(tokens.id_token)
-    validateIdTokenClaims(claims)
-    return {
-      identity: {
-        id: claims.sub,
-        traits: {
-          email: claims.email ?? claims.username ?? '',
-          full_name: claims.name ?? '',
-          role: claims.role ?? 'platform_user',
-          appRole: claims.appRole ?? null
-        }
-      }
-    }
-  } catch {
-    return null
-  }
-}
-
 async function sessionFromApiMe() {
-  const tokens = getStoredTokens()
-  if (!tokens?.access_token) return null
   const url = `${getApiTestBaseUrl()}/me`
   try {
-    const res = await fetch(url, {
-      credentials: 'omit',
-      headers: { Authorization: `Bearer ${tokens.access_token}`, 'Content-Type': 'application/json' }
-    })
+    const res = await fetch(url, { credentials: 'include' })
     if (!res.ok) return null
     const me = await res.json()
     const u = me?.user || me
@@ -426,8 +364,10 @@ async function sessionFromApiMe() {
         traits: {
           email: u.email ?? '',
           full_name: u.full_name ?? u.name ?? '',
-          role: u.role ?? 'platform_user',
           appRole: u.appRole ?? null
+        },
+        metadata_public: {
+          role: u.role ?? null
         }
       }
     }
@@ -442,10 +382,9 @@ async function loadRecentLogs() {
   try {
     const baseUrl = getApiTestBaseUrl()
     const opts = {
-      credentials: getAccessToken() ? 'omit' : 'include',
-      headers: { 'Content-Type': 'application/json', 'X-Frontend-Source': 'frontend-app' }
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', 'X-Frontend-Source': 'frontend-app' },
     }
-    if (getAccessToken()) opts.headers['Authorization'] = `Bearer ${getAccessToken()}`
     const res = await fetch(`${baseUrl}/logs?limit=3`, opts)
     if (res.ok) recentLogs.value = await res.json()
     else recentLogs.value = []
@@ -456,39 +395,14 @@ async function loadRecentLogs() {
   }
 }
 
-function copyAccessToken() {
-  const tokens = getStoredTokens()
-  if (tokens?.access_token) {
-    navigator.clipboard.writeText(tokens.access_token)
-    copyTokenFeedback.value = 'access'
-    setTimeout(() => { copyTokenFeedback.value = null }, 2000)
-  }
-}
-
-function copyIdToken() {
-  const tokens = getStoredTokens()
-  if (tokens?.id_token) {
-    navigator.clipboard.writeText(tokens.id_token)
-    copyTokenFeedback.value = 'id'
-    setTimeout(() => { copyTokenFeedback.value = null }, 2000)
-  }
-}
-
 onMounted(async () => {
   try {
-    const tokens = getStoredTokens()
-    if (tokens?.access_token) {
-      // App ya llama refreshAuth en su onMounted; no repetir para evitar /me duplicado
-      session.value = sessionFromOAuth()
-      const userRef = userFromMe && typeof userFromMe === 'object' && 'value' in userFromMe ? userFromMe.value : userFromMe
-      if (userRef && session.value?.identity?.traits) {
-        const traits = session.value.identity.traits
-        if (userRef.email) traits.email = userRef.email
-        traits.full_name = userRef.full_name ?? userRef.name ?? traits.full_name ?? ''
-        traits.appRole = userRef.appRole ?? traits.appRole ?? 'app_user'
-      }
-      // Si no hay userRef aún (App sigue cargando /me), el watch de userFromMe actualizará email y full_name
-      sessionLoading.value = false
+    // Always use the cookie session through the gateway (ADR-0002).
+    // App.vue's refreshAuth() is running concurrently; we read /api-test/me ourselves
+    // so Home has the full user shape (id, email, appRole) for the dashboard.
+    const meSession = await sessionFromApiMe()
+    if (meSession) {
+      session.value = meSession
       if (isAdmin.value) loadRecentLogs()
       return
     }
@@ -502,7 +416,7 @@ onMounted(async () => {
   }
 })
 
-// Enriquecer session con full_name y role/appRole cuando App termine de cargar /me; cargar logs si es admin
+// Enrich session with full_name and role/appRole when App finishes loading /me; load logs if admin
 watch(
   () => (userFromMe && typeof userFromMe === 'object' && 'value' in userFromMe ? userFromMe.value : null),
   (user) => {
@@ -510,7 +424,7 @@ watch(
     const traits = session.value.identity.traits
     if (user.email) traits.email = user.email
     if (user.full_name || user.name) traits.full_name = user.full_name ?? user.name ?? traits.full_name ?? ''
-    // role is admin-only and lives in metadata_public, not user-editable traits
+    // role lives in metadata_public, not user-editable traits
     if (user.role != null) {
       if (!session.value.identity.metadata_public) session.value.identity.metadata_public = {}
       session.value.identity.metadata_public.role = user.role
@@ -542,17 +456,11 @@ async function runTest(ep) {
     // Test API lives at /api-test/* (use getApiTestBaseUrl, not Oathkeeper /api)
     const url = ep.path.startsWith('/api-test') ? `${getApiTestBaseUrl()}${ep.path.replace(/^\/api-test/, '')}` : ep.path
     const isSimpleGet = ep.method === 'GET' && (ep.path === '/api-test/health' || ep.path === '/api-test/public')
-    const accessToken = getAccessToken()
-    // When we have OAuth tokens, use only Bearer – no cookies. Cookies exist because "Login with Nova ID"
-    // goes through Kratos (auth.ory.localhost); we must not send that cookie so Oathkeeper uses
-    // oauth2_introspection, not cookie_session.
+    // Always use the Kratos cookie session; the gateway's api-test rule accepts cookie_session (ADR-0002).
     const options = {
       method: ep.method,
-      credentials: accessToken ? 'omit' : 'include',
+      credentials: 'include',
       headers: {}
-    }
-    if (accessToken && ep.level !== 'public') {
-      options.headers['Authorization'] = `Bearer ${accessToken}`
     }
     if (!isSimpleGet) {
       options.headers['Content-Type'] = 'application/json'
