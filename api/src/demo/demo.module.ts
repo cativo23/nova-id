@@ -6,6 +6,7 @@ import { LogsModule } from './logs/logs.module';
 import { LoggingInterceptor } from './logging.interceptor';
 import { DemoController } from './demo.controller';
 import { DemoService } from './demo.service';
+import { DemoSeedService } from './demo-seed.service';
 import { UserRole } from './roles/entities/user-role.entity';
 
 @Module({
@@ -23,6 +24,7 @@ import { UserRole } from './roles/entities/user-role.entity';
   controllers: [DemoController],
   providers: [
     DemoService,
+    DemoSeedService,
     {
       provide: APP_INTERCEPTOR,
       useClass: LoggingInterceptor,
