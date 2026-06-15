@@ -1,6 +1,12 @@
 # Authentication & RBAC
 
-This document explains how authentication and authorization work in Nova ID, and how Keto namespaces and roles are used.
+This document explains how authentication and authorization work in Nova ID, the separation of the platform-level (Keto-based) and application-level (per-app database) authorization layers, and the boundary between the IdP and the demo app.
+
+---
+
+## Architecture overview
+
+Nova ID is a Backend-for-Frontend (BFF) that serves the browser client (`frontend-app`) and other OAuth2 clients. Internally, it is a **modular monolith** with a hard boundary: the **IdP modules** (`admin/`, `me/`, `ory/`, `auth/`) handle central identity and access-control concerns, while the **DemoModule** (`demo/`) handles a sample app's own domain logic. See [ADR-0001](./decisions/0001-idp-vs-demo-app-boundary.md) for the architectural rationale and enforcement.
 
 ---
 
@@ -9,10 +15,10 @@ This document explains how authentication and authorization work in Nova ID, and
 | | Authentication | Authorization |
 |---|----------------|----------------|
 | **Question** | *Who are you?* | *What can you do?* |
-| **Mechanism** | Login, sessions, tokens | Roles, permissions, Keto checks |
-| **Example** | Email + password → Kratos session | `platform_admin` → access admin UI |
+| **Mechanism** | Login, sessions, tokens | Roles, permissions, Keto checks, app DB |
+| **Example** | Email + password → Kratos session | `platform_admin` → access admin UI; `app_admin` → edit users in demo app |
 
-Nova ID uses **Kratos** for authentication (identity, sessions, passwords) and **Keto** for authorization (permissions, RBAC).
+Nova ID uses **Kratos** for authentication (identity, sessions, passwords). Authorization is **layered** (see below): the IdP uses **Keto** for platform-level and per-app *access* decisions, and each consuming app (including the bundled demo) uses its own database for *domain-level* roles and permissions.
 
 ---
 
@@ -37,144 +43,188 @@ Nova ID uses **Kratos** for authentication (identity, sessions, passwords) and *
 
 ---
 
-## Platform roles
+## Three-layer authorization model
+
+Authorization in Nova ID is layered into three distinct concerns, each with its own store and ownership. See [ADR-0003](./decisions/0003-three-layer-authorization-model.md) for the complete rationale.
+
+| Layer | Lives in | Decides | Enforced by |
+|---|---|---|---|
+| **1. Platform / IdP** | Keto | Who administers the IdP itself (`platform_admin`, user management) | Oathkeeper + IdP guards |
+| **2. Per-app ACCESS** | Keto | May user X reach/use app A? May X administer A's users? | Oathkeeper (per-request gateway check) or Hydra consent (at token issuance) |
+| **3. Per-app DOMAIN roles** | Each app's own DB (demo: SQLite) | What may user X do inside app A? (editor/reader, fine-grained permissions) | The app itself |
+
+**The dividing line:** Keto answers *"may you reach/enter X?"*; the app's own database answers *"what may you do once inside X?"*
+
+---
+
+## Platform roles (Layer 1)
 
 Nova ID uses two **platform roles**:
 
 | Role | Purpose |
 |------|--------|
-| **platform_admin** | Admin dashboard, user management, permission management, access to admin-only API routes. |
-| **platform_user** | Normal users; app access only. No admin UI or admin-only APIs. |
+| **platform_admin** | Administers the IdP (user management, permission management, admin API routes). |
+| **platform_user** | Normal users; no IdP admin access. Application access is determined by Layer 2. |
 
-Roles are stored:
+Platform roles are sourced from **Kratos `metadata_public.role`** (the canonical identity attribute) and reflected in **Keto** as membership in the `Platform:nova#admins` namespace for `platform_admin` users.
 
-- In **Kratos** as `traits.role` on the identity.
-- In **Keto** as membership in the `ranks` namespace (e.g. `ranks:platform_admin#member@user:&lt;id&gt;`).
-
-Oathkeeper sends the role to the API via `X-User-Role`. The API can also enforce role with `RoleGuard` (e.g. `RequireRole('platform_admin')`).
+Oathkeeper and the IdP's guards enforce platform-role checks. The IdP **mints only the platform `role`** in issued tokens (both ID Token and access token via introspection `ext`), never app-domain roles.
 
 ---
 
-## Keto namespaces
+## Keto namespaces (Layers 1 & 2)
 
-Permissions are organized in **namespaces**. RBAC uses **subject sets**: permissions are granted to **roles**, and **users** are assigned to roles. Keto resolves “user → role → permission” when checking.
+Permissions are organized in **Ory Permission Language (OPL) namespaces** using ReBAC (relationship-based access control). Keto is the canonical Policy Decision Point (PDP) for all platform-level and per-app access decisions.
 
-```mermaid
-flowchart LR
-    U[User] --> M[Member of role]
-    M --> R[platform_admin]
-    R --> P[Has permission]
-    P --> V[view_users]
-```
-
-### Namespaces
+### Layer 1: Platform namespace
 
 | Namespace | Purpose |
 |-----------|--------|
-| **ranks** | Role membership. Stores `platform_admin` / `platform_user`. Example: `ranks:platform_admin#member@user:123`. |
-| **users** | User management permissions (`view_users`, `add_users`, `edit_users`, `delete_users`, `change_permissions`). |
-| **system** | System-wide admin (e.g. `manage_permissions`). |
-| **admin** | Admin panel access (`access`). |
-| **nova** | Application-specific permissions (e.g. `nova:analytics#access`). |
+| **Platform:nova** | Platform admin membership. Example: `Platform:nova#admins@user:<id>`. |
 
-### RBAC pattern
+Platform admins are granted permissions like `administer` (permission to manage users and access tuples) via the OPL schema (`config/keto/namespaces.keto.ts`).
 
-1. **Grant permission to a role** (e.g. `view_users` to `platform_admin`):
-   - Relation tuple: `users:management#view_users` ↔ subject set `ranks:platform_admin#member`.
-2. **Assign user to role**:
-   - Relation tuple: `ranks:platform_admin#member@user:&lt;id&gt;`.
-3. **Check permission**: You ask Keto “can `user:123` do `view_users` on `users:management`?”. Keto resolves role membership and returns allowed/denied.
+### Layer 2: Per-app namespaces
 
-### Example: grant `view_users` to `platform_admin`
+| Namespace | Purpose |
+|-----------|--------|
+| **App:&lt;appId&gt;** | Per-app access and administration. `App:<appId>#members@user:<id>` grants access to the app; `App:<appId>#admins@user:<id>` grants app-admin permissions (user management). Admins are implicitly members via subject-set rewrite (`admins ⊆ members`). |
+
+The `<appId>` is **the Hydra OAuth2 `client_id`** of that app, so the same identifier keys both Keto membership checks and Hydra token issuance.
+
+### ReBAC pattern example (Layer 1)
 
 ```bash
+# Grant user access to platform admin
 curl -X PUT http://localhost:4467/admin/relation-tuples \
-  -H "Content-Type: application/json" \
+  -H “Content-Type: application/json” \
   -d '{
-    "namespace": "users",
-    "object": "management",
-    "relation": "view_users",
-    "subject_set": {
-      "namespace": "ranks",
-      "object": "platform_admin",
-      "relation": "member"
-    }
+    “namespace”: “Platform”,
+    “object”: “nova”,
+    “relation”: “admins”,
+    “subject_id”: “user:USER_ID”
   }'
 ```
 
-### Example: assign user to `platform_admin`
+### ReBAC pattern example (Layer 2)
 
 ```bash
+# Grant user access to consume app nova-id-test-app
 curl -X PUT http://localhost:4467/admin/relation-tuples \
-  -H "Content-Type: application/json" \
+  -H “Content-Type: application/json” \
   -d '{
-    "namespace": "ranks",
-    "object": "platform_admin",
-    "relation": "member",
-    "subject_id": "user:USER_ID"
+    “namespace”: “App”,
+    “object”: “nova-id-test-app”,
+    “relation”: “members”,
+    “subject_id”: “user:USER_ID”
   }'
 ```
 
-Use `USER_ID` from Kratos (identity ID).
+---
+
+## App-level domain roles (Layer 3)
+
+Each consuming app owns its own domain roles and permissions, stored in that app’s database. The demo app (`DemoModule`, per [ADR-0001](./decisions/0001-idp-vs-demo-app-boundary.md)) uses a SQLite `user_roles` table with roles like `app_admin` and `app_user`.
+
+**Important:** The IdP does **NOT** mint app-domain roles in any token. App-level authorization is resolved by the app itself, keyed on the verified user `sub` from the access token. See [ADR-0002](./decisions/0002-idp-does-not-mint-approle.md) for the rationale: the IdP is app-agnostic and does not couple its token schema to every consuming app’s internal role vocabulary.
+
+A forged or stale app-domain-role claim in a JWT cannot satisfy a guard, because the app never reads such a claim — it fetches the authoritative role from its own database on every access decision.
 
 ---
 
-## Role–permission mapping
+## Per-app access enforcement (dual-mode, [ADR-0004](./decisions/0004-per-app-access-enforcement-dual-mode.md))
 
-### platform_admin
+Per-app access is enforced in **two coexisting modes**, both reading the same Keto source of truth (`App:<appId>#access`).
 
-- **users**: `view_users`, `add_users`, `edit_users`, `delete_users`, `change_permissions`
-- **system**: `manage_permissions`
-- **admin**: `access` (admin panel)
+### Mode A: First-party apps (per-request gateway check)
 
-### platform_user
+First-party apps sit behind the Oathkeeper gateway. The gateway performs a **per-request Keto access check** via the `remote_json` authorizer:
 
-- No admin permissions. App access only; per-app roles are handled in each application’s backend.
+1. Oathkeeper authenticates the user (cookie session).
+2. The `remote_json` authorizer calls Keto: "does this user have `App:<appId>#access`?"
+3. If allowed, the request is forwarded to the app. If denied, the request is rejected at the gateway (403).
 
----
+This is the **Zero-Trust pattern** — access is re-evaluated on every request and cannot be revoked mid-session.
 
-## Setup and role syncing
+### Mode B: Third-party apps (consent-time check)
 
-### Initial setup
+Third-party apps integrate via OAuth2 authorization code flow and never traverse the Oathkeeper gateway. Access is enforced at the **Hydra consent step**:
 
-```bash
-./scripts/setup-all-permissions.sh
-```
+1. During the OAuth login flow, the BFF’s consent handler (`acceptHydraConsent` in `api/src/app.service.ts`) checks Keto: "does this user have `App:<clientId>#access`?"
+2. If a member: consent is accepted, Hydra mints a token, and the user is authenticated to the app.
+3. If **not** a member: consent is rejected with the OAuth error `access_denied`, and Hydra never mints a token.
 
-This:
+This ensures that only members of the app can obtain a token from Hydra — fail-closed.
 
-1. Grants the user-management and admin permissions to `platform_admin`.
-2. Assigns existing Kratos users to roles based on `traits.role`.
+### Invariant
 
-### Assigning platform_admin to a user
-
-```bash
-./scripts/assign-platform-admin-to-user.sh user@example.com
-```
-
-Updates Kratos `traits.role` and Keto role membership for that user.
-
-### Role syncing (UI)
-
-When an admin changes a user’s role in **Users Management**:
-
-1. Kratos `traits.role` is updated.
-2. Keto membership is updated (remove old role, add new role) via `syncRolePermissions()` in `useAuth.js`.
+Both modes read the **same Keto relation**: `App:<appId>#access`. A single grant/revoke (writing or deleting the tuple) is observed immediately by both modes. No app-domain role claim is ever the source of truth for access; per [ADR-0002](./decisions/0002-idp-does-not-mint-approle.md), the IdP does not mint `appRole`.
 
 ---
 
-## Checking permissions
+## Authorization at the API boundary
 
-Frontends use `usePermissions` (and related composables) to call Keto through Oathkeeper. Checks are done in real time (no permission caching).
+When a request arrives at the BFF (via Oathkeeper), it carries authenticated identity from Kratos (`X-User-ID`, `X-User-Email`) and the platform `role` from the token. The API uses this to:
 
-**Example flow:**
+1. **Enforce platform-level access:** Guards like `RequireRole('platform_admin')` check the platform `role` claim or a Keto `Platform:nova#admins` membership.
+2. **Enforce per-app access:** The Oathkeeper gateway (Mode A) performs the `App:<appId>#access` check before the request reaches the API. The API receives only authenticated, access-granted traffic.
+3. **Enforce app-domain roles:** The app (demo: `DemoModule`) fetches its own domain roles from SQLite, keyed on the verified `sub`, and applies its own guards (`AppAdminGuard`, `AppUserGuard`, etc.).
+
+**Example flow (gateway + app):**
 
 ```
-Check: users:management#view_users@user:123
-  → Keto: user:123 member of ranks:platform_admin? Yes
-  → Keto: platform_admin has view_users? Yes
-  → Result: Allowed
+GET /api-test/logs (Bearer token from OAuth)
+  → Oathkeeper: authenticate via Hydra introspection
+  → Oathkeeper remote_json: check App:nova-id-test-app#access on this user
+  → Keto: user:XYZ member of App:nova-id-test-app#members? Yes
+  → API: request forwarded with X-User-ID, role claim
+  → demo/logs.controller: fetch appRole from SQLite keyed on sub
+  → If appRole == app_admin or platform_admin: return logs. Else: 403.
 ```
+
+---
+
+## DemoModule boundary
+
+The BFF is a **modular monolith** (one process, explicit module boundaries). All demo-app concerns are quarantined in `DemoModule` (`api/src/demo/`) to preserve a clean IdP logical surface. See [ADR-0001](./decisions/0001-idp-vs-demo-app-boundary.md).
+
+- **Dependency rule (enforced by CI tooling):** IdP modules (`admin/`, `me/`, `ory/`, `auth/`) **MUST NOT** import from demo modules (`roles/`, `logs/`, demo guards, demo interceptors). Demo may import IdP auth primitives only (`AuthenticatedGuard`, verified `request.user`).
+- **SQLite ownership:** The demo's `user_roles` table and TypeORM connection live inside `DemoModule`, not in the root `AppModule`. The IdP's composition root owns no demo database.
+- **Gateway boundary:** Oathkeeper routes `/api/*` (IdP endpoints) and `/api-test/*` (demo endpoints) to the same container, preserving the option to extract the demo to a separate service later without changing the gateway contract.
+
+---
+
+## Audit notes
+
+- **`keto-read` access:** Querying the Keto relation tuples API (including for audit) is now gated behind the platform `administer` permission (`Platform:nova#admins`). This closes the previously-public `keto-read` browser route.
+- **Legacy `kratos-admin` rule:** The pre-A1 Oathkeeper rule that proxies Kratos admin endpoints directly (gated by `Platform:nova#admins`) still exists and still routes its matched sub-paths. It is now complemented by — and superseded *in preference* by — the A1.2 BFF `/api/admin/*` paths, which are guarded via the same `Platform:nova#admins` membership but offer a curated, type-safe API surface. Removing the direct rule is an audit follow-up.
+
+---
+
+## Live verification status
+
+**A1.4 / A1.5 live verification PASSED (2026-06-14):**
+- **API level (5/5):**
+  - Cookie session (admin) → `/api-test/me` returns 200 (`role: platform_admin`)
+  - Cookie session (admin) → `/api-test/logs` returns 200 — confirms the ADR-0002 platform-role-on-access-token fix (was 403)
+  - Cookie session (member `user@nova.test`) → `/api-test/me` returns 200 (per-request Keto check allows)
+  - Cookie session (non-member `outsider@nova.test`) → gateway denies with 403 (per-request Keto check)
+  - Keto down → gateway denies (fail-closed: the `remote_json` authorizer cannot reach Keto, returns 500 — not a pass-through); restored to 200 after Keto restart
+- **Browser OAuth happy-path:**
+  - Login flow completes; consent screen presented
+  - Accept consent: user authenticated, logs visible
+  - One-click logout: session cleared
+
+---
+
+## Architecture decision records
+
+This document is anchored in four Architecture Decision Records. For detailed rationale, constraints, and alternatives, see:
+
+- [ADR-0001](./decisions/0001-idp-vs-demo-app-boundary.md) — Hard internal module boundary between IdP and demo
+- [ADR-0002](./decisions/0002-idp-does-not-mint-approle.md) — IdP mints identity + platform role, not app-domain roles
+- [ADR-0003](./decisions/0003-three-layer-authorization-model.md) — Three-layer authz: Keto platform + per-app access, plus each app's domain roles
+- [ADR-0004](./decisions/0004-per-app-access-enforcement-dual-mode.md) — Dual-mode per-app enforcement (gateway per-request + consent-time)
 
 ---
 

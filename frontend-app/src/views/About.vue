@@ -56,7 +56,7 @@
             </li>
             <li class="flex items-start gap-2">
               <span class="inline-flex px-2 py-0.5 rounded text-xs font-bold bg-orange-500/20 text-orange-400 shrink-0">App admin</span>
-              <span><strong class="text-cyber-light">/api-test/app-admin-only</strong>, <strong class="text-cyber-light">/api-test/logs</strong> — Solo <em>app_admin</em> o <em>platform_admin</em>.</span>
+              <span><strong class="text-cyber-light">/api-test/app-admin-only</strong>, <strong class="text-cyber-light">/api-test/logs</strong> — Solo <em>app_admin</em> (rol de la app; <em>platform_admin</em> no da acceso de dominio — ADR-0003).</span>
             </li>
           </ul>
         </div>

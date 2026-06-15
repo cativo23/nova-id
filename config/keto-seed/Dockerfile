@@ -1,4 +1,4 @@
-# Minimal seeder image: curl + jq baked in (no runtime apk; reproducible).
+# Minimal seeder image: curl + jq + bash baked in (no runtime apk; reproducible).
 FROM alpine:3.20
-RUN apk add --no-cache curl jq
+RUN apk add --no-cache curl jq bash
 ENTRYPOINT ["/bin/sh", "/seed.sh"]

@@ -428,11 +428,25 @@
     },
     "authenticators": [
       {
+        "handler": "cookie_session",
+        "config": {
+          "check_session_url": "http://kratos:4433/sessions/whoami",
+          "preserve_path": true,
+          "extra_from": "@this",
+          "subject_from": "identity.id"
+        }
+      },
+      {
         "handler": "oauth2_introspection"
       }
     ],
     "authorizer": {
-      "handler": "allow"
+      "handler": "remote_json",
+      "config": {
+        "remote": "http://keto:4466/relation-tuples/check",
+        "payload": "{\"namespace\":\"App\",\"object\":\"nova-id-test-app\",\"relation\":\"access\",\"subject_id\":\"user:{{ print .Subject }}\"}",
+        "forward_response_headers_to_upstream": ["Content-Type"]
+      }
     },
     "mutators": [
       {
@@ -491,7 +505,12 @@
       }
     ],
     "authorizer": {
-      "handler": "allow"
+      "handler": "remote_json",
+      "config": {
+        "remote": "http://keto:4466/relation-tuples/check",
+        "payload": "{\"namespace\":\"Platform\",\"object\":\"nova\",\"relation\":\"administer\",\"subject_id\":\"user:{{ print .Subject }}\"}",
+        "forward_response_headers_to_upstream": ["Content-Type"]
+      }
     },
     "mutators": [
       {

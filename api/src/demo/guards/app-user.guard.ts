@@ -16,11 +16,8 @@ export class AppUserGuard implements CanActivate {
       throw new ForbiddenException('User not authenticated');
     }
 
-    // Use appRole from header (OAuth token introspection) if available, otherwise query DB
-    let appRole = user.appRole;
-    if (!appRole) {
-      appRole = await this.rolesService.getAppRole(user.userId);
-    }
+    // SQLite is the sole source of appRole (ADR-0002) — never read from JWT claim
+    const appRole = await this.rolesService.getAppRole(user.userId);
 
     // Both app_admin and app_user can access endpoints protected by AppUserGuard
     if (appRole !== 'app_admin' && appRole !== 'app_user') {

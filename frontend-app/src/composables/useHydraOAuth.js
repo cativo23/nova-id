@@ -1,6 +1,10 @@
 // Hydra OAuth2/OIDC flow for "Login with Nova ID" (test app)
 // OAuth must start at the issuer (api.ory.localhost) so Hydra's CSRF cookie domain matches the
 // redirect-after-login URL; otherwise Hydra returns "No CSRF value available in the session cookie".
+//
+// Token-persistence and client-side claim decoding removed (A1.5, ADR-0002).
+// role/appRole are now read from /api-test/me under the Kratos cookie session the gateway honors.
+// Only the transient PKCE/state/nonce handshake entries remain in sessionStorage.
 
 function getHydraPublicUrl() {
   if (import.meta.env.VITE_HYDRA_PUBLIC_URL) return import.meta.env.VITE_HYDRA_PUBLIC_URL
@@ -12,8 +16,6 @@ function getHydraPublicUrl() {
 }
 
 const OAUTH_STORAGE_PREFIX = 'nova_id_oauth_'
-/** Refresh token kept in memory only (not in sessionStorage) per OAuth 2.0 Security BCP. */
-let inMemoryRefreshToken = null
 
 /** Default clock skew in seconds for id_token exp/iat validation. */
 const ID_TOKEN_CLOCK_SKEW_SEC = 60
@@ -142,64 +144,3 @@ export function validateIdTokenClaims(claims, clockSkewSec = ID_TOKEN_CLOCK_SKEW
   }
 }
 
-export function getStoredTokens() {
-  try {
-    const raw = sessionStorage.getItem(OAUTH_STORAGE_PREFIX + 'tokens')
-    if (!raw) return null
-    const stored = JSON.parse(raw)
-    if (inMemoryRefreshToken != null) stored.refresh_token = inMemoryRefreshToken
-    return stored
-  } catch {
-    return null
-  }
-}
-
-/**
- * Persist tokens. refresh_token is stored in memory only (not in sessionStorage) per BCP.
- */
-export function setStoredTokens(tokens) {
-  inMemoryRefreshToken = tokens.refresh_token ?? inMemoryRefreshToken
-  const toStore = {
-    access_token: tokens.access_token,
-    id_token: tokens.id_token,
-    expires_in: tokens.expires_in,
-    token_type: tokens.token_type
-  }
-  sessionStorage.setItem(OAUTH_STORAGE_PREFIX + 'tokens', JSON.stringify(toStore))
-}
-
-export function clearStoredTokens() {
-  inMemoryRefreshToken = null
-  sessionStorage.removeItem(OAUTH_STORAGE_PREFIX + 'tokens')
-}
-
-/**
- * Refresh access token using in-memory refresh_token. Public client (no secret).
- * @param {string} clientId - OAuth client_id
- * @returns {Promise<object>} New token set
- */
-export async function refreshAccessToken(clientId) {
-  if (!inMemoryRefreshToken) throw new Error('No refresh token available (restart login)')
-  const res = await fetch(`${getHydraPublicUrl()}/oauth2/token`, {
-    method: 'POST',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'refresh_token',
-      refresh_token: inMemoryRefreshToken,
-      client_id: clientId
-    })
-  })
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}))
-    throw new Error(err.error_description || `Refresh failed: ${res.statusText}`)
-  }
-  const tokens = await res.json()
-  setStoredTokens(tokens)
-  return tokens
-}
-
-export function getAccessToken() {
-  const tokens = getStoredTokens()
-  return tokens?.access_token ?? null
-}

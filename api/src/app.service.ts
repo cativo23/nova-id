@@ -1,11 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { HydraService, AcceptOAuth2LoginRequestWithSession } from './ory/hydra.service';
+import { HydraService } from './ory/hydra.service';
+import { KetoService } from './ory/keto.service';
 
 @Injectable()
 export class AppService {
   private readonly logger = new Logger(AppService.name);
 
-  constructor(private readonly hydra: HydraService) {}
+  constructor(
+    private readonly hydra: HydraService,
+    private readonly keto: KetoService,
+  ) {}
+
   getPublicData() {
     return {
       message: 'This is public data - no authentication required',
@@ -18,210 +23,76 @@ export class AppService {
     };
   }
 
-  getProtectedData(user: any) {
-    return {
-      message: 'This is protected data - requires authentication',
-      timestamp: new Date().toISOString(),
-      user: {
-        id: user.userId,
-        email: user.email,
-        role: user.role,
-        authMethod: user.authMethod,
-      },
-      data: {
-        accessLevel: 'authenticated',
-        message: 'You are logged in and can access this endpoint',
-        verifiedBy: 'Kratos (user verified)',
-      },
-    };
-  }
-
-  getAdminDemoData(user: any) {
-    return {
-      message: 'Platform admin demo data',
-      timestamp: new Date().toISOString(),
-      user: {
-        id: user.userId,
-        email: user.email,
-        role: user.role,
-        authMethod: user.authMethod,
-      },
-      data: {
-        accessLevel: 'platform_admin',
-        message: 'You have platform_admin role',
-        secret: 'Admin-level information',
-        verifiedBy: 'RoleGuard (platform_admin)',
-      },
-    };
-  }
-
-  getUserDemoData(user: any) {
-    return {
-      message: 'Platform user demo data',
-      timestamp: new Date().toISOString(),
-      user: {
-        id: user.userId,
-        email: user.email,
-        role: user.role,
-        authMethod: user.authMethod,
-      },
-      data: {
-        accessLevel: 'platform_user',
-        message: 'You have platform_user role (or higher)',
-        verifiedBy: 'AuthenticatedGuard',
-      },
-    };
-  }
-
-  createData(user: any, body: any) {
-    return {
-      message: 'Data created successfully',
-      timestamp: new Date().toISOString(),
-      user: {
-        id: user.userId,
-        email: user.email,
-        role: user.role,
-        authMethod: user.authMethod,
-      },
-      created: body,
-      verifiedBy: 'Kratos (user verified)',
-    };
-  }
-
-  updateData(user: any, id: string, body: any) {
-    return {
-      message: 'Data updated successfully',
-      timestamp: new Date().toISOString(),
-      user: {
-        id: user.userId,
-        email: user.email,
-        role: user.role,
-        authMethod: user.authMethod,
-      },
-      id,
-      updated: body,
-      verifiedBy: 'Kratos (user verified)',
-    };
-  }
-
-  deleteData(user: any, id: string) {
-    return {
-      message: 'Data deleted successfully',
-      timestamp: new Date().toISOString(),
-      user: {
-        id: user.userId,
-        email: user.email,
-        role: user.role,
-        authMethod: user.authMethod,
-      },
-      id,
-      verifiedBy: 'Kratos (user verified)',
-    };
-  }
-
-  getAppUserData(user: any) {
-    return {
-      message: 'App user data - any authenticated user with app_user or app_admin',
-      timestamp: new Date().toISOString(),
-      user: {
-        id: user.userId,
-        email: user.email,
-        full_name: user.full_name,
-        role: user.role,
-        appRole: user.appRole,
-        authMethod: user.authMethod,
-      },
-      data: {
-        accessLevel: 'app_user',
-        message: 'You have app_user or app_admin role',
-        verifiedBy: 'AuthenticatedGuard',
-      },
-    };
-  }
-
-  getAppAdminOnlyData(user: any) {
-    return {
-      message: 'App admin only - requires app_admin role',
-      timestamp: new Date().toISOString(),
-      user: {
-        id: user.userId,
-        email: user.email,
-        full_name: user.full_name,
-        role: user.role,
-        appRole: user.appRole,
-        authMethod: user.authMethod,
-      },
-      data: {
-        accessLevel: 'app_admin',
-        message: 'You have app_admin role',
-        secret: 'App-level admin information',
-        verifiedBy: 'AppAdminGuard',
-      },
-    };
-  }
-
-  configureAppAdmin(user: any, body: any) {
-    return {
-      message: 'Configuration updated (app_admin)',
-      timestamp: new Date().toISOString(),
-      user: {
-        id: user.userId,
-        email: user.email,
-        appRole: user.appRole,
-      },
-      configured: body,
-      verifiedBy: 'AppAdminGuard',
-    };
-  }
-
   async acceptHydraLogin(user: any, loginChallenge: string) {
     try {
       this.logger.log(`Accepting Hydra login for user ${user.userId}`);
-      const loginBody: AcceptOAuth2LoginRequestWithSession = {
+      const loginRequest = await this.hydra.getLoginRequest(loginChallenge);
+
+      // Honor skip: Hydra already has a valid session for this subject.
+      if (loginRequest.skip) {
+        return await this.hydra.acceptLogin(loginChallenge, {
+          subject: loginRequest.subject ?? user.userId,
+        });
+      }
+
+      // Login has NO session field in Ory's contract. Carry claims forward via
+      // `context`, which Hydra echoes into the consent request's `context`.
+      // Never mint appRole (ADR-0002).
+      return await this.hydra.acceptLogin(loginChallenge, {
         subject: user.userId,
         remember: true,
         remember_for: 3600,
-        session: {
-          id_token: {
-            email: user.email,
-            name: user.full_name,
-            role: user.role,
-            appRole: user.appRole,
-          },
+        context: {
+          email: user.email,
+          name: user.full_name,
+          role: user.role,
         },
-      };
-      return await this.hydra.acceptLogin(loginChallenge, loginBody);
+      });
     } catch (error) {
-      this.logger.error(
-        'Error accepting Hydra login:',
-        error.response?.data || error.message,
-      );
+      this.logger.error('Error accepting Hydra login:', error.response?.data || error.message);
       throw error;
     }
   }
 
   async acceptHydraConsent(user: any, body: any) {
     try {
-      this.logger.log(`Accepting Hydra consent for user ${user.userId}`);
-      return await this.hydra.acceptConsent(body.consent_challenge, {
-        grant_scope: body.grant_scope,
-        grant_access_token_audience: body.grant_access_token_audience,
+      const consentChallenge = body.consent_challenge;
+      this.logger.log(`Consent for user ${user.userId} (challenge ${consentChallenge})`);
+
+      const consentRequest = await this.hydra.getConsentRequest(consentChallenge);
+      const clientId = consentRequest.client?.client_id;
+
+      // Per-app access gate (fail-closed): only members of App:<clientId> get a token.
+      const isMember = clientId ? await this.keto.checkApp(user.userId, clientId) : false;
+      if (!isMember) {
+        this.logger.warn(`Consent DENIED: ${user.userId} is not a member of app ${clientId}`);
+        return await this.hydra.rejectConsent(consentChallenge, {
+          error: 'access_denied',
+          error_description: 'You are not authorized to access this application.',
+        });
+      }
+
+      // Trust the audience from the consent request, NOT the browser body.
+      const grantAudience = consentRequest.requested_access_token_audience ?? [];
+      const grantScope = Array.from(new Set([...(body.grant_scope ?? []), 'app:member']));
+
+      // Mint platform role + membership on BOTH token surfaces. id_token serves
+      // OIDC clients; access_token surfaces via introspection `ext` so the
+      // /api-test path sees `role` (fixes the logs 403). Never mint appRole.
+      const claims = { email: user.email, name: user.full_name, role: user.role, app_access: true };
+
+      return await this.hydra.acceptConsent(consentChallenge, {
+        grant_scope: grantScope,
+        grant_access_token_audience: grantAudience,
         remember: true,
         remember_for: 3600,
         session: {
-          id_token: {
-            email: user.email,
-            name: user.full_name,
-            role: user.role,
-            appRole: user.appRole,
-          },
+          id_token: claims,
+          access_token: claims,
         },
       });
     } catch (error) {
-      this.logger.error(
-        'Error accepting Hydra consent:',
-        error.response?.data || error.message,
-      );
+      this.logger.error('Error accepting Hydra consent:', error.response?.data || error.message);
       throw error;
     }
   }

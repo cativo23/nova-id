@@ -43,7 +43,7 @@
                 <span class="sm:hidden">Arch</span>
               </router-link>
               <router-link
-                v-if="isAuthenticated && (isPlatformAdmin || isAppAdmin)"
+                v-if="isAuthenticated && isAppAdmin"
                 to="/logs"
                 active-class="!text-cyber-accent !bg-cyber-accent/10 !border-cyber-accent/30"
                 class="nav-link px-3 py-2.5 rounded-xl text-sm font-medium text-cyber-light/80 border border-transparent hover:text-cyber-accent hover:bg-cyber-accent/10 hover:border-cyber-accent/20 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyber-accent/50 focus-visible:ring-offset-2 focus-visible:ring-offset-cyber-bg"
@@ -115,7 +115,7 @@ import { ref, onMounted, provide } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import NovaLogoIcon from './components/NovaLogoIcon.vue'
 import { checkSession, logout } from './composables/useAuth'
-import { getStoredTokens, clearStoredTokens, initiateOAuthFlow, decodeIdToken, getAccessToken, refreshAccessToken, validateIdTokenClaims } from './composables/useHydraOAuth'
+import { initiateOAuthFlow } from './composables/useHydraOAuth'
 import { getApiTestBaseUrl } from './composables/useApiTest'
 
 const router = useRouter()
@@ -123,7 +123,6 @@ const route = useRoute()
 const isAuthenticated = ref(false)
 const isPlatformAdmin = ref(false)
 const isAppAdmin = ref(false)
-const isOAuthSession = ref(false)
 const userEmail = ref('')
 const userFromMe = ref(null) // resultado de /me para que Home no repita la llamada
 const apiHealth = ref(null) // 'ok' | 'error' | null
@@ -136,91 +135,31 @@ const oauthClientId = import.meta.env.VITE_NOVA_ID_CLIENT_ID || 'nova-id-test-ap
 const oauthRedirectUri = `${appUrl}/callback`
 
 const refreshAuth = async () => {
-  const tokens = getStoredTokens()
-  if (tokens?.access_token) {
-    isAuthenticated.value = true
-    isOAuthSession.value = true
-    let accessToken = tokens.access_token
-    try {
-      let res = await fetch(`${getApiTestBaseUrl()}/me`, {
-        credentials: 'omit',
-        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' }
-      })
-      if (res.status === 401) {
-        try {
-          await refreshAccessToken(oauthClientId)
-          const newTokens = getStoredTokens()
-          accessToken = newTokens?.access_token
-          if (accessToken) {
-            res = await fetch(`${getApiTestBaseUrl()}/me`, {
-              credentials: 'omit',
-              headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' }
-            })
-          }
-        } catch {
-          clearStoredTokens()
-          isAuthenticated.value = false
-          isOAuthSession.value = false
-          userEmail.value = ''
-          userFromMe.value = null
-          return
-        }
-        if (res?.status === 401) {
-          clearStoredTokens()
-          isAuthenticated.value = false
-          isOAuthSession.value = false
-          userEmail.value = ''
-          userFromMe.value = null
-          return
-        }
-      }
-      if (res.ok) {
-        const me = await res.json()
-        const user = me?.user || me
-        userFromMe.value = user || null
-        userEmail.value = user?.email || ''
-        isPlatformAdmin.value = (user?.role) === 'platform_admin'
-        isAppAdmin.value = (user?.appRole) === 'app_admin'
-      } else {
-        userFromMe.value = null
-        let role = null
-        let appRole = null
-        try {
-          if (tokens.id_token) {
-            const claims = decodeIdToken(tokens.id_token)
-            validateIdTokenClaims(claims)
-            role = claims.role || claims['https://claims.example.com/role']
-            appRole = claims.appRole
-          }
-        } catch {}
-        isPlatformAdmin.value = role === 'platform_admin'
-        isAppAdmin.value = appRole === 'app_admin'
-      }
-    } catch {
-      let role = null
-      let appRole = null
-      try {
-        if (tokens.id_token) {
-          const claims = decodeIdToken(tokens.id_token)
-          validateIdTokenClaims(claims)
-          role = claims.role || claims['https://claims.example.com/role']
-          appRole = claims.appRole
-        }
-      } catch {}
-      isPlatformAdmin.value = role === 'platform_admin'
-      isAppAdmin.value = appRole === 'app_admin'
-    }
-    return
-  }
-  isOAuthSession.value = false
+  isAuthenticated.value = false
   userEmail.value = ''
   userFromMe.value = null
+  try {
+    // The gateway honors the Kratos cookie session; /api-test/me returns the
+    // resolved user incl. appRole from the demo SQLite store (ADR-0002).
+    const res = await fetch(`${getApiTestBaseUrl()}/me`, { credentials: 'include' })
+    if (res.ok) {
+      const me = await res.json()
+      const user = me?.user || me
+      isAuthenticated.value = true
+      userFromMe.value = user || null
+      userEmail.value = user?.email || ''
+      isPlatformAdmin.value = user?.role === 'platform_admin'
+      isAppAdmin.value = user?.appRole === 'app_admin'
+      return
+    }
+  } catch {}
+  // Fall back to a bare session check (covers logged-in-but-not-yet-provisioned).
   try {
     const session = await checkSession()
     isAuthenticated.value = !!session
     userEmail.value = session?.identity?.traits?.email || ''
     isPlatformAdmin.value = session?.identity?.metadata_public?.role === 'platform_admin'
-    isAppAdmin.value = session?.identity?.traits?.appRole === 'app_admin'
+    isAppAdmin.value = false
   } catch {
     isAuthenticated.value = false
     userEmail.value = ''
@@ -251,24 +190,6 @@ function startOAuth() {
 }
 
 const handleLogout = async () => {
-  if (isOAuthSession.value) {
-    clearStoredTokens()
-    isAuthenticated.value = false
-    isOAuthSession.value = false
-    try {
-      const returnTo = window.location.origin + '/'
-      const data = await logout(returnTo)
-      if (data?.logout_url) {
-        const base = getOathkeeperUrl()
-        const apiOrigin = base.startsWith('http') ? base : (window.location.origin + base)
-        const apiBase = apiOrigin.replace(/\/$/, '') + '/'
-        window.location.href = data.logout_url.replace(/^(https?:\/\/[^/]+)\/auth\/?/, apiBase)
-        return
-      }
-    } catch {}
-    window.location.href = '/'
-    return
-  }
   try {
     const returnTo = window.location.origin + '/'
     const data = await logout(returnTo)
@@ -277,13 +198,10 @@ const handleLogout = async () => {
       const apiOrigin = base.startsWith('http') ? base : (window.location.origin + base)
       const apiBase = apiOrigin.replace(/\/$/, '') + '/'
       window.location.href = data.logout_url.replace(/^(https?:\/\/[^/]+)\/auth\/?/, apiBase)
-    } else {
-      isAuthenticated.value = false
-      window.location.href = '/'
+      return
     }
-  } catch {
-    isAuthenticated.value = false
-    window.location.href = '/'
-  }
+  } catch {}
+  isAuthenticated.value = false
+  window.location.href = '/'
 }
 </script>

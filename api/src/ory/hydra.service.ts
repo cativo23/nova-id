@@ -4,6 +4,9 @@ import type {
   AcceptOAuth2LoginRequest,
   AcceptOAuth2ConsentRequest,
   OAuth2RedirectTo,
+  OAuth2LoginRequest,
+  OAuth2ConsentRequest,
+  RejectOAuth2Request,
 } from '@ory/hydra-client';
 import { HYDRA_OAUTH2_API } from './ory.constants';
 
@@ -36,6 +39,27 @@ export class HydraService {
   // including session.id_token — is type-compatible and needs no cast.
   async acceptConsent(consentChallenge: string, body: AcceptOAuth2ConsentRequest): Promise<OAuth2RedirectTo> {
     const { data } = await this.oauth2Api.acceptOAuth2ConsentRequest({ consentChallenge, acceptOAuth2ConsentRequest: body });
+    return data;
+  }
+
+  async getLoginRequest(loginChallenge: string): Promise<OAuth2LoginRequest> {
+    const { data } = await this.oauth2Api.getOAuth2LoginRequest({ loginChallenge });
+    return data;
+  }
+
+  async getConsentRequest(consentChallenge: string): Promise<OAuth2ConsentRequest> {
+    const { data } = await this.oauth2Api.getOAuth2ConsentRequest({ consentChallenge });
+    return data;
+  }
+
+  async rejectConsent(
+    consentChallenge: string,
+    body: RejectOAuth2Request,
+  ): Promise<OAuth2RedirectTo> {
+    const { data } = await this.oauth2Api.rejectOAuth2ConsentRequest({
+      consentChallenge,
+      rejectOAuth2Request: body,
+    });
     return data;
   }
 }
