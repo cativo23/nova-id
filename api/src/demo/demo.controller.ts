@@ -105,11 +105,13 @@ export class DemoController {
   }
 
   @Put(':id')
+  @UseGuards(AppUserGuard)
   updateData(@GetUser() user: any, @Param('id') id: string, @Body() body: any) {
     return this.demoService.updateData(user, id, body);
   }
 
   @Delete(':id')
+  @UseGuards(AppUserGuard)
   deleteData(@GetUser() user: any, @Param('id') id: string) {
     return this.demoService.deleteData(user, id);
   }
