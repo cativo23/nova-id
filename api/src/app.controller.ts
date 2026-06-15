@@ -1,4 +1,5 @@
 import { Controller, Get, Post, Body, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { AppService } from './app.service';
 import { Public } from './decorators/public.decorator';
 import { GetUser } from './decorators/get-user.decorator';
@@ -25,12 +26,16 @@ export class AppController {
     return this.appService.getPublicData();
   }
 
+  @ApiTags('auth')
+  @ApiOperation({ operationId: 'acceptHydraLogin', summary: 'Accept a Hydra login challenge for the signed-in user' })
   @Post('hydra-accept-login')
   @UseGuards(AppUserGuard)
   async acceptHydraLogin(@GetUser() user: any, @Body() body: { login_challenge: string }) {
     return this.appService.acceptHydraLogin(user, body.login_challenge);
   }
 
+  @ApiTags('auth')
+  @ApiOperation({ operationId: 'acceptHydraConsent', summary: 'Accept a Hydra consent challenge for the signed-in user' })
   @Post('hydra-accept-consent')
   @UseGuards(AppUserGuard)
   async acceptHydraConsent(@GetUser() user: any, @Body() body: any) {
