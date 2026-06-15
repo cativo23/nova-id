@@ -18,10 +18,9 @@ export default defineConfig({
           path: './src/mutator/custom-instance.ts',
           name: 'customInstance',
         },
-        query: {
-          useQuery: true,
-          useMutation: true,
-        },
+        // No `query` override: let orval split by HTTP verb
+        // (GET -> useQuery, POST/PUT/PATCH/DELETE -> useMutation).
+        // Forcing both flags globally inverts the hooks.
       },
     },
   },
