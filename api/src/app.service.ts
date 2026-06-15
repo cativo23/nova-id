@@ -74,7 +74,16 @@ export class AppService {
 
       // Trust the audience from the consent request, NOT the browser body.
       const grantAudience = consentRequest.requested_access_token_audience ?? [];
-      const grantScope = Array.from(new Set([...(body.grant_scope ?? []), 'app:member']));
+
+      // Intersect browser-supplied scopes with the server-side requested_scope so
+      // a tampered body cannot smuggle scopes the OAuth client never asked for.
+      // Then unconditionally add app:member (membership is always granted to members).
+      const requestedScope: string[] = consentRequest.requested_scope ?? [];
+      const browserScope: string[] = body.grant_scope ?? [];
+      const grantScope = Array.from(new Set([
+        ...browserScope.filter((s: string) => requestedScope.includes(s)),
+        'app:member',
+      ]));
 
       // Mint platform role + membership on BOTH token surfaces. id_token serves
       // OIDC clients; access_token surfaces via introspection `ext` so the
