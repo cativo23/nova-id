@@ -225,10 +225,14 @@ services:
     build:
       context: ./config/keto-seed
     volumes:
-      - ./scripts/seed-permissions.sh:/seed.sh:ro
+      - ./scripts/seed-permissions.sh:/seed-permissions.sh:ro
+      - ./config/keto-seed/seed-app-members.sh:/seed-app-members.sh:ro
+    entrypoint: ["/bin/sh", "-c", "/seed-permissions.sh && /seed-app-members.sh"]
     environment:
       - KETO_WRITE_URL=http://keto:4467
       - KRATOS_ADMIN_URL=http://kratos:4434
+      - APP_ID=nova-id-test-app
+      - MEMBER_EMAILS=admin@nova.test user@nova.test
     networks:
       - ory-internal
     depends_on:
