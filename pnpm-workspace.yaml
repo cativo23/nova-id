@@ -3,3 +3,8 @@ packages:
   - 'frontend-auth'
   - 'frontend-admin'
   - 'frontend-app'
+
+# pnpm 10+ blocks dependency build scripts by default. esbuild (Vite's bundler)
+# needs its postinstall to fetch/build its native binary — allow only that one.
+onlyBuiltDependencies:
+  - esbuild

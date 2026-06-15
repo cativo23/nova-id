@@ -1,0 +1,7 @@
+# Shared dev image for pnpm-workspace frontends. No build-time install — deps
+# are installed at runtime from the mounted workspace root (see compose).
+# Node 22: pnpm@11 (pinned as the workspace packageManager) requires Node >=22;
+# Node 18/20 crash on corepack-activated pnpm 11 (ERR_VM_DYNAMIC_IMPORT / builtin).
+FROM node:22-alpine
+RUN corepack enable && corepack prepare pnpm@11.0.0 --activate
+WORKDIR /workspace

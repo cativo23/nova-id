@@ -305,19 +305,44 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # One-shot pnpm workspace install. Installs the WHOLE workspace once into the
+  # shared named volumes below so the three dev services don't race each other
+  # (concurrent `pnpm install` against the same store corrupts the symlink farm).
+  # The dev services gate on this via `service_completed_successfully`.
+  workspace-install:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend.dev
+    working_dir: /workspace
+    volumes:
+      - ./:/workspace
+      - pnpm_root_nm:/workspace/node_modules
+      - pnpm_auth_nm:/workspace/frontend-auth/node_modules
+      - pnpm_admin_nm:/workspace/frontend-admin/node_modules
+      - pnpm_app_nm:/workspace/frontend-app/node_modules
+    # pnpm 11 deps install fully but exits non-zero when a build script is gated
+    # (ERR_PNPM_IGNORED_BUILDS for esbuild). The deps are present regardless, so we
+    # tolerate that exit and explicitly build esbuild's native binary via `rebuild`.
+    command: sh -lc "pnpm install || true; pnpm rebuild esbuild"
+    networks:
+      - apps
+    restart: "no"
+
   # Frontend #1: Self-Service UI (Authentication flows)
   # ZERO TRUST: Frontends are on external network, can only access Ory services through Oathkeeper
+  # Runs from the pnpm workspace root so workspace:* packages + hoisted deps resolve.
   frontend-auth:
     build:
-      context: ./frontend-auth
-      dockerfile: Dockerfile.dev
-      args:
-        VITE_KRATOS_PUBLIC_URL: http://localhost:4433
+      context: .
+      dockerfile: Dockerfile.frontend.dev
     ports:
       - "5173:5173"
+    working_dir: /workspace/frontend-auth
     volumes:
-      - ./frontend-auth:/app
-      - /app/node_modules
+      - ./:/workspace
+      - pnpm_root_nm:/workspace/node_modules
+      - pnpm_auth_nm:/workspace/frontend-auth/node_modules
+    command: sh -lc "pnpm run dev -- --host 0.0.0.0 --port 5173"
     environment:
       - VITE_KRATOS_PUBLIC_URL=http://localhost:4433
     networks:
@@ -325,53 +350,63 @@ services:
     depends_on:
       oathkeeper:
         condition: service_healthy
+      workspace-install:
+        condition: service_completed_successfully
     restart: unless-stopped
 
   # Frontend #2: Admin Dashboard (User & Permission Management)
   # ZERO TRUST: Frontends are on external network, can only access Ory services through Oathkeeper
+  # Runs from the pnpm workspace root so workspace:* packages + hoisted deps resolve.
   frontend-admin:
     build:
-      context: ./frontend-admin
-      dockerfile: Dockerfile.dev
-      args:
-        VITE_KRATOS_PUBLIC_URL: http://localhost:4433
-        VITE_OATHKEEPER_URL: /api
+      context: .
+      dockerfile: Dockerfile.frontend.dev
     ports:
       - "5174:5174"
+    working_dir: /workspace/frontend-admin
     volumes:
-      - ./frontend-admin:/app
-      - /app/node_modules
-    # Environment variables are loaded from .env.local file (mounted via volume)
-    # Don't override here to allow .env.local to take precedence
-    networks:
-      - apps
-    depends_on:
-      - oathkeeper
-    restart: unless-stopped
-
-  # Frontend #3: Test Application (Business Logic with API Integration)
-  # ZERO TRUST: Frontends are on external network, can only access Ory services through Oathkeeper
-  frontend-app:
-    build:
-      context: ./frontend-app
-      dockerfile: Dockerfile.dev
-      args:
-        VITE_KRATOS_PUBLIC_URL: /api
-        VITE_OATHKEEPER_URL: /api
-    ports:
-      - "5175:5175"
-    volumes:
-      - ./frontend-app:/app
-      - /app/node_modules
-    # Environment variables are loaded from .env.local file (mounted via volume)
-    # Don't override here to allow .env.local to take precedence
-    environment:
-      - API_PROXY_TARGET=http://oathkeeper:4455
+      - ./:/workspace
+      - pnpm_root_nm:/workspace/node_modules
+      - pnpm_admin_nm:/workspace/frontend-admin/node_modules
+    command: sh -lc "pnpm run dev -- --host 0.0.0.0 --port 5174"
+    # No VITE_* env: admin reads .env.local (if present at /workspace/frontend-admin)
+    # and otherwise falls back to in-code defaults (VITE_OATHKEEPER_URL=/api).
     networks:
       - apps
     depends_on:
       oathkeeper:
         condition: service_healthy
+      workspace-install:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  # Frontend #3: Test Application (Business Logic with API Integration)
+  # ZERO TRUST: Frontends are on external network, can only access Ory services through Oathkeeper
+  # Runs from the pnpm workspace root so workspace:* packages + hoisted deps resolve.
+  frontend-app:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend.dev
+    ports:
+      - "5175:5175"
+    working_dir: /workspace/frontend-app
+    volumes:
+      - ./:/workspace
+      - pnpm_root_nm:/workspace/node_modules
+      - pnpm_app_nm:/workspace/frontend-app/node_modules
+    command: sh -lc "pnpm run dev -- --host 0.0.0.0 --port 5175"
+    environment:
+      # Vite proxy target (vite.config.js) + the only VITE_* the app actually reads.
+      # Both preserve the old image-build behavior (defaults were already /api).
+      - API_PROXY_TARGET=http://oathkeeper:4455
+      - VITE_OATHKEEPER_URL=/api
+    networks:
+      - apps
+    depends_on:
+      oathkeeper:
+        condition: service_healthy
+      workspace-install:
+        condition: service_completed_successfully
     restart: unless-stopped
 
 volumes:
@@ -379,6 +414,12 @@ volumes:
     driver: local
   api_logs:
     driver: local
+  # pnpm-workspace node_modules: one shared root volume + per-SPA volumes.
+  # These mask the host's old npm node_modules so pnpm's symlink farm stays clean.
+  pnpm_root_nm:
+  pnpm_auth_nm:
+  pnpm_admin_nm:
+  pnpm_app_nm:
 
 networks:
   # Ory Stack internal network: Kratos, Hydra, Keto, Postgres
