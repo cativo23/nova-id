@@ -33,3 +33,50 @@ describe('HydraService', () => {
     expect(passedBody.session?.id_token).toEqual({ role: 'platform_admin' });
   });
 });
+
+describe('getLoginRequest', () => {
+  it('delegates to OAuth2Api.getOAuth2LoginRequest and returns data', async () => {
+    const api = { getOAuth2LoginRequest: jest.fn().mockResolvedValue({ data: { challenge: 'c1', skip: true, subject: 'u1' } }) };
+    const svc = new HydraService(api as any);
+
+    const out = await svc.getLoginRequest('c1');
+
+    expect(api.getOAuth2LoginRequest).toHaveBeenCalledWith({ loginChallenge: 'c1' });
+    expect(out.skip).toBe(true);
+    expect(out.subject).toBe('u1');
+  });
+});
+
+describe('getConsentRequest', () => {
+  it('delegates to OAuth2Api.getOAuth2ConsentRequest and returns data', async () => {
+    const api = {
+      getOAuth2ConsentRequest: jest.fn().mockResolvedValue({
+        data: { challenge: 'c2', client: { client_id: 'nova-id-test-app' }, requested_access_token_audience: ['aud1'] },
+      }),
+    };
+    const svc = new HydraService(api as any);
+
+    const out = await svc.getConsentRequest('c2');
+
+    expect(api.getOAuth2ConsentRequest).toHaveBeenCalledWith({ consentChallenge: 'c2' });
+    expect(out.client?.client_id).toBe('nova-id-test-app');
+    expect(out.requested_access_token_audience).toEqual(['aud1']);
+  });
+});
+
+describe('rejectConsent', () => {
+  it('delegates to OAuth2Api.rejectOAuth2ConsentRequest with the error body', async () => {
+    const api = { rejectOAuth2ConsentRequest: jest.fn().mockResolvedValue({ data: { redirect_to: 'http://denied' } }) };
+    const svc = new HydraService(api as any);
+
+    const out = await svc.rejectConsent('c3', { error: 'access_denied', error_description: 'not a member' });
+
+    expect(api.rejectOAuth2ConsentRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        consentChallenge: 'c3',
+        rejectOAuth2Request: expect.objectContaining({ error: 'access_denied' }),
+      }),
+    );
+    expect(out.redirect_to).toBe('http://denied');
+  });
+});
