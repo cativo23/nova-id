@@ -1,5 +1,5 @@
 {
-  "name": "nova-id-frontend",
+  "name": "@nova-id/frontend-admin",
   "version": "1.0.0",
   "type": "module",
   "scripts": {
