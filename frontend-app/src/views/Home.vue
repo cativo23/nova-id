@@ -321,7 +321,9 @@ const userFromMe = inject('userFromMe', null)
 const isAdmin = computed(() => {
   const s = session.value
   if (!s?.identity) return false
-  return s.identity.metadata_public?.role === 'platform_admin' || s.identity.traits?.appRole === 'app_admin'
+  // Logs are app-domain; app_admin (SQLite) is the sole gate (ADR-0003).
+  // platform_admin alone does NOT grant log access.
+  return s.identity.traits?.appRole === 'app_admin'
 })
 
 const showDebug = computed(() => {
@@ -430,7 +432,8 @@ watch(
       session.value.identity.metadata_public.role = user.role
     }
     traits.appRole = user.appRole ?? traits.appRole ?? 'app_user'
-    const isUserAdmin = user.role === 'platform_admin' || user.appRole === 'app_admin'
+    // app_admin (SQLite) is the sole gate — platform_admin alone is not sufficient (ADR-0003)
+    const isUserAdmin = user.appRole === 'app_admin'
     if (isUserAdmin && recentLogs.value.length === 0 && !recentLogsLoading.value) loadRecentLogs()
   },
   { immediate: true }

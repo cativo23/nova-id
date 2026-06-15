@@ -43,7 +43,7 @@
                 <span class="sm:hidden">Arch</span>
               </router-link>
               <router-link
-                v-if="isAuthenticated && (isPlatformAdmin || isAppAdmin)"
+                v-if="isAuthenticated && isAppAdmin"
                 to="/logs"
                 active-class="!text-cyber-accent !bg-cyber-accent/10 !border-cyber-accent/30"
                 class="nav-link px-3 py-2.5 rounded-xl text-sm font-medium text-cyber-light/80 border border-transparent hover:text-cyber-accent hover:bg-cyber-accent/10 hover:border-cyber-accent/20 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyber-accent/50 focus-visible:ring-offset-2 focus-visible:ring-offset-cyber-bg"

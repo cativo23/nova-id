@@ -9,7 +9,7 @@
           </svg>
         </div>
         <h2 class="text-xl font-semibold text-cyber-light mb-2">Access restricted</h2>
-        <p class="text-cyber-light/70 text-sm mb-5">This page is only available to platform or app administrators.</p>
+        <p class="text-cyber-light/70 text-sm mb-5">This page is only available to app administrators.</p>
         <router-link
           to="/"
           class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-cyber-accent/20 text-cyber-accent border border-cyber-accent/30 hover:bg-cyber-accent/30 transition-all duration-200 text-sm font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-cyber-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-cyber-bg"
@@ -39,7 +39,7 @@
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 class="text-2xl sm:text-3xl font-bold text-cyber-accent tracking-tight">Access logs</h1>
-            <p class="mt-1 text-sm text-cyber-light/60">API request history and metrics. Platform or app admin only.</p>
+            <p class="mt-1 text-sm text-cyber-light/60">API request history and metrics. App admin only.</p>
           </div>
           <div class="flex items-center gap-3">
             <button
@@ -355,7 +355,8 @@ async function ensureAllowed() {
     if (res.ok) {
       const me = await res.json()
       const user = me?.user || me
-      allowed.value = user?.role === 'platform_admin' || user?.appRole === 'app_admin'
+      // app_admin (SQLite) is the sole gate — platform_admin alone is not sufficient (ADR-0003)
+      allowed.value = user?.appRole === 'app_admin'
     } else {
       allowed.value = false
     }

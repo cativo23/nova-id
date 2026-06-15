@@ -11,9 +11,9 @@ export class LogsController {
     private readonly rolesService: RolesService,
   ) { }
 
-  // Helper to check if user has access (platform_admin OR app_admin)
+  // Helper to check if user has access. App role app_admin (SQLite, ADR-0002) is
+  // the sole gate — platform_admin does NOT grant log access (ADR-0003, strict layering).
   private async checkAccess(user: any): Promise<boolean> {
-    if (user.role === 'platform_admin') return true
     // SQLite is the sole source of appRole (ADR-0002) — never read from JWT claim
     const appRole = await this.rolesService.getAppRole(user.userId)
     return appRole === 'app_admin'
@@ -30,7 +30,7 @@ export class LogsController {
   ) {
     const user = req?.user
     if (!user || !(await this.checkAccess(user))) {
-      throw new ForbiddenException('Access denied. Required role: platform_admin or app_admin')
+      throw new ForbiddenException('Access denied. Required app role: app_admin')
     }
     const limitNum = limit ? parseInt(limit, 10) : 100;
     const hasFilters = method || status || path || frontend;
@@ -49,7 +49,7 @@ export class LogsController {
   async getStats(@Request() req: any) {
     const user = req?.user
     if (!user || !(await this.checkAccess(user))) {
-      throw new ForbiddenException('Access denied. Required role: platform_admin or app_admin')
+      throw new ForbiddenException('Access denied. Required app role: app_admin')
     }
     return this.logsService.getAccessStats();
   }
@@ -58,7 +58,7 @@ export class LogsController {
   async getLogsByFrontend(@Request() req: any, @Param('frontend') frontend: string, @Query('limit') limit?: string) {
     const user = req?.user
     if (!user || !(await this.checkAccess(user))) {
-      throw new ForbiddenException('Access denied. Required role: platform_admin or app_admin')
+      throw new ForbiddenException('Access denied. Required app role: app_admin')
     }
     const limitNum = limit ? parseInt(limit, 10) : 100;
     return this.logsService.getAccessLogsByFrontend(frontend, limitNum);
@@ -68,7 +68,7 @@ export class LogsController {
   async getLogsByUser(@Request() req: any, @Param('userId') userId: string, @Query('limit') limit?: string) {
     const user = req?.user
     if (!user || !(await this.checkAccess(user))) {
-      throw new ForbiddenException('Access denied. Required role: platform_admin or app_admin')
+      throw new ForbiddenException('Access denied. Required app role: app_admin')
     }
     const limitNum = limit ? parseInt(limit, 10) : 100;
     return this.logsService.getAccessLogsByUser(userId, limitNum);
