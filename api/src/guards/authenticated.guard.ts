@@ -96,7 +96,7 @@ export class AuthenticatedGuard implements CanActivate {
         email: clean(decoded.email),
         full_name: clean(decoded.name ?? decoded.full_name),
         role: clean(decoded.role) || 'platform_user',
-        appRole: clean(decoded.appRole),
+        // appRole intentionally omitted: SQLite is sole source (ADR-0002); IdP no longer mints this claim
         authMethod: 'jwt',
         jwtClaims: decoded,
       };

@@ -14,7 +14,8 @@ export class LogsController {
   // Helper to check if user has access (platform_admin OR app_admin)
   private async checkAccess(user: any): Promise<boolean> {
     if (user.role === 'platform_admin') return true
-    const appRole = user.appRole || await this.rolesService.getAppRole(user.userId)
+    // SQLite is the sole source of appRole (ADR-0002) — never read from JWT claim
+    const appRole = await this.rolesService.getAppRole(user.userId)
     return appRole === 'app_admin'
   }
 
