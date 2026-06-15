@@ -1,4 +1,5 @@
-import Axios, { AxiosError, AxiosRequestConfig } from 'axios';
+import Axios from 'axios';
+import type { AxiosError, AxiosRequestConfig } from 'axios';
 
 /**
  * Same-origin gateway client. baseURL '/api' targets the Oathkeeper IdP seam;
