@@ -7,9 +7,9 @@ import {
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import { Logger } from '@nestjs/common';
-import { LOG_ACCESS_KEY } from '../decorators/log-access.decorator';
+import { LOG_ACCESS_KEY } from './log-access.decorator';
 import { Reflector } from '@nestjs/core';
-import { LogsService } from '../logs/logs.service';
+import { LogsService } from './logs/logs.service';
 
 @Injectable()
 export class LoggingInterceptor implements NestInterceptor {

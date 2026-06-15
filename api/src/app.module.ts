@@ -5,7 +5,6 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { DemoModule } from './demo/demo.module';
-import { LogsModule } from './logs/logs.module';
 import { OryModule } from './ory/ory.module';
 import { AdminModule } from './admin/admin.module';
 import { MeModule } from './me/me.module';
@@ -22,7 +21,6 @@ import { UserRole } from './demo/roles/entities/user-role.entity';
     }),
     AuthModule,
     DemoModule,
-    LogsModule,
     OryModule,
     AdminModule,
     MeModule,

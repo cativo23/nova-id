@@ -1,7 +1,7 @@
 import { Controller, Get, Query, Param, UseGuards, ForbiddenException, Request } from '@nestjs/common';
 import { LogsService } from './logs.service';
-import { AuthenticatedGuard } from '../guards/authenticated.guard';
-import { RolesService } from '../demo/roles/roles.service';
+import { AuthenticatedGuard } from '../../guards/authenticated.guard';
+import { RolesService } from '../roles/roles.service';
 
 @Controller('logs')
 @UseGuards(AuthenticatedGuard)

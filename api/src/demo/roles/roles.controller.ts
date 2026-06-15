@@ -16,7 +16,7 @@ import { RoleGuard } from '../../guards/role.guard';
 import { RequireRole } from '../../decorators/require-role.decorator';
 import { Public } from '../../decorators/public.decorator';
 import { GetUser } from '../../decorators/get-user.decorator';
-import { LogAccess } from '../../decorators/log-access.decorator';
+import { LogAccess } from '../log-access.decorator';
 
 @Controller('roles')
 @UseGuards(AuthenticatedGuard)
