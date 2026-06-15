@@ -14,8 +14,8 @@ import { Public } from './decorators/public.decorator';
 import { GetUser } from './decorators/get-user.decorator';
 import { RequireRole } from './decorators/require-role.decorator';
 import { RoleGuard } from './guards/role.guard';
-import { AppAdminGuard } from './guards/app-admin.guard';
-import { AppUserGuard } from './guards/app-user.guard';
+import { AppAdminGuard } from './demo/guards/app-admin.guard';
+import { AppUserGuard } from './demo/guards/app-user.guard';
 
 @Controller()
 export class AppController {
