@@ -121,7 +121,6 @@ import { getApiTestBaseUrl } from './composables/useApiTest'
 const router = useRouter()
 const route = useRoute()
 const isAuthenticated = ref(false)
-const isPlatformAdmin = ref(false)
 const isAppAdmin = ref(false)
 const userEmail = ref('')
 const userFromMe = ref(null) // resultado de /me para que Home no repita la llamada
@@ -148,7 +147,6 @@ const refreshAuth = async () => {
       isAuthenticated.value = true
       userFromMe.value = user || null
       userEmail.value = user?.email || ''
-      isPlatformAdmin.value = user?.role === 'platform_admin'
       isAppAdmin.value = user?.appRole === 'app_admin'
       return
     }
@@ -158,12 +156,10 @@ const refreshAuth = async () => {
     const session = await checkSession()
     isAuthenticated.value = !!session
     userEmail.value = session?.identity?.traits?.email || ''
-    isPlatformAdmin.value = session?.identity?.metadata_public?.role === 'platform_admin'
     isAppAdmin.value = false
   } catch {
     isAuthenticated.value = false
     userEmail.value = ''
-    isPlatformAdmin.value = false
     isAppAdmin.value = false
   }
 }

@@ -90,4 +90,54 @@ describe('AppService.acceptHydraConsent', () => {
     // NEVER appRole
     expect(JSON.stringify(body)).not.toContain('appRole');
   });
+
+  it('scope intersection: forged extra scope in body is dropped when not in requested_scope', async () => {
+    const hydra = makeHydra();
+    hydra.getConsentRequest.mockResolvedValue({
+      client: { client_id: 'nova-id-test-app' },
+      requested_access_token_audience: [],
+      // Client only requested openid — NOT "admin:write"
+      requested_scope: ['openid'],
+    });
+    const keto = makeKeto();
+    keto.checkApp.mockResolvedValue(true);
+    const svc = new AppService(hydra as any, keto as any);
+
+    // Tampered body includes a scope the client never requested
+    await svc.acceptHydraConsent(user, {
+      consent_challenge: 'cc',
+      grant_scope: ['openid', 'admin:write'],
+    });
+
+    const body = hydra.acceptConsent.mock.calls[0][1];
+    // 'openid' is in requested_scope → should be present
+    expect(body.grant_scope).toContain('openid');
+    // 'app:member' is always added
+    expect(body.grant_scope).toContain('app:member');
+    // 'admin:write' was NOT in requested_scope → must be absent
+    expect(body.grant_scope).not.toContain('admin:write');
+  });
+
+  it('scope intersection: legitimately-requested scopes all pass through', async () => {
+    const hydra = makeHydra();
+    hydra.getConsentRequest.mockResolvedValue({
+      client: { client_id: 'nova-id-test-app' },
+      requested_access_token_audience: [],
+      requested_scope: ['openid', 'profile', 'email'],
+    });
+    const keto = makeKeto();
+    keto.checkApp.mockResolvedValue(true);
+    const svc = new AppService(hydra as any, keto as any);
+
+    await svc.acceptHydraConsent(user, {
+      consent_challenge: 'cc',
+      grant_scope: ['openid', 'profile', 'email'],
+    });
+
+    const body = hydra.acceptConsent.mock.calls[0][1];
+    expect(body.grant_scope).toContain('openid');
+    expect(body.grant_scope).toContain('profile');
+    expect(body.grant_scope).toContain('email');
+    expect(body.grant_scope).toContain('app:member');
+  });
 });
