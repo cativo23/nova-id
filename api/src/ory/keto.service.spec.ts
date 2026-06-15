@@ -67,3 +67,34 @@ describe('KetoService', () => {
     expect(flags.administer).toBe(true);
   });
 });
+
+describe('checkApp', () => {
+  it('checks App:<appId>#access for user:<id> and returns true when allowed', async () => {
+    const api = { checkPermission: jest.fn().mockResolvedValue({ data: { allowed: true } }) };
+    const svc = new KetoService(api as any);
+
+    const allowed = await svc.checkApp('user-123', 'nova-id-test-app');
+
+    expect(allowed).toBe(true);
+    expect(api.checkPermission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        namespace: 'App',
+        object: 'nova-id-test-app',
+        relation: 'access',
+        subjectId: 'user:user-123',
+      }),
+    );
+  });
+
+  it('FAIL-CLOSED: checkApp returns false when Keto throws', async () => {
+    const api = { checkPermission: jest.fn().mockRejectedValue(new Error('ECONNREFUSED')) };
+    const svc = new KetoService(api as any);
+    expect(await svc.checkApp('u', 'app1')).toBe(false);
+  });
+
+  it('checkApp returns false when user is not a member', async () => {
+    const api = { checkPermission: jest.fn().mockResolvedValue({ data: { allowed: false } }) };
+    const svc = new KetoService(api as any);
+    expect(await svc.checkApp('u', 'app1')).toBe(false);
+  });
+});

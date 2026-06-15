@@ -38,6 +38,16 @@ export class KetoService {
     }
   }
 
+  /** Fail-closed app-access check: is this user a member of App:<appId>? */
+  async checkApp(userId: string, appId: string): Promise<boolean> {
+    return this.check({
+      namespace: 'App',
+      object: appId,
+      relation: 'access',
+      subjectId: `user:${userId}`,
+    });
+  }
+
   /** Resolve the Platform-level permit flags for a Kratos identity id. */
   async checkPlatform(userId: string): Promise<PlatformFlags> {
     const subjectId = `user:${userId}`;
