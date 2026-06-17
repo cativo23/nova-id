@@ -50,7 +50,7 @@
   </svg>
 </template>
 
-<script setup>
+<script setup lang="ts">
 defineProps({
   svgClass: { type: String, default: 'h-8 w-8' },
   gradientId: { type: String, default: 'nova-icon-grad' },

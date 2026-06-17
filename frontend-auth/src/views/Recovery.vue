@@ -214,11 +214,15 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted, computed, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import type { LocationQuery, LocationQueryValue } from 'vue-router'
+import type { UpdateRecoveryFlowBody } from '@ory/client'
 import NovaLogoIcon from '../components/NovaLogoIcon.vue'
 import { createRecoveryFlow, getRecoveryFlow, updateRecoveryFlow } from '../composables/useAuth'
+import type { FlowLike, HttpErrorLike } from '../types/flow'
+import type { UiNodeLike } from '../utils/uiNodes'
 import {
   getNodeValue,
   getNodeName,
@@ -232,19 +236,25 @@ import {
 
 const RESEND_COOLDOWN_SEC = 60
 
+/** Kratos query params may be string | string[] | null — normalize to a single string. */
+function firstQuery(v: LocationQueryValue | LocationQueryValue[] | undefined): string | undefined {
+  const val = Array.isArray(v) ? v[0] : v
+  return val ?? undefined
+}
+
 const router = useRouter()
 const route = useRoute()
-const flow = ref(null)
+const flow = ref<FlowLike | null>(null)
 const loading = ref(false)
-const returnTo = ref(route.query.return_to || route.query.returnTo || '')
+const returnTo = ref<string>(firstQuery(route.query.return_to) || firstQuery(route.query.returnTo) || '')
 const resendCooldown = ref(0)
 const recoveryEmail = ref('') // email used for "Resend code"; set when we reach code step
 const codeInputValue = ref('') // keep code in ref so it survives cooldown re-renders and flow replace
 const flowReplacedMessage = ref('')
-let resendCooldownTimer = null
+let resendCooldownTimer: ReturnType<typeof setInterval> | null = null
 
-const preservedQuery = computed(() => {
-  const q = {}
+const preservedQuery = computed<LocationQuery>(() => {
+  const q: LocationQuery = {}
   if (route.query.return_to) q.return_to = route.query.return_to
   if (route.query.returnTo) q.returnTo = route.query.returnTo
   if (route.query.login_challenge) q.login_challenge = route.query.login_challenge
@@ -274,7 +284,7 @@ const cooldownRingOffset = computed(() =>
   COOLDOWN_RING_CIRCUMFERENCE * (1 - resendCooldown.value / RESEND_COOLDOWN_SEC)
 )
 
-function nodeKey(node, index) {
+function nodeKey(node: UiNodeLike, index: number): string {
   const n = node.attributes?.name ?? ''
   const t = node.attributes?.type ?? ''
   return `n-${index}-${n}-${t}`
@@ -282,19 +292,19 @@ function nodeKey(node, index) {
 
 onMounted(async () => {
   try {
-    flowReplacedMessage.value = route.query.flow_replaced_msg ? decodeURIComponent(route.query.flow_replaced_msg) : ''
-    returnTo.value = route.query.return_to || route.query.returnTo || returnTo.value
-    const flowId = route.query.flow
-    const recoveryCode = route.query.code
+    flowReplacedMessage.value = route.query.flow_replaced_msg ? decodeURIComponent(firstQuery(route.query.flow_replaced_msg) ?? '') : ''
+    returnTo.value = firstQuery(route.query.return_to) || firstQuery(route.query.returnTo) || returnTo.value
+    const flowId = firstQuery(route.query.flow)
+    const recoveryCode = firstQuery(route.query.code)
 
     if (flowId) {
       flow.value = await getRecoveryFlow(flowId)
       const f = flow.value
       if (f?.ui?.nodes?.some(n => (getNodeName(n) === 'code' || getNodeName(n) === 'recovery_code') && getNodeType(n) !== 'submit')) {
         const emailNode = f.ui.nodes.find(n => getNodeName(n) === 'email')
-        if (emailNode) recoveryEmail.value = getNodeValue(emailNode) || ''
+        if (emailNode) recoveryEmail.value = String(getNodeValue(emailNode) || '')
         const codeNode = f.ui.nodes.find(n => (getNodeName(n) === 'code' || getNodeName(n) === 'recovery_code') && getNodeType(n) !== 'submit')
-        if (codeNode) codeInputValue.value = (recoveryCode || '') || getNodeValue(codeNode) || ''
+        if (codeNode) codeInputValue.value = (recoveryCode || '') || String(getNodeValue(codeNode) || '')
       }
     } else if (recoveryCode) {
       flow.value = await createRecoveryFlow(returnTo.value || null)
@@ -311,8 +321,8 @@ onMounted(async () => {
   }
 })
 
-const handleInput = (node, event) => {
-  const val = event.target.value
+const handleInput = (node: UiNodeLike, event: Event) => {
+  const val = (event.target as HTMLInputElement).value
   const isCode = getNodeName(node) === 'code' || getNodeName(node) === 'recovery_code'
   if (isCode) codeInputValue.value = val
   if (node.attributes?.value !== undefined) node.attributes.value = val
@@ -337,13 +347,13 @@ onUnmounted(() => {
   }
 })
 
-function preserveCodeValue(prevFlow, newFlow) {
+function preserveCodeValue(prevFlow: FlowLike | null, newFlow: FlowLike | null) {
   if (!newFlow?.ui?.nodes) return
   const codeVal = codeInputValue.value || (prevFlow?.ui?.nodes && (() => {
-    const n = prevFlow.ui.nodes.find(
+    const n = prevFlow.ui!.nodes!.find(
       x => (getNodeName(x) === 'code' || getNodeName(x) === 'recovery_code') && getNodeType(x) !== 'submit'
     )
-    return n ? getNodeValue(n) : ''
+    return n ? String(getNodeValue(n) ?? '') : ''
   })())
   const newCodeNode = newFlow.ui.nodes.find(
     n => (getNodeName(n) === 'code' || getNodeName(n) === 'recovery_code') && getNodeType(n) !== 'submit'
@@ -353,9 +363,9 @@ function preserveCodeValue(prevFlow, newFlow) {
 }
 
 /** Resend code: send only email + csrf + method so we never submit a bad code. No form submit. */
-async function handleResendCode(resendNode) {
+async function handleResendCode(resendNode: UiNodeLike) {
   if (loading.value || resendCooldown.value > 0) return
-  const email = recoveryEmail.value || getNodeValue(resendNode)
+  const email = recoveryEmail.value || String(getNodeValue(resendNode) ?? '')
   if (!email) return
   const csrfNode = flow.value?.ui?.nodes?.find(
     n => getNodeName(n) === 'csrf_token' && getNodeType(n) === 'hidden'
@@ -367,28 +377,30 @@ async function handleResendCode(resendNode) {
   const prevFlow = flow.value
   try {
     const payload = { method: 'code', email, csrf_token: csrfToken }
-    const data = await updateRecoveryFlow(flow.value.id, payload)
+    const data = (await updateRecoveryFlow(flow.value!.id!, payload as unknown as UpdateRecoveryFlowBody)) as unknown as FlowLike
     preserveCodeValue(prevFlow, data)
     flow.value = data
     if (!data?.ui?.messages?.some(m => m.type === 'error')) {
       startResendCooldown()
     }
   } catch (err) {
-    if (err.response?.status === 400 && err.response?.data) {
-      preserveCodeValue(prevFlow, err.response.data)
-      flow.value = err.response.data
+    const e = err as HttpErrorLike
+    if (e.response?.status === 400 && e.response?.data) {
+      preserveCodeValue(prevFlow, e.response.data)
+      flow.value = e.response.data
       flowReplacedMessage.value = ''
-    } else if (err.response?.status === 410) {
-      const body = err.response?.data || {}
-      const useFlowId = body.use_flow_id ?? body.error?.use_flow_id
-      const reason = body.error?.reason ?? body.error?.message ?? 'Please use the new form below.'
+    } else if (e.response?.status === 410) {
+      const body: FlowLike = e.response?.data || {}
+      const bodyErr = body.error as { use_flow_id?: string; reason?: string; message?: string } | undefined
+      const useFlowId = body.use_flow_id ?? bodyErr?.use_flow_id
+      const reason = bodyErr?.reason ?? bodyErr?.message ?? 'Please use the new form below.'
       flowReplacedMessage.value = reason
       if (useFlowId) {
         try {
           flow.value = await getRecoveryFlow(useFlowId)
           router.replace({ path: '/recovery', query: { ...route.query, flow: useFlowId } })
-        } catch (e) {
-          console.error('Failed to load new flow:', e)
+        } catch (e2) {
+          console.error('Failed to load new flow:', e2)
         }
       }
     } else {
@@ -399,17 +411,17 @@ async function handleResendCode(resendNode) {
   }
 }
 
-const getMethodValue = () => {
+const getMethodValue = (): string => {
   const methodNode = flow.value?.ui?.nodes?.find(
     node => node.attributes?.name === 'method' && node.type === 'input'
   )
-  return methodNode?.attributes?.value || 'code'
+  return (methodNode?.attributes?.value as string) || 'code'
 }
 
-const handleSubmit = async (event) => {
+const handleSubmit = async (event: Event) => {
   loading.value = true
   try {
-    const formData = new FormData(event.target)
+    const formData = new FormData(event.target as HTMLFormElement)
     const isEmailStep = !flow.value?.ui?.nodes?.some(
       n => n.attributes?.name === 'code' || n.attributes?.name === 'recovery_code'
     )
@@ -418,25 +430,25 @@ const handleSubmit = async (event) => {
     if (isEmailStep) {
       formData.set('method', 'code')
     }
-    const payload = Object.fromEntries(formData.entries())
+    const payload = Object.fromEntries(formData.entries()) as Record<string, string>
     if (isEmailStep && !payload.method) payload.method = 'code'
-    const data = await updateRecoveryFlow(flow.value.id, payload)
+    const data = (await updateRecoveryFlow(flow.value!.id!, payload as unknown as UpdateRecoveryFlowBody)) as unknown as FlowLike
 
     if (isEmailStep && payload.email) recoveryEmail.value = payload.email
     if (!isEmailStep && data?.ui?.nodes?.some(n => (getNodeName(n) === 'code' || getNodeName(n) === 'recovery_code') && getNodeType(n) !== 'submit') && !recoveryEmail.value) {
       const emailNode = data.ui.nodes.find(n => getNodeName(n) === 'email')
-      if (emailNode) recoveryEmail.value = getNodeValue(emailNode) || (payload.email || '')
+      if (emailNode) recoveryEmail.value = String(getNodeValue(emailNode) || (payload.email || ''))
     }
 
     // If we have an admin-provided recovery code stored, auto-fill it when code field appears
-    if (flow.value._adminRecoveryCode && data?.ui?.nodes) {
+    if (flow.value!._adminRecoveryCode && data?.ui?.nodes) {
       const codeNode = data.ui.nodes.find(
         node => node.attributes?.name === 'code' || node.attributes?.name === 'recovery_code'
       )
       if (codeNode && codeNode.attributes) {
-        codeNode.attributes.value = flow.value._adminRecoveryCode
+        codeNode.attributes.value = flow.value!._adminRecoveryCode
         // Clear stored code after using it
-        delete flow.value._adminRecoveryCode
+        delete flow.value!._adminRecoveryCode
       }
     }
     
@@ -464,11 +476,11 @@ const handleSubmit = async (event) => {
       } else if (hasPasswordField) {
         flow.value = data
       } else if (data?.continue_with) {
-        const settingsFlow = data.continue_with?.find(cw => cw.action === 'show_settings_ui')
+        const settingsFlow = data.continue_with.find(cw => cw.action === 'show_settings_ui')
         if (settingsFlow && settingsFlow.flow) {
           const flowId = typeof settingsFlow.flow === 'string'
             ? settingsFlow.flow
-            : (settingsFlow.flow.id || settingsFlow.flow)
+            : settingsFlow.flow.id
           const q = returnTo.value ? `&return_to=${encodeURIComponent(returnTo.value)}` : ''
           router.push(`/settings?flow=${flowId}${q}`)
         } else {
@@ -486,12 +498,14 @@ const handleSubmit = async (event) => {
       flow.value = data
     }
   } catch (error) {
-    if (error.response?.status === 400) {
-      flow.value = error.response.data
-    } else if (error.response?.status === 410) {
-      const body = error.response.data || {}
-      const useFlowId = body.use_flow_id ?? body.error?.use_flow_id
-      const reason = body.error?.reason ?? body.error?.message ?? 'Please use the new form below.'
+    const er = error as HttpErrorLike
+    if (er.response?.status === 400) {
+      flow.value = er.response.data ?? null
+    } else if (er.response?.status === 410) {
+      const body: FlowLike = er.response.data || {}
+      const bodyErr = body.error as { use_flow_id?: string; reason?: string; message?: string } | undefined
+      const useFlowId = body.use_flow_id ?? bodyErr?.use_flow_id
+      const reason = bodyErr?.reason ?? bodyErr?.message ?? 'Please use the new form below.'
       flowReplacedMessage.value = reason
       if (useFlowId) {
         try {
@@ -499,10 +513,11 @@ const handleSubmit = async (event) => {
           const f = flow.value
           if (f?.ui?.nodes?.some(n => (getNodeName(n) === 'code' || getNodeName(n) === 'recovery_code') && getNodeType(n) !== 'submit')) {
             const emailNode = f.ui.nodes.find(n => getNodeName(n) === 'email')
-            if (emailNode) recoveryEmail.value = getNodeValue(emailNode) || ''
-            if (route.query.code) {
+            if (emailNode) recoveryEmail.value = String(getNodeValue(emailNode) || '')
+            const codeFromQuery = firstQuery(route.query.code)
+            if (codeFromQuery) {
               const codeNode = f.ui.nodes.find(n => (getNodeName(n) === 'code' || getNodeName(n) === 'recovery_code') && getNodeType(n) !== 'submit')
-              if (codeNode?.attributes) codeNode.attributes.value = route.query.code
+              if (codeNode?.attributes) codeNode.attributes.value = codeFromQuery
             }
           }
           router.replace({ path: '/recovery', query: { ...route.query, flow: useFlowId } })

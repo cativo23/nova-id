@@ -33,6 +33,11 @@ Nova ID uses **Kratos** for authentication (identity, sessions, passwords). Auth
 
 **Used by:** Auth UI, Admin dashboard, Test app.
 
+The SPAs (`frontend-auth`, `frontend-admin`, `frontend-app`) call the BFF through the generated
+`@nova-id/api-client` package over a cookie-session axios instance (`baseURL: '/api'`,
+`withCredentials: true`) — same-origin via the Oathkeeper gateway, so the browser never holds a
+Bearer token. See [ADR-0005](./decisions/0005-generated-api-client-and-workspace.md).
+
 ### Token-based (OAuth2 / OIDC)
 
 1. Client obtains an access token from **Hydra** (e.g. authorization code or client credentials).

@@ -55,7 +55,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted, provide } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import AppSidebar from './components/AppSidebar.vue'
@@ -92,8 +92,7 @@ onMounted(async () => {
 
 const handleLogout = async () => {
   try {
-    const returnTo = window.location.origin + '/'
-    const data = await logout(returnTo)
+    const data = await logout()
     if (data?.logout_url) {
       // Use Kratos logout URL as-is so user goes to auth app; rewriting to admin origin
       // would load admin SPA at /self-service/logout and trigger "No match" in Vue Router.

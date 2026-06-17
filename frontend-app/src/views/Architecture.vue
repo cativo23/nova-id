@@ -488,7 +488,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 // Flow steps: rendered in template so content always shows (no runtime template component)
 const badgeCyan = 'bg-tokyo-accent text-tokyo-bg';
 const badgePurple = 'bg-tokyo-accent-2 text-tokyo-bg';

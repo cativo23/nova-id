@@ -51,15 +51,22 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
+import type { LocationQueryValue } from 'vue-router'
 import { getFlowError } from '../composables/useAuth'
 
 const route = useRoute()
 const errorMessage = ref('')
-const errorId = ref(null)
+const errorId = ref<string | null>(null)
 const loaded = ref(false)
+
+/** Kratos query params may be string | string[] | null — normalize to a single string. */
+function firstQuery(v: LocationQueryValue | LocationQueryValue[]): string | undefined {
+  const val = Array.isArray(v) ? v[0] : v
+  return val ?? undefined
+}
 
 const isVerificationRequired = computed(() => {
   if (errorId.value === 'session_verified_address_required') return true
@@ -76,12 +83,12 @@ const displayMessage = computed(() => {
 })
 
 const verificationLink = computed(() => {
-  const q = route.query.return_to || route.query.returnTo
+  const q = firstQuery(route.query.return_to) || firstQuery(route.query.returnTo)
   return q ? { path: '/verification', query: { return_to: q } } : { path: '/verification' }
 })
 
 onMounted(async () => {
-  const fromQuery = route.query.error || route.query.message || route.query.reason
+  const fromQuery = firstQuery(route.query.error) || firstQuery(route.query.message) || firstQuery(route.query.reason)
   if (fromQuery) {
     try {
       errorMessage.value = decodeURIComponent(fromQuery)
@@ -90,12 +97,12 @@ onMounted(async () => {
     }
   }
 
-  const id = route.query.id
+  const id = firstQuery(route.query.id)
   if (id) {
     errorId.value = id
     try {
       const flow = await getFlowError(id)
-      const err = flow?.error ?? flow
+      const err = (flow?.error ?? flow) as { id?: string; message?: string; reason?: string }
       if (err?.id) errorId.value = err.id
       if (err?.message) {
         errorMessage.value = err.message
@@ -111,8 +118,9 @@ onMounted(async () => {
     loaded.value = true
   }
 
-  if (route.query.error_id) {
-    errorId.value = route.query.error_id
+  const errId = firstQuery(route.query.error_id)
+  if (errId) {
+    errorId.value = errId
   }
 })
 </script>

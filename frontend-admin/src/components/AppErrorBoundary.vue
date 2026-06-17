@@ -27,10 +27,10 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onErrorCaptured } from 'vue'
 
-const error = ref(null)
+const error = ref<unknown>(null)
 
 onErrorCaptured((err) => {
   error.value = err

@@ -35,40 +35,40 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
+import { acceptHydraLogin } from '@nova-id/api-client'
 
 const route = useRoute()
-const error = ref(null)
+const error = ref<string | null>(null)
 
 onMounted(async () => {
-  const loginChallenge = route.query.login_challenge
+  const loginChallenge = Array.isArray(route.query.login_challenge)
+    ? route.query.login_challenge[0]
+    : route.query.login_challenge
   if (!loginChallenge) {
     error.value = 'Missing login challenge'
     return
   }
 
   try {
-    const apiBase = import.meta.env.VITE_OATHKEEPER_URL || '/api'
-    const res = await fetch(`${apiBase}/hydra-accept-login`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ login_challenge: loginChallenge })
-    })
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}))
-      throw new Error(data.message || data.error?.message || `Request failed: ${res.status}`)
-    }
-    const data = await res.json()
-    if (data.redirect_to) {
+    // The generated client posts to /hydra-accept-login through the shared axios
+    // mutator (baseURL '/api', withCredentials). The fn now takes the typed
+    // AcceptHydraLoginDto directly and resolves to { redirect_to }.
+    const data = await acceptHydraLogin({ login_challenge: loginChallenge })
+    if (data?.redirect_to) {
       window.location.href = data.redirect_to
       return
     }
     error.value = 'No redirect URL returned'
   } catch (err) {
-    error.value = err.message || 'Failed to complete sign in'
+    const e = err as { response?: { data?: { message?: string; error?: { message?: string } }; status?: number }; message?: string }
+    error.value =
+      e.response?.data?.message ||
+      e.response?.data?.error?.message ||
+      e.message ||
+      'Failed to complete sign in'
   }
 })
 </script>

@@ -169,7 +169,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { checkSession } from '../composables/useAuth'
@@ -180,13 +180,14 @@ import {
   createClient,
   deleteClient
 } from '../composables/useHydra'
+import type { OAuthClient } from '../composables/useHydra'
 
 const router = useRouter()
-const activeTab = ref('permissions')
+const activeTab = ref<'permissions' | 'test' | 'oauth'>('permissions')
 const loadingClients = ref(false)
-const error = ref(null)
-const success = ref(null)
-const oauthClients = ref([])
+const error = ref<string | null>(null)
+const success = ref<string | null>(null)
+const oauthClients = ref<OAuthClient[]>([])
 const creatingClient = ref(false)
 const showCreateClient = ref(false)
 
@@ -211,7 +212,7 @@ onMounted(async () => {
       return
     }
   } catch (error) {
-    console.error('Error checking permission', { status: error?.response?.status })
+    console.error('Error checking permission', { status: (error as { response?: { status?: number } })?.response?.status })
     router.push('/dashboard')
     return
   }
@@ -226,7 +227,7 @@ const loadOAuthClients = async () => {
     oauthClients.value = await listClients()
   } catch (err) {
     console.error('Error loading OAuth clients:', err)
-    error.value = err.message || 'Failed to load OAuth clients'
+    error.value = (err as Error).message || 'Failed to load OAuth clients'
   } finally {
     loadingClients.value = false
   }
@@ -251,15 +252,15 @@ const createOAuthClient = async () => {
     await loadOAuthClients()
     setTimeout(() => { success.value = null }, 3000)
   } catch (err) {
-    error.value = err.message || 'Failed to create OAuth client'
+    error.value = (err as Error).message || 'Failed to create OAuth client'
   } finally {
     creatingClient.value = false
   }
 }
 
-const deleteOAuthClient = async (clientId) => {
+const deleteOAuthClient = async (clientId: string) => {
   if (!confirm('Are you sure you want to delete this OAuth client?')) return
-  
+
   error.value = null
   success.value = null
   try {
@@ -268,7 +269,7 @@ const deleteOAuthClient = async (clientId) => {
     await loadOAuthClients()
     setTimeout(() => { success.value = null }, 3000)
   } catch (err) {
-    error.value = err.message || 'Failed to delete OAuth client'
+    error.value = (err as Error).message || 'Failed to delete OAuth client'
   }
 }
 </script>

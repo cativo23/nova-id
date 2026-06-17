@@ -255,11 +255,15 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted, computed, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import type { LocationQueryValue } from 'vue-router'
+import type { UpdateVerificationFlowBody } from '@ory/client'
 import NovaLogoIcon from '../components/NovaLogoIcon.vue'
 import { createBrowserVerificationFlow, getVerificationFlow, updateVerificationFlow } from '../composables/useAuth'
+import type { FlowLike, HttpErrorLike, ContinueWithLike } from '../types/flow'
+import type { UiNodeLike } from '../utils/uiNodes'
 import {
   getNodeValue,
   getNodeName,
@@ -274,16 +278,22 @@ import {
 const RESEND_COOLDOWN_SEC = 60
 const DEFAULT_AFTER_VERIFICATION = (import.meta.env.VITE_ADMIN_URL || 'http://admin.ory.localhost') + '/dashboard'
 
+/** Kratos query params may be string | string[] | null — normalize to a single string. */
+function firstQuery(v: LocationQueryValue | LocationQueryValue[] | undefined): string | undefined {
+  const val = Array.isArray(v) ? v[0] : v
+  return val ?? undefined
+}
+
 const router = useRouter()
 const route = useRoute()
-const flow = ref(null)
+const flow = ref<FlowLike | null>(null)
 const loading = ref(false)
-const returnTo = ref(route.query.return_to || route.query.returnTo || '')
+const returnTo = ref<string>(firstQuery(route.query.return_to) || firstQuery(route.query.returnTo) || '')
 const resendCooldown = ref(0)
 const verificationEmail = ref('')
 const codeInputValue = ref('') // keep code in ref so it survives cooldown re-renders and flow replace
 const flowReplacedMessage = ref('')
-let resendCooldownTimer = null
+let resendCooldownTimer: ReturnType<typeof setInterval> | null = null
 
 const loginLink = computed(() => {
   const q = returnTo.value
@@ -331,17 +341,17 @@ const continueUrl = computed(() => {
   const continueNode = f.ui.nodes?.find(
     n => n.type === 'a' && (n.attributes?.id === 'continue' || n.attributes?.href)
   )
-  return continueNode?.attributes?.href || DEFAULT_AFTER_VERIFICATION
+  return (continueNode?.attributes?.href as string) || DEFAULT_AFTER_VERIFICATION
 })
 
-function nodeKey(node, index) {
+function nodeKey(node: UiNodeLike, index: number): string {
   const n = node.attributes?.name ?? ''
   const t = node.attributes?.type ?? ''
   return `n-${index}-${n}-${t}`
 }
 
 /** True when flow is on the "request code" step (email field, no code field yet) */
-function isEmailRequestStep(f) {
+function isEmailRequestStep(f: FlowLike | null): boolean {
   if (!f?.ui?.nodes) return false
   const hasEmail = f.ui.nodes.some(n => getNodeName(n) === 'email')
   const hasCodeField = f.ui.nodes.some(n => (getNodeName(n) === 'code' || getNodeName(n) === 'verification_code') && getNodeType(n) !== 'submit')
@@ -350,11 +360,11 @@ function isEmailRequestStep(f) {
 
 onMounted(async () => {
   try {
-    flowReplacedMessage.value = route.query.flow_replaced_msg ? decodeURIComponent(route.query.flow_replaced_msg) : ''
-    returnTo.value = route.query.return_to || route.query.returnTo || returnTo.value
-    const flowId = route.query.flow || route.query.id
-    const codeFromUrl = route.query.code
-    const emailFromQuery = route.query.email
+    flowReplacedMessage.value = route.query.flow_replaced_msg ? decodeURIComponent(firstQuery(route.query.flow_replaced_msg) ?? '') : ''
+    returnTo.value = firstQuery(route.query.return_to) || firstQuery(route.query.returnTo) || returnTo.value
+    const flowId = firstQuery(route.query.flow) || firstQuery(route.query.id)
+    const codeFromUrl = firstQuery(route.query.code)
+    const emailFromQuery = firstQuery(route.query.email)
 
     if (flowId) {
       flow.value = await getVerificationFlow(flowId)
@@ -364,11 +374,11 @@ onMounted(async () => {
       }
       if (f?.ui?.nodes?.some(n => (getNodeName(n) === 'code' || getNodeName(n) === 'verification_code') && getNodeType(n) !== 'submit')) {
         const emailNode = f.ui.nodes.find(n => getNodeName(n) === 'email')
-        if (emailNode) verificationEmail.value = getNodeValue(emailNode) || emailFromQuery || ''
+        if (emailNode) verificationEmail.value = String(getNodeValue(emailNode) || emailFromQuery || '')
         const codeNode = f.ui.nodes.find(n => (getNodeName(n) === 'code' || getNodeName(n) === 'verification_code') && getNodeType(n) !== 'submit')
         if (codeNode) {
           const fromUrl = codeFromUrl || ''
-          codeInputValue.value = fromUrl || getNodeValue(codeNode) || ''
+          codeInputValue.value = fromUrl || String(getNodeValue(codeNode) || '')
           if (fromUrl && codeNode.attributes) codeNode.attributes.value = fromUrl
         }
       }
@@ -385,11 +395,12 @@ onMounted(async () => {
       if (csrfToken) {
         loading.value = true
         try {
-          const data = await updateVerificationFlow(f.id, { method: 'code', email: emailFromQuery, csrf_token: csrfToken })
+          const data = (await updateVerificationFlow(f.id!, { method: 'code', email: emailFromQuery, csrf_token: csrfToken } as unknown as UpdateVerificationFlowBody)) as unknown as FlowLike
           flow.value = data
           startResendCooldown()
         } catch (err) {
-          if (err.response?.status === 400 && err.response?.data) flow.value = err.response.data
+          const e = err as HttpErrorLike
+          if (e.response?.status === 400 && e.response?.data) flow.value = e.response.data
         } finally {
           loading.value = false
         }
@@ -401,8 +412,8 @@ onMounted(async () => {
   }
 })
 
-const handleInput = (node, event) => {
-  const val = event.target.value
+const handleInput = (node: UiNodeLike, event: Event) => {
+  const val = (event.target as HTMLInputElement).value
   const isCode = getNodeName(node) === 'code' || getNodeName(node) === 'verification_code'
   if (isCode) codeInputValue.value = val
   if (node.attributes?.value !== undefined) node.attributes.value = val
@@ -427,13 +438,13 @@ onUnmounted(() => {
   }
 })
 
-function preserveCodeValue(prevFlow, newFlow) {
+function preserveCodeValue(prevFlow: FlowLike | null, newFlow: FlowLike | null) {
   if (!newFlow?.ui?.nodes) return
   const codeVal = codeInputValue.value || (prevFlow?.ui?.nodes && (() => {
-    const n = prevFlow.ui.nodes.find(
+    const n = prevFlow.ui!.nodes!.find(
       x => (getNodeName(x) === 'code' || getNodeName(x) === 'verification_code') && getNodeType(x) !== 'submit'
     )
-    return n ? getNodeValue(n) : ''
+    return n ? String(getNodeValue(n) ?? '') : ''
   })())
   const newCodeNode = newFlow.ui.nodes.find(
     n => (getNodeName(n) === 'code' || getNodeName(n) === 'verification_code') && getNodeType(n) !== 'submit'
@@ -443,9 +454,9 @@ function preserveCodeValue(prevFlow, newFlow) {
 }
 
 /** Resend: send only email + csrf + method, no code. */
-async function handleResendCode(resendNode) {
+async function handleResendCode(resendNode: UiNodeLike) {
   if (loading.value || resendCooldown.value > 0) return
-  const email = verificationEmail.value || getNodeValue(resendNode)
+  const email = verificationEmail.value || String(getNodeValue(resendNode) ?? '')
   if (!email) return
   const csrfNode = flow.value?.ui?.nodes?.find(
     n => getNodeName(n) === 'csrf_token' && getNodeType(n) === 'hidden'
@@ -457,28 +468,30 @@ async function handleResendCode(resendNode) {
   const prevFlow = flow.value
   try {
     const payload = { method: 'code', email, csrf_token: csrfToken }
-    const data = await updateVerificationFlow(flow.value.id, payload)
+    const data = (await updateVerificationFlow(flow.value!.id!, payload as unknown as UpdateVerificationFlowBody)) as unknown as FlowLike
     preserveCodeValue(prevFlow, data)
     flow.value = data
     if (!data?.ui?.messages?.some(m => m.type === 'error')) {
       startResendCooldown()
     }
   } catch (err) {
-    if (err.response?.status === 400 && err.response?.data) {
-      preserveCodeValue(prevFlow, err.response.data)
-      flow.value = err.response.data
+    const e = err as HttpErrorLike
+    if (e.response?.status === 400 && e.response?.data) {
+      preserveCodeValue(prevFlow, e.response.data)
+      flow.value = e.response.data
       flowReplacedMessage.value = ''
-    } else if (err.response?.status === 410) {
-      const body = err.response?.data || {}
-      const useFlowId = body.use_flow_id ?? body.error?.use_flow_id
-      const reason = body.error?.reason ?? body.error?.message ?? 'Please use the new form below.'
+    } else if (e.response?.status === 410) {
+      const body: FlowLike = e.response?.data || {}
+      const bodyErr = body.error as { use_flow_id?: string; reason?: string; message?: string } | undefined
+      const useFlowId = body.use_flow_id ?? bodyErr?.use_flow_id
+      const reason = bodyErr?.reason ?? bodyErr?.message ?? 'Please use the new form below.'
       flowReplacedMessage.value = reason
       if (useFlowId) {
         try {
           flow.value = await getVerificationFlow(useFlowId)
           router.replace({ path: '/verification', query: { ...route.query, flow: useFlowId } })
-        } catch (e) {
-          console.error('Failed to load new flow:', e)
+        } catch (e2) {
+          console.error('Failed to load new flow:', e2)
         }
       }
     } else {
@@ -489,17 +502,17 @@ async function handleResendCode(resendNode) {
   }
 }
 
-const getMethodValue = () => {
+const getMethodValue = (): string => {
   const methodNode = flow.value?.ui?.nodes?.find(
     node => node.attributes?.name === 'method' && node.type === 'input'
   )
-  return methodNode?.attributes?.value || 'code'
+  return (methodNode?.attributes?.value as string) || 'code'
 }
 
-const handleSubmit = async (event) => {
+const handleSubmit = async (event: Event) => {
   loading.value = true
   try {
-    const formData = new FormData(event.target)
+    const formData = new FormData(event.target as HTMLFormElement)
     const isEmailStep = !flow.value?.ui?.nodes?.some(
       n => n.attributes?.name === 'code' || n.attributes?.name === 'verification_code'
     )
@@ -508,14 +521,14 @@ const handleSubmit = async (event) => {
     if (isEmailStep) {
       formData.set('method', 'code')
     }
-    const payload = Object.fromEntries(formData.entries())
+    const payload = Object.fromEntries(formData.entries()) as Record<string, string>
     if (isEmailStep && !payload.method) payload.method = 'code'
-    const data = await updateVerificationFlow(flow.value.id, payload)
+    const data = (await updateVerificationFlow(flow.value!.id!, payload as unknown as UpdateVerificationFlowBody)) as unknown as FlowLike
 
     if (isEmailStep && payload.email) verificationEmail.value = payload.email
     if (!isEmailStep && data?.ui?.nodes?.some(n => (getNodeName(n) === 'code' || getNodeName(n) === 'verification_code') && getNodeType(n) !== 'submit') && !verificationEmail.value) {
       const emailNode = data.ui.nodes.find(n => getNodeName(n) === 'email')
-      if (emailNode) verificationEmail.value = getNodeValue(emailNode) || (payload.email || '')
+      if (emailNode) verificationEmail.value = String(getNodeValue(emailNode) || (payload.email || ''))
     }
 
     const hasErrors = data?.ui?.messages?.some(msg => msg.type === 'error')
@@ -524,7 +537,7 @@ const handleSubmit = async (event) => {
 
     if (!hasErrors) {
       const hasSession = data?.session || data?.session_token
-      const continueWith = data?.continue_with || []
+      const continueWith: ContinueWithLike[] = data?.continue_with || []
       const stillVerificationStep = continueWith.some(c => c.action === 'show_verification_ui')
 
       if (hasSession) {
@@ -544,13 +557,15 @@ const handleSubmit = async (event) => {
       flow.value = data
     }
   } catch (error) {
-    if (error.response?.status === 400) {
-      flow.value = error.response.data
+    const er = error as HttpErrorLike
+    if (er.response?.status === 400) {
+      flow.value = er.response.data ?? null
       flowReplacedMessage.value = ''
-    } else if (error.response?.status === 410) {
-      const body = error.response.data || {}
-      const useFlowId = body.use_flow_id ?? body.error?.use_flow_id
-      const reason = body.error?.reason ?? body.error?.message ?? 'Please use the new form below.'
+    } else if (er.response?.status === 410) {
+      const body: FlowLike = er.response.data || {}
+      const bodyErr = body.error as { use_flow_id?: string; reason?: string; message?: string } | undefined
+      const useFlowId = body.use_flow_id ?? bodyErr?.use_flow_id
+      const reason = bodyErr?.reason ?? bodyErr?.message ?? 'Please use the new form below.'
       flowReplacedMessage.value = reason
       if (useFlowId) {
         try {
@@ -558,10 +573,11 @@ const handleSubmit = async (event) => {
           const f = flow.value
           if (f?.ui?.nodes?.some(n => (getNodeName(n) === 'code' || getNodeName(n) === 'verification_code') && getNodeType(n) !== 'submit')) {
             const emailNode = f.ui.nodes.find(n => getNodeName(n) === 'email')
-            if (emailNode) verificationEmail.value = getNodeValue(emailNode) || ''
-            if (route.query.code) {
+            if (emailNode) verificationEmail.value = String(getNodeValue(emailNode) || '')
+            const codeFromQuery = firstQuery(route.query.code)
+            if (codeFromQuery) {
               const codeNode = f.ui.nodes.find(n => (getNodeName(n) === 'code' || getNodeName(n) === 'verification_code') && getNodeType(n) !== 'submit')
-              if (codeNode?.attributes) codeNode.attributes.value = route.query.code
+              if (codeNode?.attributes) codeNode.attributes.value = codeFromQuery
             }
           }
           const q = { ...route.query, flow: useFlowId }

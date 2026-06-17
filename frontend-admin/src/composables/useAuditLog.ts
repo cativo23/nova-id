@@ -7,10 +7,10 @@ const auditUrl = import.meta.env.VITE_AUDIT_API_URL
 
 /**
  * Send an audit event. No-op if VITE_AUDIT_API_URL is not set.
- * @param {string} action - e.g. 'user.create', 'user.delete', 'permission.grant'
- * @param {Record<string, unknown>} payload - action details (avoid PII in prod or ensure backend redacts)
+ * @param action - e.g. 'user.create', 'user.delete', 'permission.grant'
+ * @param payload - action details (avoid PII in prod or ensure backend redacts)
  */
-export async function auditLog (action, payload = {}) {
+export async function auditLog (action: string, payload: Record<string, unknown> = {}): Promise<void> {
   if (!auditUrl) return
 
   try {

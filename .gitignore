@@ -57,3 +57,11 @@ docs/superpowers/
 
 # Local-only compose override (dev routing: --dev, oathkeeper :80, frontend /api) — never commit
 docker-compose.override.yml
+
+# pnpm workspace
+.pnpm-store/
+
+# generated api client (regenerated from api/openapi.json)
+packages/api-client/src/generated/
+packages/api-client/src/model/
+packages/api-client/openapi.json

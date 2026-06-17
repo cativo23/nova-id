@@ -100,12 +100,12 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import NovaLogoIcon from '../components/NovaLogoIcon.vue'
-import { checkSession, logout } from '../composables/useAuth.js'
-import { canAccessAdmin } from '../composables/usePermissions.js'
+import { checkSession, logout } from '../composables/useAuth'
+import { canAccessAdmin } from '../composables/usePermissions'
 
 const router = useRouter()
 const loading = ref(false)
@@ -120,7 +120,7 @@ const startLogin = async () => {
     try {
       session = await checkSession()
     } catch (e) {
-      if (e?.response?.status !== 401) console.error('startLogin:', e)
+      if ((e as { response?: { status?: number } })?.response?.status !== 401) console.error('startLogin:', e)
     }
     if (session?.identity?.id) {
       await checkAccess()
@@ -155,8 +155,7 @@ const checkAccess = async () => {
 
 const handleLogout = async () => {
   try {
-    const returnTo = window.location.origin + '/'
-    const data = await logout(returnTo)
+    const data = await logout()
     if (data?.logout_url) {
       window.location.href = data.logout_url
     } else {

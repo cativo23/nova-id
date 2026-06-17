@@ -110,21 +110,22 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted, provide } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import NovaLogoIcon from './components/NovaLogoIcon.vue'
 import { checkSession, logout } from './composables/useAuth'
 import { initiateOAuthFlow } from './composables/useHydraOAuth'
 import { getApiTestBaseUrl } from './composables/useApiTest'
+import type { DemoUser, MeResponse } from './types'
 
 const router = useRouter()
 const route = useRoute()
 const isAuthenticated = ref(false)
 const isAppAdmin = ref(false)
 const userEmail = ref('')
-const userFromMe = ref(null) // resultado de /me para que Home no repita la llamada
-const apiHealth = ref(null) // 'ok' | 'error' | null
+const userFromMe = ref<DemoUser | null>(null) // resultado de /me para que Home no repita la llamada
+const apiHealth = ref<'ok' | 'error' | null>(null)
 
 function getOathkeeperUrl() {
   return import.meta.env.VITE_OATHKEEPER_URL || '/api'
@@ -142,8 +143,8 @@ const refreshAuth = async () => {
     // resolved user incl. appRole from the demo SQLite store (ADR-0002).
     const res = await fetch(`${getApiTestBaseUrl()}/me`, { credentials: 'include' })
     if (res.ok) {
-      const me = await res.json()
-      const user = me?.user || me
+      const me = await res.json() as MeResponse
+      const user: DemoUser = me.user ?? (me as unknown as DemoUser)
       isAuthenticated.value = true
       userFromMe.value = user || null
       userEmail.value = user?.email || ''
