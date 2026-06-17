@@ -106,6 +106,7 @@ import { useRouter } from 'vue-router'
 import NovaLogoIcon from '../components/NovaLogoIcon.vue'
 import { checkSession, logout } from '../composables/useAuth'
 import { canAccessAdmin } from '../composables/usePermissions'
+import { logger, errMessage } from '../utils/logger'
 
 const router = useRouter()
 const loading = ref(false)
@@ -120,7 +121,7 @@ const startLogin = async () => {
     try {
       session = await checkSession()
     } catch (e) {
-      if ((e as { response?: { status?: number } })?.response?.status !== 401) console.error('startLogin:', e)
+      if ((e as { response?: { status?: number } })?.response?.status !== 401) logger.error('startLogin:', errMessage(e))
     }
     if (session?.identity?.id) {
       await checkAccess()
@@ -129,7 +130,7 @@ const startLogin = async () => {
     const returnTo = window.location.origin + '/dashboard'
     window.location.href = `${authUiUrl()}/auth/login?return_to=${encodeURIComponent(returnTo)}`
   } catch (error) {
-    console.error('startLogin:', error)
+    logger.error('startLogin:', errMessage(error))
     const returnTo = window.location.origin + '/dashboard'
     window.location.href = `${authUiUrl()}/auth/login?return_to=${encodeURIComponent(returnTo)}`
   } finally {

@@ -223,6 +223,7 @@ import NovaLogoIcon from '../components/NovaLogoIcon.vue'
 import { createRecoveryFlow, getRecoveryFlow, updateRecoveryFlow } from '../composables/useAuth'
 import type { FlowLike, HttpErrorLike } from '../types/flow'
 import type { UiNodeLike } from '../utils/uiNodes'
+import { logger, errMessage } from '../utils/logger'
 import {
   getNodeValue,
   getNodeName,
@@ -316,7 +317,7 @@ onMounted(async () => {
       flow.value = await createRecoveryFlow(returnTo.value || null)
     }
   } catch (error) {
-    console.error('Error loading recovery flow:', error)
+    logger.error('Error loading recovery flow:', errMessage(error))
     router.push('/error')
   }
 })
@@ -400,11 +401,11 @@ async function handleResendCode(resendNode: UiNodeLike) {
           flow.value = await getRecoveryFlow(useFlowId)
           router.replace({ path: '/recovery', query: { ...route.query, flow: useFlowId } })
         } catch (e2) {
-          console.error('Failed to load new flow:', e2)
+          logger.error('Failed to load new flow:', errMessage(e2))
         }
       }
     } else {
-      console.error('Resend code failed:', err)
+      logger.error('Resend code failed:', errMessage(err))
     }
   } finally {
     loading.value = false
@@ -522,11 +523,11 @@ const handleSubmit = async (event: Event) => {
           }
           router.replace({ path: '/recovery', query: { ...route.query, flow: useFlowId } })
         } catch (e) {
-          console.error('Failed to load new flow:', e)
+          logger.error('Failed to load new flow:', errMessage(e))
         }
       }
     } else {
-      console.error('Recovery error:', error)
+      logger.error('Recovery error:', errMessage(error))
       router.push('/error')
     }
   } finally {

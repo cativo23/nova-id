@@ -16,6 +16,7 @@
 // usePermissionCache.ts delegates here (this is the leaf module → no import cycle).
 import { meControllerPermissions } from '@nova-id/api-client'
 import type { PermissionsResponseDto } from '@nova-id/api-client'
+import { logger, errMessage } from '../utils/logger'
 
 // Module-level memoized promise for the raw /me/permissions response.
 let _cachedPermsPromise: Promise<PermissionsResponseDto> | null = null
@@ -45,7 +46,7 @@ export async function canAccessAdmin(_userId?: string): Promise<boolean> {
     const perms = await fetchMyPermissions()
     return perms.canAccessAdmin === true
   } catch (error) {
-    console.error('canAccessAdmin failed:', error)
+    logger.error('canAccessAdmin failed:', errMessage(error))
     return false
   }
 }
@@ -56,7 +57,7 @@ export async function canManagePermissions(_userId?: string): Promise<boolean> {
     const perms = await fetchMyPermissions()
     return perms.canManagePermissions === true
   } catch (error) {
-    console.error('canManagePermissions failed:', error)
+    logger.error('canManagePermissions failed:', errMessage(error))
     return false
   }
 }
@@ -89,7 +90,7 @@ export async function getAllUserPermissionFlags(_userId?: string, forceRefresh =
       canAccessAdmin: perms.canAccessAdmin === true,
     }
   } catch (error) {
-    console.error('Error getting user permission flags:', error)
+    logger.error('Error getting user permission flags:', errMessage(error))
     return {
       canViewUsers: false,
       canAddUsers: false,

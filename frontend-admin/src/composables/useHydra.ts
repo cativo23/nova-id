@@ -3,6 +3,7 @@
 // NOTE: This is OUTSIDE the BFF surface (calls Hydra Admin via the gateway, not
 // the Nest BFF), so it intentionally keeps hand-rolled fetch — it is not part of
 // the generated @nova-id/api-client.
+import { logger, errMessage } from '../utils/logger'
 const oathkeeperUrl = import.meta.env.VITE_OATHKEEPER_URL || '/api'
 const hydraAdminUrl = `${oathkeeperUrl}/hydra-admin`
 
@@ -33,7 +34,7 @@ export async function listClients(): Promise<OAuthClient[]> {
 
     return await response.json()
   } catch (error) {
-    console.error('Error listing clients:', error)
+    logger.error('Error listing clients:', errMessage(error))
     throw error
   }
 }
@@ -57,7 +58,7 @@ export async function getClient(clientId: string): Promise<OAuthClient> {
 
     return await response.json()
   } catch (error) {
-    console.error('Error getting client:', error)
+    logger.error('Error getting client:', errMessage(error))
     throw error
   }
 }
@@ -83,7 +84,7 @@ export async function createClient(clientData: Record<string, unknown>): Promise
 
     return await response.json()
   } catch (error) {
-    console.error('Error creating client:', error)
+    logger.error('Error creating client:', errMessage(error))
     throw error
   }
 }
@@ -109,7 +110,7 @@ export async function updateClient(clientId: string, clientData: Record<string, 
 
     return await response.json()
   } catch (error) {
-    console.error('Error updating client:', error)
+    logger.error('Error updating client:', errMessage(error))
     throw error
   }
 }
@@ -133,7 +134,7 @@ export async function deleteClient(clientId: string): Promise<boolean> {
 
     return true
   } catch (error) {
-    console.error('Error deleting client:', error)
+    logger.error('Error deleting client:', errMessage(error))
     throw error
   }
 }
@@ -157,7 +158,7 @@ export async function listAccessTokens(): Promise<unknown> {
 
     return await response.json()
   } catch (error) {
-    console.error('Error listing tokens:', error)
+    logger.error('Error listing tokens:', errMessage(error))
     throw error
   }
 }
