@@ -683,6 +683,78 @@
           "canManagePermissions",
           "canAccessAdmin"
         ]
+      },
+      "DemoCreateDataDto": {
+        "type": "object",
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "description": "ISO-8601 timestamp injected by the frontend-app",
+            "example": "2026-06-17T00:00:00.000Z"
+          },
+          "source": {
+            "type": "string",
+            "description": "Caller identifier injected by the frontend-app",
+            "example": "frontend-app"
+          }
+        }
+      },
+      "DemoConfigureDto": {
+        "type": "object",
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "description": "ISO-8601 timestamp injected by the frontend-app",
+            "example": "2026-06-17T00:00:00.000Z"
+          },
+          "source": {
+            "type": "string",
+            "description": "Caller identifier injected by the frontend-app",
+            "example": "frontend-app"
+          }
+        }
+      },
+      "DemoUpdateDataDto": {
+        "type": "object",
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "description": "ISO-8601 timestamp injected by the frontend-app",
+            "example": "2026-06-17T00:00:00.000Z"
+          },
+          "source": {
+            "type": "string",
+            "description": "Caller identifier injected by the frontend-app",
+            "example": "frontend-app"
+          }
+        }
+      },
+      "BootstrapAppAdminDto": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "description": "Kratos identity UUID to promote to app_admin. Defaults to the authenticated user.",
+            "example": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+          }
+        }
+      },
+      "SetUserRoleDto": {
+        "type": "object",
+        "properties": {
+          "appRole": {
+            "type": "string",
+            "enum": [
+              "app_admin",
+              "app_user"
+            ],
+            "description": "Target application role for the user.",
+            "example": "app_user"
+          }
+        },
+        "required": [
+          "appRole"
+        ]
       }
     }
   }

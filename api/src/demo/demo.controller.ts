@@ -9,6 +9,9 @@ import { RequireRole } from '../decorators/require-role.decorator';
 import { RoleGuard } from '../guards/role.guard';
 import { AppAdminGuard } from './guards/app-admin.guard';
 import { AppUserGuard } from './guards/app-user.guard';
+import { DemoCreateDataDto } from './dto/demo-create-data.dto';
+import { DemoConfigureDto } from './dto/demo-configure.dto';
+import { DemoUpdateDataDto } from './dto/demo-update-data.dto';
 
 @Controller()
 export class DemoController {
@@ -64,14 +67,14 @@ export class DemoController {
 
   @Post('data')
   @UseGuards(AppUserGuard)
-  createData(@GetUser() user: AuthenticatedUser, @Body() body: any) {
-    return this.demoService.createData(user, body);
+  createData(@GetUser() user: AuthenticatedUser, @Body() dto: DemoCreateDataDto) {
+    return this.demoService.createData(user, dto);
   }
 
   @Post('create')
   @UseGuards(AppUserGuard)
-  createDataLegacy(@GetUser() user: AuthenticatedUser, @Body() body: any) {
-    return this.demoService.createData(user, body);
+  createDataLegacy(@GetUser() user: AuthenticatedUser, @Body() dto: DemoCreateDataDto) {
+    return this.demoService.createData(user, dto);
   }
 
   @Get('app-user-data')
@@ -82,8 +85,8 @@ export class DemoController {
 
   @Post('app-user-data')
   @UseGuards(AppUserGuard)
-  async createAppUserData(@GetUser() user: AuthenticatedUser, @Body() body: any) {
-    return this.demoService.createData(user, body);
+  async createAppUserData(@GetUser() user: AuthenticatedUser, @Body() dto: DemoCreateDataDto) {
+    return this.demoService.createData(user, dto);
   }
 
   @Get('admin-demo')
@@ -101,14 +104,14 @@ export class DemoController {
 
   @Post('app-admin/configure')
   @UseGuards(AppAdminGuard)
-  configureAppAdmin(@GetUser() user: AuthenticatedUser, @Body() body: any) {
-    return this.demoService.configureAppAdmin(user, body);
+  configureAppAdmin(@GetUser() user: AuthenticatedUser, @Body() dto: DemoConfigureDto) {
+    return this.demoService.configureAppAdmin(user, dto);
   }
 
   @Put(':id')
   @UseGuards(AppUserGuard)
-  updateData(@GetUser() user: AuthenticatedUser, @Param('id') id: string, @Body() body: any) {
-    return this.demoService.updateData(user, id, body);
+  updateData(@GetUser() user: AuthenticatedUser, @Param('id') id: string, @Body() dto: DemoUpdateDataDto) {
+    return this.demoService.updateData(user, id, dto);
   }
 
   @Delete(':id')
