@@ -44,7 +44,9 @@ const route = useRoute()
 const error = ref<string | null>(null)
 
 onMounted(async () => {
-  const loginChallenge = route.query.login_challenge
+  const loginChallenge = Array.isArray(route.query.login_challenge)
+    ? route.query.login_challenge[0]
+    : route.query.login_challenge
   if (!loginChallenge) {
     error.value = 'Missing login challenge'
     return
@@ -52,14 +54,9 @@ onMounted(async () => {
 
   try {
     // The generated client posts to /hydra-accept-login through the shared axios
-    // mutator (baseURL '/api', withCredentials). The BFF body is the login challenge;
-    // the OpenAPI spec leaves it undocumented, so the generated fn takes no body
-    // param — we pass it via the request `data` option. The generated return type
-    // is `void` (response body undocumented), but the BFF returns { redirect_to },
-    // so we cast the resolved value to read it.
-    const data = (await acceptHydraLogin({
-      data: { login_challenge: loginChallenge },
-    })) as { redirect_to?: string } | undefined
+    // mutator (baseURL '/api', withCredentials). The fn now takes the typed
+    // AcceptHydraLoginDto directly and resolves to { redirect_to }.
+    const data = await acceptHydraLogin({ login_challenge: loginChallenge })
     if (data?.redirect_to) {
       window.location.href = data.redirect_to
       return

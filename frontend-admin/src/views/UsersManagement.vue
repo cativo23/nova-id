@@ -897,8 +897,7 @@ const sendRecoveryPassword = async (user: UserResponseDto) => {
 
   try {
     // BFF returns { recovery_link } — normalise to an absolute URL for the modal.
-    // The OpenAPI op types the body as void, so cast through unknown to read it.
-    const result = await recoveryLinkMutation.mutateAsync({ id: user.id }) as unknown as { recovery_link?: string }
+    const result = await recoveryLinkMutation.mutateAsync({ id: user.id })
     const recoveryLink = result?.recovery_link
     if (!recoveryLink) {
       throw new Error('BFF did not return a recovery_link')

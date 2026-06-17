@@ -144,21 +144,22 @@ onMounted(async () => {
 })
 
 const acceptConsent = async () => {
+  if (!consentChallenge.value) {
+    error.value = 'Missing consent challenge'
+    return
+  }
   processing.value = true
   error.value = null
   // Call our API (via the generated client → shared axios mutator, baseURL '/api',
   // withCredentials) so session { email, role } is taken from Oathkeeper headers
   // (cookie_session) and sent to Hydra; then introspection will return them for
-  // token-only requests. The BFF body is undocumented in the OpenAPI spec, so the
-  // generated fn takes no body param — we pass it via the request `data` option.
-  // Return type is `void` (undocumented), but the BFF returns { redirect_to }; cast to read it.
+  // token-only requests. The fn now takes the typed AcceptHydraConsentDto directly
+  // and resolves to { redirect_to }.
   try {
-    const result = (await acceptHydraConsent({
-      data: {
-        consent_challenge: consentChallenge.value,
-        grant_scope: consentInfo.value?.requested_scope ?? [],
-      },
-    })) as { redirect_to?: string } | undefined
+    const result = await acceptHydraConsent({
+      consent_challenge: consentChallenge.value,
+      grant_scope: consentInfo.value?.requested_scope ?? [],
+    })
 
     if (result?.redirect_to) {
       window.location.href = result.redirect_to
