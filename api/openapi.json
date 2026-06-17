@@ -6,9 +6,26 @@
         "operationId": "acceptHydraLogin",
         "summary": "Accept a Hydra login challenge for the signed-in user",
         "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptHydraLoginDto"
+              }
+            }
+          }
+        },
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HydraRedirectResponseDto"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -21,9 +38,26 @@
         "operationId": "acceptHydraConsent",
         "summary": "Accept a Hydra consent challenge for the signed-in user",
         "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptHydraConsentDto"
+              }
+            }
+          }
+        },
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HydraRedirectResponseDto"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -337,7 +371,14 @@
         ],
         "responses": {
           "201": {
-            "description": "Recovery link generated"
+            "description": "Recovery link generated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecoveryLinkResponseDto"
+                }
+              }
+            }
           },
           "401": {
             "description": "Missing or invalid Bearer id_token"
@@ -407,6 +448,56 @@
       }
     },
     "schemas": {
+      "AcceptHydraLoginDto": {
+        "type": "object",
+        "properties": {
+          "login_challenge": {
+            "type": "string",
+            "description": "The Hydra login challenge issued at the start of the OAuth2 authorization flow.",
+            "example": "a1b2c3d4e5f6..."
+          }
+        },
+        "required": [
+          "login_challenge"
+        ]
+      },
+      "HydraRedirectResponseDto": {
+        "type": "object",
+        "properties": {
+          "redirect_to": {
+            "type": "string",
+            "description": "URL the browser must follow to continue the OAuth2 flow.",
+            "example": "https://hydra.nova-id.localhost/oauth2/auth?login_verifier=..."
+          }
+        },
+        "required": [
+          "redirect_to"
+        ]
+      },
+      "AcceptHydraConsentDto": {
+        "type": "object",
+        "properties": {
+          "consent_challenge": {
+            "type": "string",
+            "description": "The Hydra consent challenge issued by Hydra after login.",
+            "example": "a1b2c3d4e5f6..."
+          },
+          "grant_scope": {
+            "description": "Scopes the user agrees to grant. Intersected server-side with the OAuth client's requested_scope; tampered scopes are dropped.",
+            "example": [
+              "openid",
+              "offline"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "consent_challenge"
+        ]
+      },
       "UserResponseDto": {
         "type": "object",
         "properties": {
@@ -541,6 +632,19 @@
         },
         "required": [
           "state"
+        ]
+      },
+      "RecoveryLinkResponseDto": {
+        "type": "object",
+        "properties": {
+          "recovery_link": {
+            "type": "string",
+            "description": "One-time self-service recovery link the user can follow to reset their credentials.",
+            "example": "https://nova-id.localhost/self-service/recovery?flow=...&token=..."
+          }
+        },
+        "required": [
+          "recovery_link"
         ]
       },
       "PermissionsResponseDto": {

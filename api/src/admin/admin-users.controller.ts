@@ -26,6 +26,7 @@ import { SetUserStateDto } from './dto/set-user-state.dto';
 import { ListUsersQueryDto } from './dto/list-users-query.dto';
 import { UserResponseDto } from './dto/user-response.dto';
 import { PaginatedUsersDto } from './dto/paginated-users.dto';
+import { RecoveryLinkResponseDto } from './dto/recovery-link-response.dto';
 
 @ApiTags('admin')
 @ApiBearerAuth('oathkeeper-id-token')
@@ -92,11 +93,11 @@ export class AdminUsersController {
   @Post(':id/recovery-link')
   @HttpCode(201)
   @ApiOperation({ summary: 'Generate a recovery link for a user' })
-  @ApiResponse({ status: 201, description: 'Recovery link generated' })
+  @ApiResponse({ status: 201, type: RecoveryLinkResponseDto, description: 'Recovery link generated' })
   @ApiResponse({ status: 401, description: 'Missing or invalid Bearer id_token' })
   @ApiResponse({ status: 403, description: 'Caller lacks Platform:nova#manage_users in Keto' })
   @ApiResponse({ status: 404, description: 'Identity not found' })
-  async recoveryLink(@Param('id') id: string): Promise<{ recovery_link: string }> {
+  async recoveryLink(@Param('id') id: string): Promise<RecoveryLinkResponseDto> {
     return { recovery_link: await this.kratos.createRecoveryLink(id) };
   }
 
