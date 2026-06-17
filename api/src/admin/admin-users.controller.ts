@@ -43,22 +43,40 @@ export class AdminUsersController {
 
   @Get()
   @ApiOperation({ summary: 'List all platform users (cursor-paginated)' })
-  @ApiOkResponse({ type: PaginatedUsersDto, description: 'Page of users + optional next-page cursor' })
-  @ApiResponse({ status: 401, description: 'Missing or invalid Bearer id_token' })
-  @ApiResponse({ status: 403, description: 'Caller lacks Platform:nova#manage_users in Keto' })
+  @ApiOkResponse({
+    type: PaginatedUsersDto,
+    description: 'Page of users + optional next-page cursor',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Missing or invalid Bearer id_token',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Caller lacks Platform:nova#manage_users in Keto',
+  })
   async list(@Query() query: ListUsersQueryDto): Promise<PaginatedUsersDto> {
     const { identities, nextPageToken } = await this.kratos.listIdentities({
       pageSize: query.pageSize,
       pageToken: query.pageToken,
     });
-    return { data: identities.map(i => UserResponseDto.fromIdentity(i)), nextPageToken };
+    return {
+      data: identities.map((i) => UserResponseDto.fromIdentity(i)),
+      nextPageToken,
+    };
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get a single user by Kratos identity id' })
   @ApiOkResponse({ type: UserResponseDto })
-  @ApiResponse({ status: 401, description: 'Missing or invalid Bearer id_token' })
-  @ApiResponse({ status: 403, description: 'Caller lacks Platform:nova#manage_users in Keto' })
+  @ApiResponse({
+    status: 401,
+    description: 'Missing or invalid Bearer id_token',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Caller lacks Platform:nova#manage_users in Keto',
+  })
   @ApiResponse({ status: 404, description: 'Identity not found' })
   async get(@Param('id') id: string): Promise<UserResponseDto> {
     return UserResponseDto.fromIdentity(await this.kratos.getIdentity(id));
@@ -67,13 +85,28 @@ export class AdminUsersController {
   @Post()
   @HttpCode(201)
   @ApiOperation({ summary: 'Create a new platform user identity' })
-  @ApiResponse({ status: 201, type: UserResponseDto, description: 'Identity created' })
-  @ApiResponse({ status: 401, description: 'Missing or invalid Bearer id_token' })
-  @ApiResponse({ status: 403, description: 'Caller lacks Platform:nova#manage_users in Keto' })
+  @ApiResponse({
+    status: 201,
+    type: UserResponseDto,
+    description: 'Identity created',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Missing or invalid Bearer id_token',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Caller lacks Platform:nova#manage_users in Keto',
+  })
   @ApiResponse({ status: 409, description: 'Email already registered' })
   @ApiResponse({ status: 422, description: 'Validation failed' })
-  async create(@GetUser() actor: AuthenticatedUser, @Body() dto: CreateUserDto): Promise<UserResponseDto> {
-    const result = UserResponseDto.fromIdentity(await this.kratos.createIdentity(dto));
+  async create(
+    @GetUser() actor: AuthenticatedUser,
+    @Body() dto: CreateUserDto,
+  ): Promise<UserResponseDto> {
+    const result = UserResponseDto.fromIdentity(
+      await this.kratos.createIdentity(dto),
+    );
     await this.audit.record({
       actorId: actor.userId,
       actorEmail: actor.email,
@@ -87,15 +120,23 @@ export class AdminUsersController {
   @Patch(':id')
   @ApiOperation({ summary: 'Partially update user traits / role' })
   @ApiOkResponse({ type: UserResponseDto })
-  @ApiResponse({ status: 401, description: 'Missing or invalid Bearer id_token' })
-  @ApiResponse({ status: 403, description: 'Caller lacks Platform:nova#manage_users in Keto' })
+  @ApiResponse({
+    status: 401,
+    description: 'Missing or invalid Bearer id_token',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Caller lacks Platform:nova#manage_users in Keto',
+  })
   @ApiResponse({ status: 404, description: 'Identity not found' })
   async update(
     @GetUser() actor: AuthenticatedUser,
     @Param('id') id: string,
     @Body() dto: UpdateUserDto,
   ): Promise<UserResponseDto> {
-    const result = UserResponseDto.fromIdentity(await this.kratos.updateIdentity(id, dto));
+    const result = UserResponseDto.fromIdentity(
+      await this.kratos.updateIdentity(id, dto),
+    );
     await this.audit.record({
       actorId: actor.userId,
       actorEmail: actor.email,
@@ -110,15 +151,23 @@ export class AdminUsersController {
   @Patch(':id/state')
   @ApiOperation({ summary: 'Activate or deactivate a user identity' })
   @ApiOkResponse({ type: UserResponseDto })
-  @ApiResponse({ status: 401, description: 'Missing or invalid Bearer id_token' })
-  @ApiResponse({ status: 403, description: 'Caller lacks Platform:nova#manage_users in Keto' })
+  @ApiResponse({
+    status: 401,
+    description: 'Missing or invalid Bearer id_token',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Caller lacks Platform:nova#manage_users in Keto',
+  })
   @ApiResponse({ status: 404, description: 'Identity not found' })
   async setState(
     @GetUser() actor: AuthenticatedUser,
     @Param('id') id: string,
     @Body() dto: SetUserStateDto,
   ): Promise<UserResponseDto> {
-    const result = UserResponseDto.fromIdentity(await this.kratos.setIdentityState(id, dto.state));
+    const result = UserResponseDto.fromIdentity(
+      await this.kratos.setIdentityState(id, dto.state),
+    );
     await this.audit.record({
       actorId: actor.userId,
       actorEmail: actor.email,
@@ -133,11 +182,24 @@ export class AdminUsersController {
   @Post(':id/recovery-link')
   @HttpCode(201)
   @ApiOperation({ summary: 'Generate a recovery link for a user' })
-  @ApiResponse({ status: 201, type: RecoveryLinkResponseDto, description: 'Recovery link generated' })
-  @ApiResponse({ status: 401, description: 'Missing or invalid Bearer id_token' })
-  @ApiResponse({ status: 403, description: 'Caller lacks Platform:nova#manage_users in Keto' })
+  @ApiResponse({
+    status: 201,
+    type: RecoveryLinkResponseDto,
+    description: 'Recovery link generated',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Missing or invalid Bearer id_token',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Caller lacks Platform:nova#manage_users in Keto',
+  })
   @ApiResponse({ status: 404, description: 'Identity not found' })
-  async recoveryLink(@GetUser() actor: AuthenticatedUser, @Param('id') id: string): Promise<RecoveryLinkResponseDto> {
+  async recoveryLink(
+    @GetUser() actor: AuthenticatedUser,
+    @Param('id') id: string,
+  ): Promise<RecoveryLinkResponseDto> {
     const result = { recovery_link: await this.kratos.createRecoveryLink(id) };
     await this.audit.record({
       actorId: actor.userId,
@@ -153,10 +215,19 @@ export class AdminUsersController {
   @HttpCode(204)
   @ApiOperation({ summary: 'Delete a user identity permanently' })
   @ApiNoContentResponse({ description: 'Identity deleted' })
-  @ApiResponse({ status: 401, description: 'Missing or invalid Bearer id_token' })
-  @ApiResponse({ status: 403, description: 'Caller lacks Platform:nova#manage_users in Keto' })
+  @ApiResponse({
+    status: 401,
+    description: 'Missing or invalid Bearer id_token',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Caller lacks Platform:nova#manage_users in Keto',
+  })
   @ApiResponse({ status: 404, description: 'Identity not found' })
-  async remove(@GetUser() actor: AuthenticatedUser, @Param('id') id: string): Promise<void> {
+  async remove(
+    @GetUser() actor: AuthenticatedUser,
+    @Param('id') id: string,
+  ): Promise<void> {
     await this.kratos.deleteIdentity(id);
     await this.audit.record({
       actorId: actor.userId,

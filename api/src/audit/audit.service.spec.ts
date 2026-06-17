@@ -51,7 +51,8 @@ describe('AuditService', () => {
       });
 
       // Either save or insert must have been called exactly once.
-      const persistCalled = repo.save.mock.calls.length + repo.insert.mock.calls.length;
+      const persistCalled =
+        repo.save.mock.calls.length + repo.insert.mock.calls.length;
       expect(persistCalled).toBe(1);
 
       // Verify the data passed to create() contains all mapped fields.
@@ -78,7 +79,8 @@ describe('AuditService', () => {
         }),
       );
 
-      const persistCalled = repo.save.mock.calls.length + repo.insert.mock.calls.length;
+      const persistCalled =
+        repo.save.mock.calls.length + repo.insert.mock.calls.length;
       expect(persistCalled).toBe(1);
     });
 
