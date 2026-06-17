@@ -89,6 +89,11 @@ export class AuthenticatedGuard implements CanActivate {
         issuer: this.issuer,
       }) as jwt.JwtPayload;
 
+      // A token without a `sub` claim has no identity — reject it.
+      // This makes `request.user.userId` an honest `string` (never undefined).
+      if (!decoded.sub) {
+        throw new UnauthorizedException('Token missing subject claim');
+      }
       const clean = (val: unknown) =>
         val && val !== '<no value>' ? (val as string) : undefined;
       request.user = {
@@ -105,6 +110,13 @@ export class AuthenticatedGuard implements CanActivate {
       );
       return true;
     } catch (error: any) {
+      // Re-throw explicit UnauthorizedException (e.g. missing sub) as-is so
+      // its message is preserved; wrap all other errors (JWT lib exceptions)
+      // in a generic 401 to avoid leaking internal details.
+      if (error instanceof UnauthorizedException) {
+        this.logger.error(`JWT validation failed: ${error.message}`);
+        throw error;
+      }
       this.logger.error(`JWT validation failed: ${error?.message ?? error}`);
       throw new UnauthorizedException('Invalid token');
     }
