@@ -266,11 +266,18 @@ services:
       - HYDRA_ADMIN_URL=http://hydra:4445
       - KRATOS_ADMIN_URL=http://kratos:4434
       - KETO_READ_URL=http://keto:4466
+      # Audit trail Postgres connection (nova_audit DB on the ory-internal network).
+      - AUDIT_DB_HOST=postgres
+      - AUDIT_DB_PORT=5432
+      - AUDIT_DB_NAME=nova_audit
+      - AUDIT_DB_USER=postgres
+      - AUDIT_DB_PASSWORD=${POSTGRES_PASSWORD}
     networks:
       - apps
       - ory-internal
     depends_on:
       - oathkeeper
+      - postgres
     restart: unless-stopped
 
   oathkeeper:

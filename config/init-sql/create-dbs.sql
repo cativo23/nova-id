@@ -10,3 +10,6 @@ CREATE DATABASE hydra;
 
 -- Create keto database
 CREATE DATABASE keto;
+
+-- Create nova_audit database (append-only audit trail for the BFF)
+CREATE DATABASE nova_audit;
