@@ -19,6 +19,29 @@ Postgres, Redis (to add), Docker Compose.
 
 ---
 
+## Current status (updated 2026-06-17)
+
+| Phase | Status | Where |
+|---|---|---|
+| **A0 — Security & foundations** | ✅ **DONE / merged** | develop (PRs #25 admin-paths, #26 config-hygiene, #27 keto-opl) |
+| **A1 — BFF consolidation** | ✅ **DONE / merged** | develop (PR #28 BFF core, #29 OAuth/access gates, #30 followups, #31 api-client + pnpm workspace + SPAs→TS) |
+| **A2 — Hardening** | 🔜 **NEXT** (some items partially landed during A1 — see reconciliation) | — |
+| **B — Deploy** | ⛔ out of scope / **not planned yet** | future bucket (outline below) |
+
+**A2 reconciliation (verified on develop 2026-06-17 — only the remaining work counts):**
+- A2.1 DTOs — *partial*: IdP controllers (admin/me/app hydra-accept) fully typed; **remaining**: 5 `@Body() any` + inline-literal bodies in `api/src/demo/**`, and a shared `AuthenticatedUser` type for `@GetUser() any`.
+- A2.2 throttler — `@nestjs/throttler@^6.5.0` installed, **unwired**.
+- A2.3 helmet — `helmet@^8.1.0` installed, **unwired**.
+- A2.4 versioning — **not done**; adding `/v1` ripples to Oathkeeper `strip_path`, the generated client `baseURL`, and SPA paths (coordinated change — decision pending).
+- A2.5 OpenAPI — *partial*: single ungated `/docs`; needs public-vs-admin split + gating.
+- A2.6 audit — *partial*: `LoggingInterceptor`/`LogsService` live in `DemoModule`, file-backed (append) **but** in-memory lossy cap (`slice(-1000)`), `@LogAccess` opt-in only on RolesController; **no IdP-level append-only audit** of admin mutations (membership grant/revoke, recovery, trait edits). Design decision pending (home + store + scope).
+- A2.7 demo cleanup — *partial*: demo `PUT/DELETE /:id` now guarded ✅; **remaining**: M1 boundary inversion below + thin demo bodies.
+- A2.8 frontend hygiene — *partial*: `useKeto.js` removed ✅; **remaining**: ~29 raw `console.*` across SPAs (some log full OAuth/Kratos error objects → PHI/secret risk).
+- **M1 (from A1 review):** `api/src/app.controller.ts` imports `AppUserGuard` from `demo/guards/` for the hydra-accept routes — IdP→demo boundary inversion; should rely on the global auth guard + the in-handler Keto gate.
+- **Legacy `kratos-admin` gateway rule (A0 deferral):** `config/oathkeeper/rules.{local,production}.json` still route `/api/admin/identities|sessions|recovery` **directly to Kratos:4434**, bypassing the BFF `/api/admin/*` + its `PlatformManageUsersGuard` (overlaps `protected-api`, order favors the bypass). Close it.
+
+---
+
 ## Phase ordering & dependencies
 
 ```
@@ -150,10 +173,16 @@ the audit remain open.
 
 ---
 
-## Out of scope here (Bucket B — deploy, later)
-TLS/certs, secrets manager, prod DB/Redis HA, monitoring/metrics, K8s/Helm/Terraform, Traefik prod,
-managed email + SPF/DKIM/DMARC, backups, blue-green/canary, service mesh. Also: Cerbos per-app
-sidecar and SCIM provisioning are future complements, not this bucket.
+## Bucket B — Deploy & operate (future; NOT planned yet)
+
+Out of scope for "finish the code." No detailed plan exists yet — this is the outline for when deployment is picked up:
+- **Transport & ingress:** TLS/certs, Traefik (or equivalent) prod ingress, blue-green/canary.
+- **Secrets & config:** secrets manager (not env files), key rotation automation.
+- **Data tier:** prod Postgres HA + backups; Redis (HA) for sessions/throttling.
+- **Observability:** monitoring/metrics, centralized logging, alerting, tracing.
+- **Orchestration:** K8s/Helm/Terraform (IaC), service mesh.
+- **Email:** managed email provider + SPF/DKIM/DMARC.
+- **Future complements (not core):** Cerbos per-app sidecar (richer per-app policy), SCIM provisioning.
 
 ## Acceptance for "Bucket A done"
 - 0 open P0/P1 from `docs/AUDIT_FINDINGS.md`.
