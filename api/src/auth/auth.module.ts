@@ -1,14 +1,18 @@
 import { Module, Global } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
 import { AuthenticatedGuard } from '../guards/authenticated.guard';
 
+/**
+ * AuthModule — provides AuthenticatedGuard to the DI container globally.
+ *
+ * The APP_GUARD binding has been moved to AppModule.providers so that guard
+ * execution order can be controlled explicitly: ThrottlerGuard is registered
+ * first (throttles all requests, including unauthenticated ones) and
+ * AuthenticatedGuard second (rejects unauth requests with 401 after rate-limit
+ * headers have already been applied).
+ */
 @Global()
 @Module({
-  providers: [
-    {
-      provide: APP_GUARD,
-      useClass: AuthenticatedGuard,
-    },
-  ],
+  providers: [AuthenticatedGuard],
+  exports: [AuthenticatedGuard],
 })
 export class AuthModule { }

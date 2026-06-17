@@ -150,4 +150,25 @@ describe('AuthenticatedGuard — JWKS-verified id_token', () => {
     const ctx = ctxWithHeaders({ authorization: `Bearer ${token}` });
     await expect(guard.canActivate(ctx)).rejects.toThrow();
   });
+
+  it('rejects a valid JWT that has no sub claim (empty string)', async () => {
+    const guard = newGuardWithJwks();
+    // jwt.sign with sub='' still produces a valid signed token; the guard must
+    // reject it because an empty subject is not a valid principal.
+    const token = sign({ sub: '', email: 'u@example.com', role: 'platform_user' }, trustedPrivPem);
+    const ctx = ctxWithHeaders({ authorization: `Bearer ${token}` });
+    await expect(guard.canActivate(ctx)).rejects.toThrow(/subject/i);
+  });
+
+  it('rejects a valid JWT that has no sub claim (omitted)', async () => {
+    const guard = newGuardWithJwks();
+    // Explicitly omit sub by not including it in the claims.
+    const token = jwt.sign(
+      { email: 'u@example.com', role: 'platform_user' },
+      trustedPrivPem,
+      { algorithm: 'RS256', issuer: ISSUER, keyid: KID },
+    );
+    const ctx = ctxWithHeaders({ authorization: `Bearer ${token}` });
+    await expect(guard.canActivate(ctx)).rejects.toThrow();
+  });
 });

@@ -7,15 +7,16 @@ import {
   Body,
   Param,
   UseGuards,
-  BadRequestException,
 } from '@nestjs/common';
 import { RolesService } from './roles.service';
 import { AuthenticatedGuard } from '../../guards/authenticated.guard';
 import { AppAdminGuard } from '../guards/app-admin.guard';
 import { RoleGuard } from '../../guards/role.guard';
 import { RequireRole } from '../../decorators/require-role.decorator';
-import { Public } from '../../decorators/public.decorator';
 import { GetUser } from '../../decorators/get-user.decorator';
+import { AuthenticatedUser } from '../../common/types/authenticated-user';
+import { BootstrapAppAdminDto } from './dto/bootstrap-app-admin.dto';
+import { SetUserRoleDto } from './dto/set-user-role.dto';
 import { LogAccess } from '../log-access.decorator';
 
 @Controller('roles')
@@ -29,10 +30,10 @@ export class RolesController {
   @UseGuards(RoleGuard)
   @RequireRole('platform_admin')
   async bootstrapAppAdmin(
-    @GetUser() user: any,
-    @Body() body: { userId?: string },
+    @GetUser() user: AuthenticatedUser,
+    @Body() dto: BootstrapAppAdminDto,
   ) {
-    const targetUserId = body.userId || user.userId;
+    const targetUserId = dto.userId || user.userId;
     const userRole = await this.rolesService.setAppRole(targetUserId, 'app_admin');
     return {
       message: `User ${targetUserId} set as app_admin (bootstrap)`,
@@ -42,7 +43,7 @@ export class RolesController {
   }
 
   @Get('my-role')
-  async getMyRole(@GetUser() user: any) {
+  async getMyRole(@GetUser() user: AuthenticatedUser) {
     // Always query DB to get the most up-to-date appRole
     const appRole = await this.rolesService.getAppRole(user.userId, true);
     return {
@@ -81,14 +82,11 @@ export class RolesController {
   @UseGuards(AppAdminGuard)
   async setUserRole(
     @Param('userId') userId: string,
-    @Body() body: { appRole: 'app_admin' | 'app_user' },
+    @Body() dto: SetUserRoleDto,
   ) {
-    if (!body.appRole || !['app_admin', 'app_user'].includes(body.appRole)) {
-      throw new BadRequestException('appRole must be "app_admin" or "app_user"');
-    }
-    const userRole = await this.rolesService.setAppRole(userId, body.appRole);
+    const userRole = await this.rolesService.setAppRole(userId, dto.appRole);
     return {
-      message: `User role set to ${body.appRole}`,
+      message: `User role set to ${dto.appRole}`,
       userRole,
     };
   }
@@ -97,14 +95,11 @@ export class RolesController {
   @UseGuards(AppAdminGuard)
   async updateUserRole(
     @Param('userId') userId: string,
-    @Body() body: { appRole: 'app_admin' | 'app_user' },
+    @Body() dto: SetUserRoleDto,
   ) {
-    if (!body.appRole || !['app_admin', 'app_user'].includes(body.appRole)) {
-      throw new BadRequestException('appRole must be "app_admin" or "app_user"');
-    }
-    const userRole = await this.rolesService.setAppRole(userId, body.appRole);
+    const userRole = await this.rolesService.setAppRole(userId, dto.appRole);
     return {
-      message: `User role updated to ${body.appRole}`,
+      message: `User role updated to ${dto.appRole}`,
       userRole,
     };
   }

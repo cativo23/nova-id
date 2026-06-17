@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { WinstonLogger } from './common/logger';
 
@@ -8,6 +9,17 @@ async function bootstrap() {
     const app = await NestFactory.create(AppModule, {
         logger: WinstonLogger,
     });
+
+    // Trust exactly one proxy hop (the Oathkeeper gateway — A0.4).
+    // The BFF has no host-published ports; all traffic arrives via the gateway,
+    // which sets X-Forwarded-For to the real client IP.  With trust=1 Express
+    // (and therefore @nestjs/throttler) reads req.ip from that header instead
+    // of the socket address (which is always the gateway's container IP).
+    app.getHttpAdapter().getInstance().set('trust proxy', 1);
+
+    // Security headers — disable CSP so Swagger UI (inline scripts/styles) loads correctly.
+    // All other helmet defaults (X-Frame-Options, X-Content-Type-Options, etc.) remain active.
+    app.use(helmet({ contentSecurityPolicy: false }));
 
     // CORS: explicit allowlist; never reflect arbitrary origins. X-User-* and
     // X-Gateway-Auth are gateway-injected server-side and must NOT be accepted from browsers.
