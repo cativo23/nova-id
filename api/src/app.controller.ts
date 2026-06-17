@@ -1,9 +1,8 @@
-import { Controller, Get, Post, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBody, ApiOkResponse } from '@nestjs/swagger';
 import { AppService } from './app.service';
 import { Public } from './decorators/public.decorator';
 import { GetUser } from './decorators/get-user.decorator';
-import { AppUserGuard } from './demo/guards/app-user.guard';
 import { AcceptHydraLoginDto } from './dto/accept-hydra-login.dto';
 import { AcceptHydraConsentDto } from './dto/accept-hydra-consent.dto';
 import { HydraRedirectResponseDto } from './dto/hydra-redirect-response.dto';
@@ -34,7 +33,6 @@ export class AppController {
   @ApiBody({ type: AcceptHydraLoginDto })
   @ApiOkResponse({ type: HydraRedirectResponseDto })
   @Post('hydra-accept-login')
-  @UseGuards(AppUserGuard)
   async acceptHydraLogin(
     @GetUser() user: any,
     @Body() body: AcceptHydraLoginDto,
@@ -47,7 +45,6 @@ export class AppController {
   @ApiBody({ type: AcceptHydraConsentDto })
   @ApiOkResponse({ type: HydraRedirectResponseDto })
   @Post('hydra-accept-consent')
-  @UseGuards(AppUserGuard)
   async acceptHydraConsent(
     @GetUser() user: any,
     @Body() body: AcceptHydraConsentDto,
