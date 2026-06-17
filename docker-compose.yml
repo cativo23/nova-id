@@ -323,7 +323,19 @@ services:
     # pnpm 11 deps install fully but exits non-zero when a build script is gated
     # (ERR_PNPM_IGNORED_BUILDS for esbuild). The deps are present regardless, so we
     # tolerate that exit and explicitly build esbuild's native binary via `rebuild`.
-    command: sh -lc "pnpm install || true; pnpm rebuild esbuild"
+    # We then sentinel-check that the install actually produced a usable tree (orval +
+    # vite present) instead of letting `|| true` mask a genuinely broken install, and
+    # generate the gitignored @nova-id/api-client so a fresh clone can resolve it.
+    # Sentinels target the per-package bin dirs: pnpm hoists each package's devDeps
+    # into <package>/node_modules/.bin, not the workspace root, so checking root would
+    # false-negative. orval lives with the api-client package; vite with each frontend.
+    command: >
+      sh -lc "pnpm install || true;
+              pnpm rebuild esbuild;
+              test -x packages/api-client/node_modules/.bin/orval || { echo 'FATAL: orval missing after install'; exit 1; };
+              test -x frontend-admin/node_modules/.bin/vite || { echo 'FATAL: vite missing after install'; exit 1; };
+              pnpm --filter @nova-id/api-client run generate;
+              test -f packages/api-client/src/generated/admin/admin.ts || { echo 'FATAL: client not generated'; exit 1; }"
     networks:
       - apps
     restart: "no"
