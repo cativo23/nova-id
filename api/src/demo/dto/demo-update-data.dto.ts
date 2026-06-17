@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsISO8601, IsOptional, IsString } from 'class-validator';
+import { IsISO8601, IsOptional, IsString, MaxLength } from 'class-validator';
 
 /**
  * Body for PUT /:id.
@@ -22,5 +22,6 @@ export class DemoUpdateDataDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(256)
   source?: string;
 }
