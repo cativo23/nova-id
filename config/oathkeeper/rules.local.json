@@ -49,38 +49,6 @@
     ]
   },
   {
-    "id": "kratos-admin-recovery-link",
-    "upstream": {
-      "preserve_host": false,
-      "strip_path": "/api",
-      "url": "http://kratos:4434"
-    },
-    "match": {
-      "url": "<(http|https)://(api\\.ory\\.localhost|admin\\.ory\\.localhost|auth\\.ory\\.localhost|app\\.ory\\.localhost|localhost(:[0-9]+)?|oathkeeper(:[0-9]+)?)/api/admin/recovery/link.*>",
-      "methods": ["POST"]
-    },
-    "authenticators": [{ "handler": "cookie_session" }],
-    "authorizer": {
-      "handler": "remote_json",
-      "config": {
-        "remote": "http://keto:4466/relation-tuples/check",
-        "payload": "{\"namespace\":\"Platform\",\"object\":\"nova\",\"relation\":\"manage_users\",\"subject_id\":\"user:{{ print .Subject }}\"}",
-        "forward_response_headers_to_upstream": ["Content-Type"]
-      }
-    },
-    "mutators": [
-      {
-        "handler": "header",
-        "config": {
-          "headers": {
-            "X-User-ID": "{{ print .Subject }}",
-            "X-User-Email": "{{ print .Extra.identity.traits.email }}"
-          }
-        }
-      }
-    ]
-  },
-  {
     "id": "oauth2-public",
     "upstream": {
       "preserve_host": false,
@@ -426,7 +394,7 @@
       "url": "http://api:8080"
     },
     "match": {
-      "url": "<(http|https)://(api\\.ory\\.localhost|admin\\.ory\\.localhost|auth\\.ory\\.localhost|app\\.ory\\.localhost|localhost(:[0-9]+)?|oathkeeper(:[0-9]+)?)/api/(hydra-accept-login|hydra-accept-consent)>",
+      "url": "<(http|https)://(api\\.ory\\.localhost|admin\\.ory\\.localhost|auth\\.ory\\.localhost|app\\.ory\\.localhost|localhost(:[0-9]+)?|oathkeeper(:[0-9]+)?)/api/v1/(hydra-accept-login|hydra-accept-consent)>",
       "methods": ["POST", "OPTIONS"]
     },
     "authenticators": [
@@ -492,7 +460,7 @@
       "url": "http://api:8080"
     },
     "match": {
-      "url": "<(http|https)://(api\\.ory\\.localhost|admin\\.ory\\.localhost|auth\\.ory\\.localhost|app\\.ory\\.localhost|localhost(:[0-9]+)?|oathkeeper(:[0-9]+)?)/api/(me/permissions|admin(?!-))(/.*)?>",
+      "url": "<(http|https)://(api\\.ory\\.localhost|admin\\.ory\\.localhost|auth\\.ory\\.localhost|app\\.ory\\.localhost|localhost(:[0-9]+)?|oathkeeper(:[0-9]+)?)/api/v1/(me/permissions|admin(?!-))(/.*)?>",
       "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
     },
     "authenticators": [
