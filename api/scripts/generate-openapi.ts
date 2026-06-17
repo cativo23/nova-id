@@ -8,6 +8,61 @@ import { AppModule } from '../src/app.module';
 /** Tags whose operations belong to the IdP client surface (ADR-0001). */
 const ALLOWED_TAGS = new Set(['admin', 'me', 'auth']);
 
+/** Collect all $ref values pointing to #/components/schemas/<Name>. */
+function collectRefs(node: unknown, acc: Set<string>): void {
+  if (!node || typeof node !== 'object') return;
+  if (Array.isArray(node)) {
+    node.forEach((n) => collectRefs(n, acc));
+    return;
+  }
+  for (const [k, v] of Object.entries(node as Record<string, unknown>)) {
+    if (k === '$ref' && typeof v === 'string') {
+      const m = v.match(/^#\/components\/schemas\/(.+)$/);
+      if (m) acc.add(m[1]);
+    } else {
+      collectRefs(v, acc);
+    }
+  }
+}
+
+/**
+ * Prune components.schemas to only those reachable (transitively via $ref)
+ * from the kept paths. Cycles are handled via a visited set.
+ * securitySchemes and other components.* maps are left untouched.
+ */
+function pruneSchemas(doc: OpenAPIObject): OpenAPIObject {
+  const schemas = (doc.components?.schemas ?? {}) as Record<string, unknown>;
+  const reachable = new Set<string>();
+
+  // Seed: all $refs in the kept paths
+  collectRefs(doc.paths, reachable);
+
+  // Transitively follow $refs inside each reachable schema
+  const work = [...reachable];
+  const visited = new Set<string>();
+  while (work.length) {
+    const name = work.pop()!;
+    if (visited.has(name)) continue;
+    visited.add(name);
+    const schema = schemas[name];
+    const before = reachable.size;
+    collectRefs(schema, reachable);
+    if (reachable.size !== before) {
+      // new names were added — push them onto the worklist
+      for (const r of reachable) {
+        if (!visited.has(r)) work.push(r);
+      }
+    }
+  }
+
+  const kept: Record<string, unknown> = {};
+  for (const name of Object.keys(schemas)) {
+    if (reachable.has(name)) kept[name] = schemas[name];
+  }
+
+  return { ...doc, components: { ...doc.components, schemas: kept } };
+}
+
 function filterByTags(doc: OpenAPIObject): OpenAPIObject {
   const paths = doc.paths ?? {};
   const kept: typeof paths = {};
@@ -44,7 +99,7 @@ async function generate() {
     .build();
 
   const full = SwaggerModule.createDocument(app, config);
-  const filtered = filterByTags(full);
+  const filtered = pruneSchemas(filterByTags(full));
 
   const outPath = join(__dirname, '..', 'openapi.json');
   writeFileSync(outPath, JSON.stringify(filtered, null, 2) + '\n');
