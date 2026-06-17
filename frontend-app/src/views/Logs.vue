@@ -264,6 +264,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getApiTestBaseUrl } from '../composables/useApiTest'
 import type { LogEntry, LogStats, MeResponse, DemoUser } from '../types'
+import { logger, errMessage } from '../utils/logger'
 
 const router = useRouter()
 const allowed = ref(false)
@@ -394,7 +395,7 @@ async function loadLogs() {
   } catch (err) {
     logs.value = []
     stats.value = {}
-    console.error('Failed to load logs:', err)
+    logger.error('Failed to load logs:', errMessage(err))
   } finally {
     loading.value = false
   }

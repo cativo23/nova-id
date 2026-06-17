@@ -238,6 +238,7 @@ import NovaLogoIcon from '../components/NovaLogoIcon.vue'
 import { createLoginFlow, getLoginFlow, updateLoginFlow } from '../composables/useAuth'
 import type { FlowLike, HttpErrorLike, ContinueWithLike } from '../types/flow'
 import type { UiNodeLike } from '../utils/uiNodes'
+import { logger, errMessage } from '../utils/logger'
 
 const refreshAuth = inject<(() => Promise<void>) | null>('refreshAuth', null)
 import {
@@ -289,7 +290,7 @@ onMounted(async () => {
       flow.value = await createLoginFlow(returnUrl)
     }
   } catch (error) {
-    console.error('Error loading login flow:', error)
+    logger.error('Error loading login flow:', errMessage(error))
     router.push('/error')
   }
 })
@@ -509,7 +510,7 @@ const handleSubmit = async (event: Event) => {
       if (errId) {
         router.push({ path: '/error', query: { id: errId, ...(route.query.return_to && { return_to: route.query.return_to }) } })
       } else {
-        console.error('Login error:', error)
+        logger.error('Login error:', errMessage(error))
         router.push('/error')
       }
     }

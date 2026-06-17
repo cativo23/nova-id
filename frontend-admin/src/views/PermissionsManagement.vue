@@ -181,6 +181,7 @@ import {
   deleteClient
 } from '../composables/useHydra'
 import type { OAuthClient } from '../composables/useHydra'
+import { logger, errMessage } from '../utils/logger'
 
 const router = useRouter()
 const activeTab = ref<'permissions' | 'test' | 'oauth'>('permissions')
@@ -212,7 +213,7 @@ onMounted(async () => {
       return
     }
   } catch (error) {
-    console.error('Error checking permission', { status: (error as { response?: { status?: number } })?.response?.status })
+    logger.error('Error checking permission', String((error as { response?: { status?: number } })?.response?.status ?? ''))
     router.push('/dashboard')
     return
   }
@@ -226,7 +227,7 @@ const loadOAuthClients = async () => {
   try {
     oauthClients.value = await listClients()
   } catch (err) {
-    console.error('Error loading OAuth clients:', err)
+    logger.error('Error loading OAuth clients:', errMessage(err))
     error.value = (err as Error).message || 'Failed to load OAuth clients'
   } finally {
     loadingClients.value = false

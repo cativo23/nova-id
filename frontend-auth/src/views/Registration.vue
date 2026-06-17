@@ -223,6 +223,7 @@ import NovaLogoIcon from '../components/NovaLogoIcon.vue'
 import { createRegistrationFlow, getRegistrationFlow, updateRegistrationFlow } from '../composables/useAuth'
 import type { FlowLike, HttpErrorLike, ContinueWithLike } from '../types/flow'
 import type { UiNodeLike } from '../utils/uiNodes'
+import { logger, errMessage } from '../utils/logger'
 import {
   getNodeValue,
   getNodeName,
@@ -355,7 +356,7 @@ onMounted(async () => {
       })
     }
   } catch (error) {
-    console.error('Error loading registration flow:', error)
+    logger.error('Error loading registration flow:', errMessage(error))
     router.push('/error')
   }
 })
@@ -485,7 +486,7 @@ const handleSubmit = async (event: Event) => {
       // Update flow with error response (includes new flow state)
       flow.value = e.response.data ?? null
     } else {
-      console.error('Registration error:', error)
+      logger.error('Registration error:', errMessage(error))
       router.push('/error')
     }
   } finally {

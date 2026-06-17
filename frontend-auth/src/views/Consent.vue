@@ -73,6 +73,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { acceptHydraConsent } from '@nova-id/api-client'
+import { logger, errMessage } from '../utils/logger'
 
 interface ConsentInfo {
   skip?: boolean
@@ -138,7 +139,7 @@ onMounted(async () => {
     loading.value = false
   } catch (err) {
     error.value = (err as Error).message || 'Failed to load consent information'
-    console.error('Error loading consent info:', err)
+    logger.error('Error loading consent info:', errMessage(err))
     loading.value = false
   }
 })
@@ -169,7 +170,7 @@ const acceptConsent = async () => {
   } catch (err) {
     const e = err as { response?: { data?: { message?: string } }; message?: string }
     error.value = e.response?.data?.message || e.message || 'Failed to accept consent'
-    console.error('Error accepting consent:', err)
+    logger.error('Error accepting consent:', errMessage(err))
     processing.value = false
   }
 }
@@ -207,7 +208,7 @@ const rejectConsent = async () => {
     }
   } catch (err) {
     error.value = (err as Error).message || 'Failed to reject consent'
-    console.error('Error rejecting consent:', err)
+    logger.error('Error rejecting consent:', errMessage(err))
     processing.value = false
   }
 }

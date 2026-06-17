@@ -587,6 +587,7 @@ import {
 import type { UserResponseDto, CreateUserDto, UpdateUserDto } from '@nova-id/api-client'
 import { checkSession, markEmailAsVerified } from '../composables/useAuth'
 import { getRoleBadgeClass } from '../utils/roleColors'
+import { logger, errMessage } from '../utils/logger'
 import type { Identity } from '@ory/client'
 
 const router = useRouter()
@@ -699,7 +700,7 @@ onMounted(async () => {
       return
     }
   } catch (err) {
-    console.error('Error checking permission', { status: (err as { response?: { status?: number } })?.response?.status })
+    logger.error('Error checking permission', String((err as { response?: { status?: number } })?.response?.status ?? ''))
     router.push('/dashboard')
     return
   } finally {
@@ -854,7 +855,7 @@ const createUserAction = async () => {
     setTimeout(() => { success.value = null }, 3000)
   } catch (err) {
     // Do not log err directly — may carry BFF body with PHI.
-    console.error('Error creating user', { status: (err as { response?: { status?: number } })?.response?.status })
+    logger.error('Error creating user', String((err as { response?: { status?: number } })?.response?.status ?? ''))
     error.value = 'Failed to create user. Please try again.'
   } finally {
     creatingUser.value = false
@@ -882,7 +883,7 @@ const deleteUserAction = async () => {
     await invalidateUsers()
     setTimeout(() => { success.value = null }, 3000)
   } catch (err) {
-    console.error('Error deleting user', { status: (err as { response?: { status?: number } })?.response?.status })
+    logger.error('Error deleting user', String((err as { response?: { status?: number } })?.response?.status ?? ''))
     error.value = 'Failed to delete user. Please try again.'
   } finally {
     deleting.value = false
@@ -915,7 +916,7 @@ const sendRecoveryPassword = async (user: UserResponseDto) => {
       copiedCode: false
     }
   } catch (err) {
-    console.error('Error creating recovery link', { status: (err as { response?: { status?: number } })?.response?.status })
+    logger.error('Error creating recovery link', String((err as { response?: { status?: number } })?.response?.status ?? ''))
     error.value = 'Failed to create recovery link. Please try again.'
   } finally {
     sendingRecovery.value = null
@@ -937,7 +938,7 @@ const copyToClipboard = async (text: string, type: 'url' | 'code') => {
       }, 2000)
     }
   } catch (err) {
-    console.error('Failed to copy to clipboard:', err)
+    logger.error('Failed to copy to clipboard:', errMessage(err))
     // Fallback for older browsers
     const textArea = document.createElement('textarea')
     textArea.value = text
@@ -963,7 +964,7 @@ const copyToClipboard = async (text: string, type: 'url' | 'code') => {
         }, 2000)
       }
     } catch (fallbackErr) {
-      console.error('Fallback copy failed:', fallbackErr)
+      logger.error('Fallback copy failed:', errMessage(fallbackErr))
     }
     document.body.removeChild(textArea)
   }
@@ -1013,7 +1014,7 @@ const saveUser = async () => {
     await invalidateUsers()
     setTimeout(() => { success.value = null }, 3000)
   } catch (err) {
-    console.error('Error updating user', { status: (err as { response?: { status?: number } })?.response?.status })
+    logger.error('Error updating user', String((err as { response?: { status?: number } })?.response?.status ?? ''))
     error.value = 'Failed to update user. Please try again.'
   } finally {
     saving.value = false
@@ -1031,7 +1032,7 @@ const verifyEmail = async (user: UserResponseDto) => {
     const result = await markEmailAsVerified(user.email)
     success.value = `Verification email sent to ${result?.userEmail || user.email}.`
   } catch (err) {
-    console.error('Error sending verification email', { status: (err as { response?: { status?: number } })?.response?.status })
+    logger.error('Error sending verification email', String((err as { response?: { status?: number } })?.response?.status ?? ''))
     error.value = 'Failed to send verification email. Please try again.'
   } finally {
     verifyingEmail.value = null
@@ -1047,7 +1048,7 @@ const viewPermissions = async (user: UserResponseDto) => {
     const { getCachedUserPermissions } = await import('../composables/usePermissionCache')
     userPermissionsList.value = await getCachedUserPermissions(user.id)
   } catch (err) {
-    console.error('Error loading user permissions', { status: (err as { response?: { status?: number } })?.response?.status })
+    logger.error('Error loading user permissions', String((err as { response?: { status?: number } })?.response?.status ?? ''))
     userPermissionsList.value = []
   } finally {
     loadingUserPermissions.value = false

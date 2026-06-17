@@ -1,11 +1,10 @@
 /**
  * App logger: in production only warn/error are emitted, and ONLY with string
  * arguments. In development all levels pass through. Use this instead of
- * console.* so prod builds never leak raw error objects (which can carry OAuth
- * client secrets, Kratos CSRF tokens, or user PII).
+ * console.* so prod builds never leak raw error objects.
  *
  * Safe usage pattern:
- *   logger.error('doSomething failed', errMessage(e))
+ *   logger.error('loadLogs failed', errMessage(e))
  *   logger.warn('unexpected status', String(status))
  */
 const isProd = import.meta.env.PROD
@@ -22,30 +21,30 @@ export function errMessage(e: unknown): string {
 
 export const logger = {
   debug (...args: unknown[]) {
-    if (!isProd) console.debug('[admin]', ...args)
+    if (!isProd) console.debug('[app]', ...args)
   },
   log (...args: unknown[]) {
-    if (!isProd) console.log('[admin]', ...args)
+    if (!isProd) console.log('[app]', ...args)
   },
   info (...args: unknown[]) {
-    if (!isProd) console.info('[admin]', ...args)
+    if (!isProd) console.info('[app]', ...args)
   },
   warn (...args: unknown[]) {
     // In prod, only accept strings to avoid leaking objects
     if (isProd) {
       const safeArgs = args.filter(a => typeof a === 'string' || typeof a === 'number')
-      if (safeArgs.length) console.warn('[admin]', ...safeArgs)
+      if (safeArgs.length) console.warn('[app]', ...safeArgs)
     } else {
-      console.warn('[admin]', ...args)
+      console.warn('[app]', ...args)
     }
   },
   error (...args: unknown[]) {
     // In prod, only accept strings to avoid leaking objects
     if (isProd) {
       const safeArgs = args.filter(a => typeof a === 'string' || typeof a === 'number')
-      if (safeArgs.length) console.error('[admin]', ...safeArgs)
+      if (safeArgs.length) console.error('[app]', ...safeArgs)
     } else {
-      console.error('[admin]', ...args)
+      console.error('[app]', ...args)
     }
   }
 }

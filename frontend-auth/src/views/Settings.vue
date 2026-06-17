@@ -207,6 +207,7 @@ import type { UpdateSettingsFlowBody } from '@ory/client'
 import { getSettingsFlow, updateSettingsFlow } from '../composables/useAuth'
 import type { FlowLike, HttpErrorLike } from '../types/flow'
 import type { UiNodeLike } from '../utils/uiNodes'
+import { logger, errMessage } from '../utils/logger'
 import {
   getNodeValue,
   getNodeName,
@@ -341,7 +342,7 @@ onMounted(async () => {
       router.push('/error')
     }
   } catch (error) {
-    console.error('Error loading settings flow:', error)
+    logger.error('Error loading settings flow:', errMessage(error))
     router.push('/error')
   }
 })
@@ -509,7 +510,7 @@ const handleSubmit = async (event: Event) => {
     if (e.response?.status === 400) {
       flow.value = e.response.data ?? null
     } else {
-      console.error('Settings error:', error)
+      logger.error('Settings error:', errMessage(error))
       router.push('/error')
     }
   } finally {
