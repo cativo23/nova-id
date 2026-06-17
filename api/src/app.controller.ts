@@ -3,6 +3,7 @@ import { ApiTags, ApiOperation, ApiBody, ApiOkResponse } from '@nestjs/swagger';
 import { AppService } from './app.service';
 import { Public } from './decorators/public.decorator';
 import { GetUser } from './decorators/get-user.decorator';
+import { AuthenticatedUser } from './common/types/authenticated-user';
 import { AcceptHydraLoginDto } from './dto/accept-hydra-login.dto';
 import { AcceptHydraConsentDto } from './dto/accept-hydra-consent.dto';
 import { HydraRedirectResponseDto } from './dto/hydra-redirect-response.dto';
@@ -34,7 +35,7 @@ export class AppController {
   @ApiOkResponse({ type: HydraRedirectResponseDto })
   @Post('hydra-accept-login')
   async acceptHydraLogin(
-    @GetUser() user: any,
+    @GetUser() user: AuthenticatedUser,
     @Body() body: AcceptHydraLoginDto,
   ): Promise<HydraRedirectResponseDto> {
     return this.appService.acceptHydraLogin(user, body.login_challenge);
@@ -46,7 +47,7 @@ export class AppController {
   @ApiOkResponse({ type: HydraRedirectResponseDto })
   @Post('hydra-accept-consent')
   async acceptHydraConsent(
-    @GetUser() user: any,
+    @GetUser() user: AuthenticatedUser,
     @Body() body: AcceptHydraConsentDto,
   ): Promise<HydraRedirectResponseDto> {
     return this.appService.acceptHydraConsent(user, body);

@@ -16,6 +16,7 @@ import { RoleGuard } from '../../guards/role.guard';
 import { RequireRole } from '../../decorators/require-role.decorator';
 import { Public } from '../../decorators/public.decorator';
 import { GetUser } from '../../decorators/get-user.decorator';
+import { AuthenticatedUser } from '../../common/types/authenticated-user';
 import { LogAccess } from '../log-access.decorator';
 
 @Controller('roles')
@@ -29,7 +30,7 @@ export class RolesController {
   @UseGuards(RoleGuard)
   @RequireRole('platform_admin')
   async bootstrapAppAdmin(
-    @GetUser() user: any,
+    @GetUser() user: AuthenticatedUser,
     @Body() body: { userId?: string },
   ) {
     const targetUserId = body.userId || user.userId;
@@ -42,7 +43,7 @@ export class RolesController {
   }
 
   @Get('my-role')
-  async getMyRole(@GetUser() user: any) {
+  async getMyRole(@GetUser() user: AuthenticatedUser) {
     // Always query DB to get the most up-to-date appRole
     const appRole = await this.rolesService.getAppRole(user.userId, true);
     return {
