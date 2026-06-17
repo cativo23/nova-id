@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { WinstonLogger } from './common/logger';
 
@@ -8,6 +9,10 @@ async function bootstrap() {
     const app = await NestFactory.create(AppModule, {
         logger: WinstonLogger,
     });
+
+    // Security headers — disable CSP so Swagger UI (inline scripts/styles) loads correctly.
+    // All other helmet defaults (X-Frame-Options, X-Content-Type-Options, etc.) remain active.
+    app.use(helmet({ contentSecurityPolicy: false }));
 
     // CORS: explicit allowlist; never reflect arbitrary origins. X-User-* and
     // X-Gateway-Auth are gateway-injected server-side and must NOT be accepted from browsers.
