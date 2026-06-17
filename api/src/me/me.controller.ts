@@ -6,7 +6,7 @@ import { PermissionsResponseDto } from './dto/permissions-response.dto';
 
 @ApiTags('me')
 @ApiBearerAuth('oathkeeper-id-token')
-@Controller('me')
+@Controller({ path: 'me', version: '1' })
 export class MeController {
   constructor(private readonly keto: KetoService) {}
 

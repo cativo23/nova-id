@@ -31,7 +31,7 @@ import { RecoveryLinkResponseDto } from './dto/recovery-link-response.dto';
 @ApiTags('admin')
 @ApiBearerAuth('oathkeeper-id-token')
 @UseGuards(PlatformManageUsersGuard)
-@Controller('admin/users')
+@Controller({ path: 'admin/users', version: '1' })
 export class AdminUsersController {
   constructor(private readonly kratos: KratosAdminService) {}
 

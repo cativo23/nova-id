@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body } from '@nestjs/common';
+import { Controller, Get, Post, Body, Version } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBody, ApiOkResponse } from '@nestjs/swagger';
 import { AppService } from './app.service';
 import { Public } from './decorators/public.decorator';
@@ -33,6 +33,7 @@ export class AppController {
   @ApiOperation({ operationId: 'acceptHydraLogin', summary: 'Accept a Hydra login challenge for the signed-in user' })
   @ApiBody({ type: AcceptHydraLoginDto })
   @ApiOkResponse({ type: HydraRedirectResponseDto })
+  @Version('1')
   @Post('hydra-accept-login')
   async acceptHydraLogin(
     @GetUser() user: AuthenticatedUser,
@@ -45,6 +46,7 @@ export class AppController {
   @ApiOperation({ operationId: 'acceptHydraConsent', summary: 'Accept a Hydra consent challenge for the signed-in user' })
   @ApiBody({ type: AcceptHydraConsentDto })
   @ApiOkResponse({ type: HydraRedirectResponseDto })
+  @Version('1')
   @Post('hydra-accept-consent')
   async acceptHydraConsent(
     @GetUser() user: AuthenticatedUser,

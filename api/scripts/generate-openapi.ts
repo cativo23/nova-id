@@ -1,5 +1,6 @@
 // api/scripts/generate-openapi.ts
 import { NestFactory } from '@nestjs/core';
+import { VersioningType } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule, OpenAPIObject } from '@nestjs/swagger';
 import { writeFileSync } from 'fs';
 import { join } from 'path';
@@ -88,6 +89,8 @@ function filterByTags(doc: OpenAPIObject): OpenAPIObject {
 
 async function generate() {
   const app = await NestFactory.create(AppModule, { logger: false });
+  // Must match main.ts: URI versioning so /v1/... paths appear in the spec.
+  app.enableVersioning({ type: VersioningType.URI });
   const config = new DocumentBuilder()
     .setTitle('Nova ID API')
     .setDescription('Self-hosted central IdP BFF — Ory consolidation layer')

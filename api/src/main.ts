@@ -1,5 +1,5 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, VersioningType } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
@@ -16,6 +16,11 @@ async function bootstrap() {
     // (and therefore @nestjs/throttler) reads req.ip from that header instead
     // of the socket address (which is always the gateway's container IP).
     app.getHttpAdapter().getInstance().set('trust proxy', 1);
+
+    // URI versioning: /v1/... for IdP business endpoints.
+    // No global defaultVersion — unversioned controllers (health, public, demo)
+    // remain accessible at their existing paths (version-neutral).
+    app.enableVersioning({ type: VersioningType.URI });
 
     // Security headers — disable CSP so Swagger UI (inline scripts/styles) loads correctly.
     // All other helmet defaults (X-Frame-Options, X-Content-Type-Options, etc.) remain active.

@@ -1,7 +1,7 @@
 {
   "openapi": "3.0.0",
   "paths": {
-    "/hydra-accept-login": {
+    "/v1/hydra-accept-login": {
       "post": {
         "operationId": "acceptHydraLogin",
         "summary": "Accept a Hydra login challenge for the signed-in user",
@@ -33,7 +33,7 @@
         ]
       }
     },
-    "/hydra-accept-consent": {
+    "/v1/hydra-accept-consent": {
       "post": {
         "operationId": "acceptHydraConsent",
         "summary": "Accept a Hydra consent challenge for the signed-in user",
@@ -65,7 +65,7 @@
         ]
       }
     },
-    "/admin/users": {
+    "/v1/admin/users": {
       "get": {
         "operationId": "AdminUsersController_list",
         "summary": "List all platform users (cursor-paginated)",
@@ -166,7 +166,7 @@
         ]
       }
     },
-    "/admin/users/{id}": {
+    "/v1/admin/users/{id}": {
       "get": {
         "operationId": "AdminUsersController_get",
         "summary": "Get a single user by Kratos identity id",
@@ -300,7 +300,7 @@
         ]
       }
     },
-    "/admin/users/{id}/state": {
+    "/v1/admin/users/{id}/state": {
       "patch": {
         "operationId": "AdminUsersController_setState",
         "summary": "Activate or deactivate a user identity",
@@ -355,7 +355,7 @@
         ]
       }
     },
-    "/admin/users/{id}/recovery-link": {
+    "/v1/admin/users/{id}/recovery-link": {
       "post": {
         "operationId": "AdminUsersController_recoveryLink",
         "summary": "Generate a recovery link for a user",
@@ -400,7 +400,7 @@
         ]
       }
     },
-    "/me/permissions": {
+    "/v1/me/permissions": {
       "get": {
         "operationId": "MeController_permissions",
         "summary": "Resolve the caller's Platform-level Keto permissions",
