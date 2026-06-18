@@ -9,7 +9,6 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { RolesService } from './roles.service';
-import { AuthenticatedGuard } from '../../guards/authenticated.guard';
 import { AppAdminGuard } from '../guards/app-admin.guard';
 import { RoleGuard } from '../../guards/role.guard';
 import { RequireRole } from '../../decorators/require-role.decorator';
@@ -24,7 +23,6 @@ import { AuditService } from '../../audit/audit.service';
 const DEMO_APP_ID = process.env.APP_ID ?? 'nova-id-test-app';
 
 @Controller('roles')
-@UseGuards(AuthenticatedGuard)
 @LogAccess()
 export class RolesController {
   constructor(

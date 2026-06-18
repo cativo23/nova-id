@@ -1,37 +1,28 @@
-import { Controller, Get, Query, Param, UseGuards, ForbiddenException, Request } from '@nestjs/common';
+import { Controller, Get, Query, Param, UseGuards } from '@nestjs/common';
 import { LogsService } from './logs.service';
-import { AuthenticatedGuard } from '../../guards/authenticated.guard';
-import { RolesService } from '../roles/roles.service';
+import { AppAdminGuard } from '../guards/app-admin.guard';
 
+/**
+ * Access gate: AppAdminGuard (class-level) enforces that the caller
+ * has app role app_admin in SQLite (ADR-0002 / ADR-0003, strict layering).
+ * platform_admin does NOT grant access — only SQLite app_admin does.
+ *
+ * The global AuthenticatedGuard (registered as APP_GUARD in AppModule)
+ * already ensures every caller is authenticated before AppAdminGuard runs.
+ */
 @Controller('logs')
-@UseGuards(AuthenticatedGuard)
+@UseGuards(AppAdminGuard)
 export class LogsController {
-  constructor(
-    private readonly logsService: LogsService,
-    private readonly rolesService: RolesService,
-  ) { }
-
-  // Helper to check if user has access. App role app_admin (SQLite, ADR-0002) is
-  // the sole gate — platform_admin does NOT grant log access (ADR-0003, strict layering).
-  private async checkAccess(user: any): Promise<boolean> {
-    // SQLite is the sole source of appRole (ADR-0002) — never read from JWT claim
-    const appRole = await this.rolesService.getAppRole(user.userId)
-    return appRole === 'app_admin'
-  }
+  constructor(private readonly logsService: LogsService) {}
 
   @Get()
   async getLogs(
-    @Request() req: any,
     @Query('limit') limit?: string,
     @Query('frontend') frontend?: string,
     @Query('method') method?: string,
     @Query('status') status?: string,
     @Query('path') path?: string,
   ) {
-    const user = req?.user
-    if (!user || !(await this.checkAccess(user))) {
-      throw new ForbiddenException('Access denied. Required app role: app_admin')
-    }
     const limitNum = limit ? parseInt(limit, 10) : 100;
     const hasFilters = method || status || path || frontend;
     if (hasFilters) {
@@ -46,30 +37,24 @@ export class LogsController {
   }
 
   @Get('stats')
-  async getStats(@Request() req: any) {
-    const user = req?.user
-    if (!user || !(await this.checkAccess(user))) {
-      throw new ForbiddenException('Access denied. Required app role: app_admin')
-    }
+  async getStats() {
     return this.logsService.getAccessStats();
   }
 
   @Get('frontend/:frontend')
-  async getLogsByFrontend(@Request() req: any, @Param('frontend') frontend: string, @Query('limit') limit?: string) {
-    const user = req?.user
-    if (!user || !(await this.checkAccess(user))) {
-      throw new ForbiddenException('Access denied. Required app role: app_admin')
-    }
+  async getLogsByFrontend(
+    @Param('frontend') frontend: string,
+    @Query('limit') limit?: string,
+  ) {
     const limitNum = limit ? parseInt(limit, 10) : 100;
     return this.logsService.getAccessLogsByFrontend(frontend, limitNum);
   }
 
   @Get('user/:userId')
-  async getLogsByUser(@Request() req: any, @Param('userId') userId: string, @Query('limit') limit?: string) {
-    const user = req?.user
-    if (!user || !(await this.checkAccess(user))) {
-      throw new ForbiddenException('Access denied. Required app role: app_admin')
-    }
+  async getLogsByUser(
+    @Param('userId') userId: string,
+    @Query('limit') limit?: string,
+  ) {
     const limitNum = limit ? parseInt(limit, 10) : 100;
     return this.logsService.getAccessLogsByUser(userId, limitNum);
   }
