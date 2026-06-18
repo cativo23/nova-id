@@ -505,8 +505,11 @@ async function runTest(ep: Endpoint) {
 
     const response = await fetch(url, options)
     if (!response.ok) {
-      const errorText = await response.text().catch(() => response.statusText)
-      throw new Error(`API request failed: ${response.status} ${response.statusText} - ${errorText}`)
+      const errorText = import.meta.env.DEV
+        ? await response.text().catch(() => response.statusText)
+        : null
+      const detail = errorText ? ` - ${errorText}` : ''
+      throw new Error(`API request failed: ${response.status} ${response.statusText}${detail}`)
     }
     apiResponse.value = await response.json()
   } catch (err) {

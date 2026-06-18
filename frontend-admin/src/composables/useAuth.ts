@@ -43,7 +43,7 @@ export async function checkSession(): Promise<Session | null> {
   try {
     logger.log('checkSession - Calling toSession() via Oathkeeper at:', oathkeeperUrl)
     const { data } = await ory.toSession()
-    logger.log('checkSession - Session found:', data ? 'Yes' : 'No', data?.identity?.id ? `User: ${data.identity.id}` : '')
+    logger.log('checkSession - Session found:', data ? 'Yes' : 'No')
     return data
   } catch (error) {
     // 401 is expected when there's no session - don't log as error
