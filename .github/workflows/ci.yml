@@ -92,6 +92,11 @@ jobs:
       HYDRA_ADMIN_URL: http://localhost:4445
       KETO_READ_URL: http://localhost:4466
       KRATOS_ADMIN_URL: http://localhost:4434
+      # AuthenticatedGuard reads these via ConfigService.getOrThrow at boot
+      # (api/src/guards/authenticated.guard.ts). The JwksClient is lazy — no
+      # network call is made during generation — so placeholder URLs suffice.
+      OAUTH_JWKS_URL: http://localhost:4456/.well-known/jwks.json
+      OAUTH_ISSUER: http://localhost:4455/
     defaults:
       run:
         working-directory: ./api
@@ -107,6 +112,12 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      # DemoModule's SQLite DB lives in api/data/ which is gitignored and therefore
+      # absent on a fresh checkout. sqlite3 won't create the parent directory itself,
+      # so we pre-create it here to prevent a boot-time SQLITE_CANTOPEN error.
+      - name: Create demo SQLite data dir
+        run: mkdir -p data
 
       - name: Build
         run: npm run build
