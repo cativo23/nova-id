@@ -35,12 +35,20 @@ serve:
     base_url: http://kratos:4434/
 
 selfservice:
-  default_browser_return_url: https://admin.cativo.dev/dashboard
+  # Neutral fallback for flows that complete WITHOUT a return_to (multi-app IdP:
+  # admin/dashboard is the wrong default — most users aren't admins). Per-flow
+  # return_to / after_verification_return_to override this when context exists.
+  default_browser_return_url: https://auth.cativo.dev/auth/login
   allowed_return_urls:
     - https://auth.cativo.dev
     - https://admin.cativo.dev
     - https://admin.cativo.dev/dashboard
     - https://api.cativo.dev
+    # The app is the neutral DEFAULT_RETURN_URL target (VITE_DEFAULT_RETURN_URL in
+    # the prod build); Kratos validates return_to against this list, so the app
+    # host must be allowed or context-less flows would 400.
+    - https://app.cativo.dev
+    - https://app.cativo.dev/
 
   methods:
     password:
@@ -68,11 +76,14 @@ selfservice:
       ui_url: https://auth.cativo.dev/auth/verification
       use: code
       after:
-        default_browser_return_url: https://admin.cativo.dev/dashboard
+        # Neutral fallback when the verification flow has no return_to /
+        # after_verification_return_to (e.g. an app user clicking the email link
+        # without context). Was admin/dashboard → wrongly dumped app users in admin.
+        default_browser_return_url: https://auth.cativo.dev/auth/login
 
     logout:
       after:
-        default_browser_return_url: https://admin.cativo.dev/
+        default_browser_return_url: https://auth.cativo.dev/auth/login
 
     login:
       ui_url: https://auth.cativo.dev/auth/login

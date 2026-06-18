@@ -36,7 +36,10 @@ serve:
     base_url: http://localhost:4434/
 
 selfservice:
-  default_browser_return_url: http://admin.ory.localhost/dashboard
+  # Neutral fallback for flows that complete WITHOUT a return_to (multi-app IdP:
+  # admin/dashboard is the wrong default — most users aren't admins). Per-flow
+  # return_to / after_verification_return_to override this when context exists.
+  default_browser_return_url: http://auth.ory.localhost/auth/login
   allowed_return_urls:
     - http://auth.ory.localhost
     - http://auth.ory.localhost/auth/hydra-callback
@@ -87,11 +90,14 @@ selfservice:
       ui_url: http://auth.ory.localhost/auth/verification
       use: code
       after:
-        default_browser_return_url: http://admin.ory.localhost/dashboard
+        # Neutral fallback when the verification flow has no return_to /
+        # after_verification_return_to (e.g. an app user clicking the email link
+        # without context). Was admin/dashboard → wrongly dumped app users in admin.
+        default_browser_return_url: http://auth.ory.localhost/auth/login
 
     logout:
       after:
-        default_browser_return_url: http://admin.ory.localhost/
+        default_browser_return_url: http://auth.ory.localhost/auth/login
 
     login:
       ui_url: http://auth.ory.localhost/auth/login

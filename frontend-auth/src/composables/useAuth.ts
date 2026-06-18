@@ -75,12 +75,18 @@ export async function getRegistrationFlow(flowId: string): Promise<RegistrationF
   return data
 }
 
-// `returnTo` is accepted for call-site compatibility but Kratos browser
-// registration here does not forward it (parity with the prior JS behavior,
-// where the argument was silently ignored).
-export async function createRegistrationFlow(_returnTo: string | null = null): Promise<RegistrationFlow> {
-  void _returnTo
-  const { data } = await ory.createBrowserRegistrationFlow()
+// Forward `returnTo` so registration completion returns the user to the
+// originating app, and `afterVerificationReturnTo` so the verification flow
+// spawned by the registration after-hook (the email-link path) ALSO lands back
+// on that app instead of falling through to the global default. Both are
+// documented Kratos registration-init parameters; without them an app user who
+// verifies via the email link is dumped on `default_browser_return_url`.
+export async function createRegistrationFlow(returnTo: string | null = null): Promise<RegistrationFlow> {
+  const { data } = await ory.createBrowserRegistrationFlow(
+    returnTo
+      ? { returnTo, afterVerificationReturnTo: returnTo }
+      : {},
+  )
   return data
 }
 
