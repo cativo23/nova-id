@@ -240,6 +240,7 @@ import type { FlowLike, HttpErrorLike, ContinueWithLike } from '../types/flow'
 import type { UiNodeLike } from '../utils/uiNodes'
 import { logger, errMessage } from '../utils/logger'
 import { safeRedirect } from '../utils/safeRedirect'
+import { DEFAULT_RETURN_URL } from '../utils/defaultReturnUrl'
 
 const refreshAuth = inject<(() => Promise<void>) | null>('refreshAuth', null)
 import {
@@ -284,10 +285,9 @@ onMounted(async () => {
       intendedReturnUrl.value = returnUrl
       flow.value = await createLoginFlow(returnUrl)
     } else {
-      // Use return_to if provided, otherwise default to admin dashboard
-      const authUrl = import.meta.env.VITE_AUTH_URL || window.location.origin
-      const adminUrl = import.meta.env.VITE_ADMIN_URL || 'http://admin.ory.localhost'
-      const returnUrl = returnTo || `${adminUrl}/dashboard`
+      // No app context (no flow, no login_challenge, no return_to): fall back to
+      // the neutral default — NOT a hardcoded admin console.
+      const returnUrl = returnTo || DEFAULT_RETURN_URL
       flow.value = await createLoginFlow(returnUrl)
     }
   } catch (error) {
@@ -448,8 +448,7 @@ const handleSubmit = async (event: Event) => {
       // Prefer intended return URL (OAuth hydra-callback), then flow/query
       const returnTo = intendedReturnUrl.value || flow.value?.return_to || firstQuery(route.query.return_to) || firstQuery(route.query.returnTo)
 
-      const adminUrl = import.meta.env.VITE_ADMIN_URL || 'http://admin.ory.localhost'
-      const destination = safeRedirect(returnTo ? decodeURIComponent(returnTo) : null, `${adminUrl}/dashboard`)
+      const destination = safeRedirect(returnTo ? decodeURIComponent(returnTo) : null, DEFAULT_RETURN_URL)
       window.location.href = destination
     } else {
       // Response has errors: check for verification required (continue_with in success body)

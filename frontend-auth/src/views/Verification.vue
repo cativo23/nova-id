@@ -266,6 +266,7 @@ import type { FlowLike, HttpErrorLike, ContinueWithLike } from '../types/flow'
 import type { UiNodeLike } from '../utils/uiNodes'
 import { logger, errMessage } from '../utils/logger'
 import { safeRedirect } from '../utils/safeRedirect'
+import { DEFAULT_RETURN_URL } from '../utils/defaultReturnUrl'
 import {
   getNodeValue,
   getNodeName,
@@ -278,7 +279,8 @@ import {
 } from '../utils/uiNodes'
 
 const RESEND_COOLDOWN_SEC = 60
-const DEFAULT_AFTER_VERIFICATION = (import.meta.env.VITE_ADMIN_URL || 'http://admin.ory.localhost') + '/dashboard'
+// Neutral fallback only — real context (return_to) takes precedence below. Not admin.
+const DEFAULT_AFTER_VERIFICATION = DEFAULT_RETURN_URL
 
 /** Kratos query params may be string | string[] | null — normalize to a single string. */
 function firstQuery(v: LocationQueryValue | LocationQueryValue[] | undefined): string | undefined {
