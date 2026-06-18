@@ -265,6 +265,7 @@ import { createBrowserVerificationFlow, getVerificationFlow, updateVerificationF
 import type { FlowLike, HttpErrorLike, ContinueWithLike } from '../types/flow'
 import type { UiNodeLike } from '../utils/uiNodes'
 import { logger, errMessage } from '../utils/logger'
+import { safeRedirect } from '../utils/safeRedirect'
 import {
   getNodeValue,
   getNodeName,
@@ -542,7 +543,7 @@ const handleSubmit = async (event: Event) => {
       const stillVerificationStep = continueWith.some(c => c.action === 'show_verification_ui')
 
       if (hasSession) {
-        const target = returnTo.value ? decodeURIComponent(returnTo.value) : DEFAULT_AFTER_VERIFICATION
+        const target = safeRedirect(returnTo.value ? decodeURIComponent(returnTo.value) : null, DEFAULT_AFTER_VERIFICATION)
         window.location.href = target
       } else if (stillVerificationStep) {
         flow.value = data

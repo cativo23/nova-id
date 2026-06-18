@@ -224,6 +224,7 @@ import { createRegistrationFlow, getRegistrationFlow, updateRegistrationFlow } f
 import type { FlowLike, HttpErrorLike, ContinueWithLike } from '../types/flow'
 import type { UiNodeLike } from '../utils/uiNodes'
 import { logger, errMessage } from '../utils/logger'
+import { safeRedirect } from '../utils/safeRedirect'
 import {
   getNodeValue,
   getNodeName,
@@ -452,10 +453,11 @@ const handleSubmit = async (event: Event) => {
     }
 
     const redirectAfter = () => {
-      if (returnTo.value) {
-        window.location.href = decodeURIComponent(returnTo.value)
+      const destination = safeRedirect(returnTo.value ? decodeURIComponent(returnTo.value) : null, '/dashboard')
+      if (destination.startsWith('/')) {
+        router.push(destination)
       } else {
-        router.push('/dashboard')
+        window.location.href = destination
       }
     }
 

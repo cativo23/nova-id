@@ -208,6 +208,7 @@ import { getSettingsFlow, updateSettingsFlow } from '../composables/useAuth'
 import type { FlowLike, HttpErrorLike } from '../types/flow'
 import type { UiNodeLike } from '../utils/uiNodes'
 import { logger, errMessage } from '../utils/logger'
+import { safeRedirect } from '../utils/safeRedirect'
 import {
   getNodeValue,
   getNodeName,
@@ -492,10 +493,11 @@ const handleSubmit = async (event: Event) => {
       if (hasSuccess || data?.state === 'success') {
         // Password reset successful - redirect to return_to if provided (e.g. from recovery), else dashboard
         const returnTo = firstQuery(route.query.return_to) || firstQuery(route.query.returnTo)
-        if (returnTo) {
-          window.location.href = decodeURIComponent(returnTo)
+        const destination = safeRedirect(returnTo ? decodeURIComponent(returnTo) : null, '/dashboard?password_reset=true')
+        if (destination.startsWith('/')) {
+          router.push(destination)
         } else {
-          router.push('/dashboard?password_reset=true')
+          window.location.href = destination
         }
       } else {
         // Update flow with new state
