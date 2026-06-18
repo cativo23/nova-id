@@ -224,6 +224,7 @@ import { createRecoveryFlow, getRecoveryFlow, updateRecoveryFlow } from '../comp
 import type { FlowLike, HttpErrorLike } from '../types/flow'
 import type { UiNodeLike } from '../utils/uiNodes'
 import { logger, errMessage } from '../utils/logger'
+import { safeRedirect } from '../utils/safeRedirect'
 import {
   getNodeValue,
   getNodeName,
@@ -469,10 +470,11 @@ const handleSubmit = async (event: Event) => {
       
       if (hasSession) {
         // Recovery successful - redirect to return_to if provided, else login with recovered flag
-        if (returnTo.value) {
-          window.location.href = decodeURIComponent(returnTo.value)
+        const destination = safeRedirect(returnTo.value ? decodeURIComponent(returnTo.value) : null, '/login?recovered=true')
+        if (destination.startsWith('/')) {
+          router.push(destination)
         } else {
-          router.push('/login?recovered=true')
+          window.location.href = destination
         }
       } else if (hasPasswordField) {
         flow.value = data

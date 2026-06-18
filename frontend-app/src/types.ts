@@ -55,6 +55,9 @@ export interface TokenResponse {
 export interface IdTokenClaims {
   exp?: number
   iat?: number
+  iss?: string
+  /** aud may be a single string or an array per OIDC §2. */
+  aud?: string | string[]
   nonce?: string
   [key: string]: unknown
 }

@@ -24,9 +24,17 @@ const ID_TOKEN_CLOCK_SKEW_SEC = 60
 
 function generateRandomString(length = 43) {
   const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~'
+  // Use CSPRNG. Rejection sampling: discard bytes that would introduce modulo bias.
+  // charset.length = 66; mask = 0x7f (127) keeps all 66 values within a 7-bit window
+  // (66 < 128), guaranteeing a rejection rate below 50% per byte.
+  const mask = (1 << Math.ceil(Math.log2(charset.length + 1))) - 1
   let result = ''
-  for (let i = 0; i < length; i++) {
-    result += charset.charAt(Math.floor(Math.random() * charset.length))
+  while (result.length < length) {
+    const bytes = crypto.getRandomValues(new Uint8Array(length - result.length))
+    for (const byte of bytes) {
+      const idx = byte & mask
+      if (idx < charset.length) result += charset[idx]
+    }
   }
   return result
 }
@@ -104,7 +112,7 @@ export async function handleOAuthCallback(code: string, state: string): Promise<
   const storedNonce = sessionStorage.getItem(OAUTH_STORAGE_PREFIX + 'nonce')
   if (tokens.id_token) {
     const claims = decodeIdToken(tokens.id_token)
-    validateIdTokenClaims(claims)
+    validateIdTokenClaims(claims, getHydraPublicUrl(), clientId)
     if (storedNonce && claims.nonce && claims.nonce !== storedNonce) {
       sessionStorage.removeItem(OAUTH_STORAGE_PREFIX + 'code_verifier')
       sessionStorage.removeItem(OAUTH_STORAGE_PREFIX + 'state')
@@ -131,18 +139,46 @@ export function decodeIdToken(idToken: string): IdTokenClaims {
 }
 
 /**
- * Validate id_token claims (exp, iat) per OIDC. Optional clock skew applied.
+ * Normalise an issuer URL for comparison by stripping a trailing slash.
+ * Hydra emits the issuer exactly as configured in urls.self.issuer (no trailing slash),
+ * but VITE_HYDRA_PUBLIC_URL may vary in local environments. Strip both sides to be safe.
+ */
+function normaliseIssuer(url: string) {
+  return url.replace(/\/$/, '')
+}
+
+/**
+ * Validate id_token claims (exp, iat, iss, aud) per OIDC. Optional clock skew applied.
  * @param claims - Decoded id_token payload
+ * @param expectedIssuer - Exact issuer from Hydra config (e.g. http://api.ory.localhost)
+ * @param clientId - OAuth client_id that must appear in aud
  * @param clockSkewSec - Allowed skew in seconds (default 60)
  */
-export function validateIdTokenClaims(claims: IdTokenClaims, clockSkewSec: number = ID_TOKEN_CLOCK_SKEW_SEC) {
+export function validateIdTokenClaims(
+  claims: IdTokenClaims,
+  expectedIssuer: string,
+  clientId: string,
+  clockSkewSec: number = ID_TOKEN_CLOCK_SKEW_SEC
+) {
   if (!claims || typeof claims !== 'object') throw new Error('Invalid id_token claims')
+
   const now = Math.floor(Date.now() / 1000)
   if (claims.exp != null) {
     if (now > claims.exp + clockSkewSec) throw new Error('id_token expired')
   }
   if (claims.iat != null) {
     if (now < claims.iat - clockSkewSec) throw new Error('id_token not yet valid (iat in future)')
+  }
+
+  // iss validation — normalise both sides to tolerate trailing-slash mismatch
+  if (!claims.iss || normaliseIssuer(claims.iss) !== normaliseIssuer(expectedIssuer)) {
+    throw new Error(`id_token issuer mismatch: expected "${expectedIssuer}", got "${claims.iss}"`)
+  }
+
+  // aud validation — OIDC §2: aud MUST be the client_id (string or array)
+  const audList = Array.isArray(claims.aud) ? claims.aud : [claims.aud]
+  if (!claims.aud || !audList.includes(clientId)) {
+    throw new Error(`id_token audience does not include client "${clientId}"`)
   }
 }
 

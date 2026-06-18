@@ -239,6 +239,7 @@ import { createLoginFlow, getLoginFlow, updateLoginFlow } from '../composables/u
 import type { FlowLike, HttpErrorLike, ContinueWithLike } from '../types/flow'
 import type { UiNodeLike } from '../utils/uiNodes'
 import { logger, errMessage } from '../utils/logger'
+import { safeRedirect } from '../utils/safeRedirect'
 
 const refreshAuth = inject<(() => Promise<void>) | null>('refreshAuth', null)
 import {
@@ -430,7 +431,8 @@ const handleSubmit = async (event: Event) => {
     }
     
     const payload = Object.fromEntries(formData.entries())
-    const data = (await updateLoginFlow(flow.value!.id!, payload as unknown as UpdateLoginFlowBody)) as unknown as FlowLike
+    if (!flow.value?.id) return
+    const data = (await updateLoginFlow(flow.value.id, payload as unknown as UpdateLoginFlowBody)) as unknown as FlowLike
 
     // For browser-based login, if we get here without an error, login succeeded
     // Session is set as a cookie, not in the response body
@@ -446,12 +448,9 @@ const handleSubmit = async (event: Event) => {
       // Prefer intended return URL (OAuth hydra-callback), then flow/query
       const returnTo = intendedReturnUrl.value || flow.value?.return_to || firstQuery(route.query.return_to) || firstQuery(route.query.returnTo)
 
-      if (returnTo) {
-        window.location.href = decodeURIComponent(returnTo)
-      } else {
-        const adminUrl = import.meta.env.VITE_ADMIN_URL || 'http://admin.ory.localhost'
-        window.location.href = `${adminUrl}/dashboard`
-      }
+      const adminUrl = import.meta.env.VITE_ADMIN_URL || 'http://admin.ory.localhost'
+      const destination = safeRedirect(returnTo ? decodeURIComponent(returnTo) : null, `${adminUrl}/dashboard`)
+      window.location.href = destination
     } else {
       // Response has errors: check for verification required (continue_with in success body)
       const continueWith = getContinueWith(data)
