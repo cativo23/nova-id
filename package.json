@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "packageManager": "pnpm@11.0.0",
-  "engines": { "node": ">=18" },
+  "engines": { "node": ">=22" },
   "scripts": {
     "client:gen": "pnpm --filter @nova-id/api-client run generate",
     "typecheck": "pnpm -r run typecheck"

@@ -20,10 +20,14 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "openapi:gen": "ts-node -r tsconfig-paths/register scripts/generate-openapi.ts",
     "openapi:verify": "ts-node -r tsconfig-paths/register scripts/generate-openapi.ts && git diff --exit-code -- openapi.json",
+    "boundary:check": "depcruise src --config .dependency-cruiser.js",
     "migration:generate": "typeorm-ts-node-commonjs migration:generate -d src/audit/audit.datasource.ts",
     "migration:run": "typeorm-ts-node-commonjs migration:run -d src/audit/audit.datasource.ts",
     "migration:revert": "typeorm-ts-node-commonjs migration:revert -d src/audit/audit.datasource.ts",
     "migration:show": "typeorm-ts-node-commonjs migration:show -d src/audit/audit.datasource.ts"
+  },
+  "engines": {
+    "node": ">=22"
   },
   "dependencies": {
     "@nestjs/common": "^10.3.0",
@@ -61,6 +65,7 @@
     "@types/supertest": "^6.0.2",
     "@typescript-eslint/eslint-plugin": "^6.17.0",
     "@typescript-eslint/parser": "^6.17.0",
+    "dependency-cruiser": "^16.10.4",
     "eslint": "^8.56.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-prettier": "^5.1.2",
