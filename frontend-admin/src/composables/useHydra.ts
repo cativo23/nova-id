@@ -138,27 +138,3 @@ export async function deleteClient(clientId: string): Promise<boolean> {
     throw error
   }
 }
-
-// List OAuth2 access tokens (for testing)
-export async function listAccessTokens(): Promise<unknown> {
-  try {
-    const response = await fetch(`${hydraAdminUrl}/oauth2/tokens`, {
-      method: 'GET',
-      credentials: 'include',
-      mode: 'cors',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      }
-    })
-
-    if (!response.ok) {
-      throw new Error(`Failed to list tokens: ${response.statusText}`)
-    }
-
-    return await response.json()
-  } catch (error) {
-    logger.error('Error listing tokens:', errMessage(error))
-    throw error
-  }
-}
