@@ -44,6 +44,18 @@ describe('safeRedirect', () => {
     expect(safeRedirect('//evil.example.com/path', '/')).toBe('/')
   })
 
+  it('rejects a backslash bypass /\\evil.com (browsers normalise \\ to /)', () => {
+    expect(safeRedirect('/\\evil.com', '/')).toBe('/')
+  })
+
+  it('rejects a mixed slash-backslash bypass /\\/evil.com', () => {
+    expect(safeRedirect('/\\/evil.com', '/')).toBe('/')
+  })
+
+  it('rejects a leading-backslash bypass \\/evil.com', () => {
+    expect(safeRedirect('\\/evil.com', '/')).toBe('/')
+  })
+
   it('returns fallback for null input', () => {
     expect(safeRedirect(null, '/home')).toBe('/home')
   })

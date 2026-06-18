@@ -21,7 +21,10 @@ export function safeRedirect(url: string | null | undefined, fallback: string): 
 
   // Relative paths (starting with / but not //) are always safe — they stay on the current origin.
   // Protocol-relative URLs (starting with //) are treated as absolute and must pass origin check.
-  if (url.startsWith('/') && !url.startsWith('//')) return url
+  // Backslashes are rejected: browsers normalise `\` to `/`, so `/\evil.com` would resolve
+  // off-origin. Any candidate containing `\` falls through to URL parsing (throws → fallback)
+  // instead of being trusted as a relative path.
+  if (url.startsWith('/') && !url.startsWith('//') && !url.includes('\\')) return url
 
   // Parse as absolute URL
   let parsed: URL
