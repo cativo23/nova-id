@@ -73,42 +73,6 @@
     ]
   },
   {
-    "id": "hydra-admin",
-    "upstream": {
-      "preserve_host": false,
-      "strip_path": "/hydra-admin",
-      "url": "http://hydra:4445"
-    },
-    "match": {
-      "url": "<(http|https)://(api\\.cativo\\.dev|oathkeeper(:[0-9]+)?)/hydra-admin/.*>",
-      "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
-    },
-    "authenticators": [
-      {
-        "handler": "cookie_session"
-      }
-    ],
-    "authorizer": {
-      "handler": "remote_json",
-      "config": {
-        "remote": "http://keto:4466/relation-tuples/check",
-        "payload": "{\"namespace\":\"Platform\",\"object\":\"nova\",\"relation\":\"administer\",\"subject_id\":\"user:{{ print .Subject }}\"}",
-        "forward_response_headers_to_upstream": ["Content-Type"]
-      }
-    },
-    "mutators": [
-      {
-        "handler": "header",
-        "config": {
-          "headers": {
-            "X-User-ID": "{{ print .Subject }}",
-            "X-User-Email": "{{ print .Extra.identity.traits.email }}"
-          }
-        }
-      }
-    ]
-  },
-  {
     "id": "frontend-auth",
     "upstream": {
       "preserve_host": false,
@@ -154,37 +118,6 @@
         "payload": "{\"namespace\":\"Platform\",\"object\":\"nova\",\"relation\":\"administer\",\"subject_id\":\"user:{{ print .Subject }}\"}",
         "forward_response_headers_to_upstream": ["Content-Type"]
       }
-    },
-    "mutators": [
-      {
-        "handler": "header",
-        "config": {
-          "headers": {
-            "X-User-ID": "{{ print .Subject }}",
-            "X-User-Email": "{{ print .Extra.identity.traits.email }}",
-            "X-User-Role": "{{ if .Extra.identity.metadata_public }}{{ print .Extra.identity.metadata_public.role }}{{ end }}"
-          }
-        }
-      }
-    ]
-  },
-  {
-    "id": "frontend-app",
-    "upstream": {
-      "preserve_host": false,
-      "url": "http://frontend-app:5175"
-    },
-    "match": {
-      "url": "<(http|https)://api\\.cativo\\.dev/app/.*>",
-      "methods": ["GET", "POST", "PUT", "DELETE", "PATCH"]
-    },
-    "authenticators": [
-      {
-        "handler": "cookie_session"
-      }
-    ],
-    "authorizer": {
-      "handler": "allow"
     },
     "mutators": [
       {
@@ -369,31 +302,6 @@
     "mutators": [ { "handler": "id_token" } ]
   },
   {
-    "id": "api-test-app-gate",
-    "upstream": {
-      "preserve_host": true,
-      "strip_path": "/api",
-      "url": "http://api:8080"
-    },
-    "match": {
-      "url": "<(http|https)://(api\\.cativo\\.dev|oathkeeper(:[0-9]+)?)/api/(me(?!\\/permissions)|nova-id-session|protected|user-demo|admin-demo|data|create|app-user-data|app-admin-only|app-admin|logs|roles(?!\\/bootstrap))(/.*)?>",
-      "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
-    },
-    "authenticators": [
-      { "handler": "cookie_session", "config": { "check_session_url": "http://kratos:4433/sessions/whoami", "preserve_path": true, "extra_from": "@this", "subject_from": "identity.id" } },
-      { "handler": "oauth2_introspection" }
-    ],
-    "authorizer": {
-      "handler": "remote_json",
-      "config": {
-        "remote": "http://keto:4466/relation-tuples/check",
-        "payload": "{\"namespace\":\"App\",\"object\":\"nova-id-test-app\",\"relation\":\"access\",\"subject_id\":\"user:{{ print .Subject }}\"}",
-        "forward_response_headers_to_upstream": ["Content-Type"]
-      }
-    },
-    "mutators": [ { "handler": "id_token" } ]
-  },
-  {
     "id": "keto-read",
     "upstream": {
       "preserve_host": false,
@@ -403,42 +311,6 @@
     "match": {
       "url": "<(http|https)://(api\\.cativo\\.dev|oathkeeper(:[0-9]+)?)/keto/read/.*>",
       "methods": ["GET", "POST"]
-    },
-    "authenticators": [
-      {
-        "handler": "cookie_session"
-      }
-    ],
-    "authorizer": {
-      "handler": "remote_json",
-      "config": {
-        "remote": "http://keto:4466/relation-tuples/check",
-        "payload": "{\"namespace\":\"Platform\",\"object\":\"nova\",\"relation\":\"administer\",\"subject_id\":\"user:{{ print .Subject }}\"}",
-        "forward_response_headers_to_upstream": ["Content-Type"]
-      }
-    },
-    "mutators": [
-      {
-        "handler": "header",
-        "config": {
-          "headers": {
-            "X-User-ID": "{{ print .Subject }}",
-            "X-User-Email": "{{ print .Extra.identity.traits.email }}"
-          }
-        }
-      }
-    ]
-  },
-  {
-    "id": "keto-write",
-    "upstream": {
-      "preserve_host": false,
-      "strip_path": "/keto/write",
-      "url": "http://keto:4467"
-    },
-    "match": {
-      "url": "<(http|https)://api\\.cativo\\.dev/keto/write/.*>",
-      "methods": ["GET", "POST", "PUT", "DELETE", "PATCH"]
     },
     "authenticators": [
       {

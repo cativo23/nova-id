@@ -48,7 +48,7 @@ errors:
     redirect:
       enabled: true
       config:
-        to: http://auth.local/auth/login
+        to: http://auth.ory.localhost/auth/login
         when:
           - error:
               - unauthorized
