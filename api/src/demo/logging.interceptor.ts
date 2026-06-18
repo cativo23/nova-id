@@ -34,9 +34,11 @@ export class LoggingInterceptor implements NestInterceptor {
 
     const startTime = Date.now();
     const frontendSource = this.extractFrontendSource(headers, request);
-    const userId = request.user?.userId || headers['x-user-id'] || 'anonymous';
-    const userEmail = request.user?.email || headers['x-user-email'] || 'anonymous';
-    const userRole = request.user?.role || headers['x-user-role'] || 'platform_user';
+    // Never fall back to X-User-* headers — they are spoofable (M-2).
+    // When request.user is absent (unauthenticated / Public decorator), use 'anonymous'.
+    const userId = request.user?.userId ?? 'anonymous';
+    const userEmail = request.user?.email ?? 'anonymous';
+    const userRole = request.user?.role ?? 'anonymous';
     const authMethod = request.user?.authMethod || 'session';
     const clientId = request.user?.clientId || null;
 
