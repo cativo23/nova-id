@@ -12,13 +12,23 @@ function makeHydra() {
 function makeKeto() {
   return { checkApp: jest.fn() };
 }
-const user = { userId: 'u1', email: 'a@b.c', full_name: 'A B', role: 'platform_admin' };
+function makeAudit() {
+  return { record: jest.fn().mockResolvedValue(undefined) };
+}
+const user = {
+  userId: 'u1',
+  email: 'a@b.c',
+  full_name: 'A B',
+  role: 'platform_admin',
+  authMethod: 'jwt' as const,
+  jwtClaims: {},
+};
 
 describe('AppService.acceptHydraLogin', () => {
   it('honors skip=true: accepts with subject only, no context claims', async () => {
     const hydra = makeHydra();
     hydra.getLoginRequest.mockResolvedValue({ skip: true, subject: 'u1' });
-    const svc = new AppService(hydra as any, makeKeto() as any);
+    const svc = new AppService(hydra as any, makeKeto() as any, makeAudit() as any);
 
     await svc.acceptHydraLogin(user, 'chal');
 
@@ -32,7 +42,7 @@ describe('AppService.acceptHydraLogin', () => {
   it('skip=false: puts claims on context, never on session', async () => {
     const hydra = makeHydra();
     hydra.getLoginRequest.mockResolvedValue({ skip: false });
-    const svc = new AppService(hydra as any, makeKeto() as any);
+    const svc = new AppService(hydra as any, makeKeto() as any, makeAudit() as any);
 
     await svc.acceptHydraLogin(user, 'chal');
 
@@ -54,7 +64,7 @@ describe('AppService.acceptHydraConsent', () => {
     });
     const keto = makeKeto();
     keto.checkApp.mockResolvedValue(false);
-    const svc = new AppService(hydra as any, keto as any);
+    const svc = new AppService(hydra as any, keto as any, makeAudit() as any);
 
     const out = await svc.acceptHydraConsent(user, { consent_challenge: 'cc', grant_scope: ['openid'] });
 
@@ -62,6 +72,31 @@ describe('AppService.acceptHydraConsent', () => {
     expect(hydra.acceptConsent).not.toHaveBeenCalled();
     expect(hydra.rejectConsent).toHaveBeenCalledWith('cc', expect.objectContaining({ error: 'access_denied' }));
     expect(out.redirect_to).toBe('http://denied');
+  });
+
+  it('consent.deny: emits audit record with action=consent.deny, actorId, appId, targetType=app', async () => {
+    const hydra = makeHydra();
+    hydra.getConsentRequest.mockResolvedValue({
+      client: { client_id: 'nova-id-test-app' },
+      requested_access_token_audience: ['aud1'],
+      requested_scope: ['openid'],
+    });
+    const keto = makeKeto();
+    keto.checkApp.mockResolvedValue(false);
+    const audit = makeAudit();
+    const svc = new AppService(hydra as any, keto as any, audit as any);
+
+    await svc.acceptHydraConsent(user, { consent_challenge: 'cc', grant_scope: ['openid'] });
+
+    expect(audit.record).toHaveBeenCalledTimes(1);
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actorId: 'u1',
+        action: 'consent.deny',
+        appId: 'nova-id-test-app',
+        targetType: 'app',
+      }),
+    );
   });
 
   it('members: accepts with trusted audience, role on id_token AND access_token, app:member scope, no appRole', async () => {
@@ -73,7 +108,7 @@ describe('AppService.acceptHydraConsent', () => {
     });
     const keto = makeKeto();
     keto.checkApp.mockResolvedValue(true);
-    const svc = new AppService(hydra as any, keto as any);
+    const svc = new AppService(hydra as any, keto as any, makeAudit() as any);
 
     await svc.acceptHydraConsent(user, { consent_challenge: 'cc', grant_scope: ['openid', 'profile'] });
 
@@ -101,7 +136,7 @@ describe('AppService.acceptHydraConsent', () => {
     });
     const keto = makeKeto();
     keto.checkApp.mockResolvedValue(true);
-    const svc = new AppService(hydra as any, keto as any);
+    const svc = new AppService(hydra as any, keto as any, makeAudit() as any);
 
     // Tampered body includes a scope the client never requested
     await svc.acceptHydraConsent(user, {
@@ -127,7 +162,7 @@ describe('AppService.acceptHydraConsent', () => {
     });
     const keto = makeKeto();
     keto.checkApp.mockResolvedValue(true);
-    const svc = new AppService(hydra as any, keto as any);
+    const svc = new AppService(hydra as any, keto as any, makeAudit() as any);
 
     await svc.acceptHydraConsent(user, {
       consent_challenge: 'cc',

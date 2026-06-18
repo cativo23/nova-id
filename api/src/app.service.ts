@@ -1,6 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { HydraService } from './ory/hydra.service';
 import { KetoService } from './ory/keto.service';
+import { AuditService } from './audit/audit.service';
+import { AuthenticatedUser } from './common/types/authenticated-user';
+import { AcceptHydraConsentDto } from './dto/accept-hydra-consent.dto';
 
 @Injectable()
 export class AppService {
@@ -9,6 +12,7 @@ export class AppService {
   constructor(
     private readonly hydra: HydraService,
     private readonly keto: KetoService,
+    private readonly audit: AuditService,
   ) {}
 
   getPublicData() {
@@ -23,7 +27,7 @@ export class AppService {
     };
   }
 
-  async acceptHydraLogin(user: any, loginChallenge: string) {
+  async acceptHydraLogin(user: AuthenticatedUser, loginChallenge: string) {
     try {
       this.logger.log(`Accepting Hydra login for user ${user.userId}`);
       const loginRequest = await this.hydra.getLoginRequest(loginChallenge);
@@ -54,7 +58,7 @@ export class AppService {
     }
   }
 
-  async acceptHydraConsent(user: any, body: any) {
+  async acceptHydraConsent(user: AuthenticatedUser, body: AcceptHydraConsentDto) {
     try {
       const consentChallenge = body.consent_challenge;
       this.logger.log(`Consent for user ${user.userId} (challenge ${consentChallenge})`);
@@ -66,6 +70,12 @@ export class AppService {
       const isMember = clientId ? await this.keto.checkApp(user.userId, clientId) : false;
       if (!isMember) {
         this.logger.warn(`Consent DENIED: ${user.userId} is not a member of app ${clientId}`);
+        await this.audit.record({
+          actorId: user.userId,
+          action: 'consent.deny',
+          appId: clientId ?? null,
+          targetType: 'app',
+        });
         return await this.hydra.rejectConsent(consentChallenge, {
           error: 'access_denied',
           error_description: 'You are not authorized to access this application.',
