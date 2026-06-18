@@ -19,7 +19,11 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "openapi:gen": "ts-node -r tsconfig-paths/register scripts/generate-openapi.ts",
-    "openapi:verify": "ts-node -r tsconfig-paths/register scripts/generate-openapi.ts && git diff --exit-code -- openapi.json"
+    "openapi:verify": "ts-node -r tsconfig-paths/register scripts/generate-openapi.ts && git diff --exit-code -- openapi.json",
+    "migration:generate": "typeorm-ts-node-commonjs migration:generate -d src/audit/audit.datasource.ts",
+    "migration:run": "typeorm-ts-node-commonjs migration:run -d src/audit/audit.datasource.ts",
+    "migration:revert": "typeorm-ts-node-commonjs migration:revert -d src/audit/audit.datasource.ts",
+    "migration:show": "typeorm-ts-node-commonjs migration:show -d src/audit/audit.datasource.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.3.0",
