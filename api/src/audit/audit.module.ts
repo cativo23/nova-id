@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuditLog } from './audit-log.entity';
 import { AuditService } from './audit.service';
+import { CreateAuditLogs1781750293893 } from './migrations/1781750293893-CreateAuditLogs';
 
 /**
  * AuditModule — registers a NAMED 'audit' TypeORM connection backed by
@@ -11,8 +12,13 @@ import { AuditService } from './audit.service';
  * treating it as the default connection and avoids conflicts with the
  * existing SQLite 'default' connection registered by DemoModule.
  *
- * synchronize=true in non-production is intentional for local dev only;
- * production must use explicit migrations (follow-up task A2-plan-2).
+ * Schema management: migrations only, in ALL environments.
+ * - synchronize: false — never auto-mutate the schema. Use `npm run migration:generate`
+ *   to produce a migration and `npm run migration:run` to apply it.
+ * - migrationsRun: true — TypeORM runs pending migrations on every boot, so
+ *   the table is created automatically in fresh dev/staging/prod environments
+ *   without any manual step.
+ * - The standalone DataSource for the CLI lives in audit.datasource.ts.
  */
 @Module({
   imports: [
@@ -25,9 +31,9 @@ import { AuditService } from './audit.service';
       password: process.env.AUDIT_DB_PASSWORD,
       database: process.env.AUDIT_DB_NAME,
       entities: [AuditLog],
-      // Dev-only schema sync: creates audit_logs on first boot. Never in production —
-      // use explicit TypeORM migrations instead (follow-up).
-      synchronize: process.env.NODE_ENV !== 'production',
+      migrations: [CreateAuditLogs1781750293893],
+      synchronize: false,
+      migrationsRun: true,
     }),
     TypeOrmModule.forFeature([AuditLog], 'audit'),
   ],

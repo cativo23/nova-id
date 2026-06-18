@@ -15,7 +15,12 @@ import { UserRole } from './roles/entities/user-role.entity';
       type: 'sqlite',
       database: 'data/app_roles.db',
       entities: [UserRole],
-      // synchronize is dev-only: never auto-migrate schema in production.
+      // synchronize is intentionally left enabled for non-production here.
+      // Rationale (ADR-0001): the demo SQLite DB is ephemeral and dev/demo-only;
+      // it is never deployed to production. Auto-sync is harmless on a local,
+      // disposable file-based DB and avoids the overhead of maintaining SQLite
+      // migrations for a module that exists only to support local demos.
+      // If this module is ever promoted to a real environment, migrate it properly.
       synchronize: process.env.NODE_ENV !== 'production',
     }),
     RolesModule,
