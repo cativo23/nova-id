@@ -1,0 +1,111 @@
+name: CI
+
+# Mechanical gates that must pass before code lands on develop/main. Without this
+# the project's quality scripts (typecheck, jest, openapi:verify, ADR-0001 boundary
+# check) are dead letters — present but never enforced. See ADR-0001 for why the
+# IdP/demo boundary is enforced by tooling rather than developer discipline.
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+    branches: [develop, main]
+
+# Cancel superseded runs on the same ref to save CI minutes.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # pnpm workspace: the generated api-client + the three Vue SPAs.
+  # `api/` is NOT a workspace member (it uses npm) — it has its own job below.
+  # ---------------------------------------------------------------------------
+  workspace:
+    name: Workspace (typecheck + build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # frontend-auth and frontend-admin import @nova-id/api-client, whose generated
+      # sources are gitignored (regenerated from api/openapi.json). Generate them
+      # before typecheck/build so those imports resolve. api/openapi.json is committed.
+      - name: Generate API client
+        run: pnpm run client:gen
+
+      - name: Typecheck (api-client + all SPAs)
+        run: pnpm -r run typecheck
+
+      - name: Build SPAs
+        run: pnpm -r run build
+
+  # ---------------------------------------------------------------------------
+  # NestJS BFF (api/) — standalone npm project, not part of the pnpm workspace.
+  # ---------------------------------------------------------------------------
+  api:
+    name: API (build + test + boundary)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: nova_audit
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      AUDIT_DB_HOST: localhost
+      AUDIT_DB_PORT: "5432"
+      AUDIT_DB_USER: postgres
+      AUDIT_DB_PASSWORD: postgres
+      AUDIT_DB_NAME: nova_audit
+    defaults:
+      run:
+        working-directory: ./api
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      # Unit tests fully mock the audit repository so they run without a live DB.
+      # The Postgres service above is required by openapi:verify (NestFactory boots
+      # AppModule → AuditModule → TypeORM forRoot with migrationsRun: true).
+      - name: Test
+        run: npm test
+
+      # Fails if the committed openapi.json drifts from the decorated controllers.
+      - name: Verify OpenAPI is up to date
+        run: npm run openapi:verify
+
+      # Enforces the ADR-0001 one-way module boundary (IdP must not import demo).
+      - name: Check module boundary (ADR-0001)
+        run: npm run boundary:check
