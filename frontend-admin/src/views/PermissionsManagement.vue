@@ -107,13 +107,36 @@
                     </p>
                   </div>
                   <button
-                    @click="deleteOAuthClient(client.client_id)"
+                    @click="clientToDelete = client.client_id"
                     class="px-3 py-1 bg-red-500/20 text-red-400 rounded hover:bg-red-500/30 transition-colors text-sm"
                   >
                     Delete
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Delete OAuth Client Confirmation Modal -->
+        <div
+          v-if="clientToDelete"
+          class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          @click.self="clientToDelete = null"
+        >
+          <div class="card mx-4 w-full max-w-md p-6 shadow-modal">
+            <h3 class="text-lg font-semibold text-red-400 mb-4">Delete OAuth client</h3>
+            <p class="text-cyber-light mb-4">
+              Are you sure you want to delete client <code class="text-cyber-light font-mono">{{ clientToDelete }}</code>?
+              This action cannot be undone.
+            </p>
+            <div class="flex justify-end gap-3 pt-4">
+              <button type="button" @click="clientToDelete = null" class="btn-secondary">
+                Cancel
+              </button>
+              <button type="button" @click="deleteOAuthClient" class="btn-danger disabled:opacity-50">
+                Delete
+              </button>
             </div>
           </div>
         </div>
@@ -191,6 +214,7 @@ const success = ref<string | null>(null)
 const oauthClients = ref<OAuthClient[]>([])
 const creatingClient = ref(false)
 const showCreateClient = ref(false)
+const clientToDelete = ref<string | null>(null)
 
 const clientForm = ref({
   client_name: '',
@@ -259,9 +283,11 @@ const createOAuthClient = async () => {
   }
 }
 
-const deleteOAuthClient = async (clientId: string) => {
-  if (!confirm('Are you sure you want to delete this OAuth client?')) return
+const deleteOAuthClient = async () => {
+  if (!clientToDelete.value) return
 
+  const clientId = clientToDelete.value
+  clientToDelete.value = null
   error.value = null
   success.value = null
   try {
