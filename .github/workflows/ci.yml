@@ -36,8 +36,15 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      # dangerouslyAllowAllBuilds: pnpm 11 fails install (ERR_PNPM_IGNORED_BUILDS,
+      # exit 1) whenever a dependency has an ignored build script. The pnpm-workspace
+      # `onlyBuiltDependencies` allowlist does NOT suppress this gate on a fresh
+      # frozen install (verified on pnpm 11.0.0 and 11.8.0). The only build-script
+      # deps in the locked tree are esbuild (vite's native binary — required for the
+      # SPA builds below) and vue-demi; with a frozen lockfile, allowing all builds
+      # means exactly those trusted, pinned packages.
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --config.dangerouslyAllowAllBuilds=true
 
       # frontend-auth and frontend-admin import @nova-id/api-client, whose generated
       # sources are gitignored (regenerated from api/openapi.json). Generate them
@@ -77,6 +84,19 @@ jobs:
       AUDIT_DB_USER: postgres
       AUDIT_DB_PASSWORD: postgres
       AUDIT_DB_NAME: nova_audit
+      # openapi:verify boots the full AppModule. OryModule's providers resolve these
+      # via ConfigService.getOrThrow at boot (api/src/ory/ory.module.ts), so they must
+      # exist or the app crashes before the spec is generated. The values are never
+      # dialed — OpenAPI generation only reads decorator metadata, it makes no Ory
+      # calls — so placeholder URLs are sufficient.
+      HYDRA_ADMIN_URL: http://localhost:4445
+      KETO_READ_URL: http://localhost:4466
+      KRATOS_ADMIN_URL: http://localhost:4434
+      # AuthenticatedGuard reads these via ConfigService.getOrThrow at boot
+      # (api/src/guards/authenticated.guard.ts). The JwksClient is lazy — no
+      # network call is made during generation — so placeholder URLs suffice.
+      OAUTH_JWKS_URL: http://localhost:4456/.well-known/jwks.json
+      OAUTH_ISSUER: http://localhost:4455/
     defaults:
       run:
         working-directory: ./api
@@ -92,6 +112,12 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      # DemoModule's SQLite DB lives in api/data/ which is gitignored and therefore
+      # absent on a fresh checkout. sqlite3 won't create the parent directory itself,
+      # so we pre-create it here to prevent a boot-time SQLITE_CANTOPEN error.
+      - name: Create demo SQLite data dir
+        run: mkdir -p data
 
       - name: Build
         run: npm run build

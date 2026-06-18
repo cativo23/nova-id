@@ -36,5 +36,8 @@ async function generate() {
 
 generate().catch((err) => {
   console.error('OpenAPI generation failed:', err);
-  process.exit(1);
+  // Set the exit code rather than calling process.exit(1): a synchronous
+  // process.exit truncates buffered stderr, which hid the real boot error in CI.
+  // Letting the event loop drain flushes the message before the process exits.
+  process.exitCode = 1;
 });
