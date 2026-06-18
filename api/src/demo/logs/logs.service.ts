@@ -65,22 +65,19 @@ export class LogsService {
    * permanently bounded without requiring an external log-rotation daemon.
    */
   private async writeLogLine(line: string): Promise<void> {
+    // Check current file size; rotate if over the cap.
     try {
-      // Check current file size; rotate if over the cap.
-      try {
-        const stat = await fsPromises.stat(this.accessLogFile);
-        if (stat.size >= MAX_LOG_BYTES) {
-          const rotatedPath = `${this.accessLogFile}.1`;
-          await fsPromises.rename(this.accessLogFile, rotatedPath);
-        }
-      } catch {
-        // File doesn't exist yet — no rotation needed.
+      const stat = await fsPromises.stat(this.accessLogFile);
+      if (stat.size >= MAX_LOG_BYTES) {
+        const rotatedPath = `${this.accessLogFile}.1`;
+        await fsPromises.rename(this.accessLogFile, rotatedPath);
       }
-
-      await fsPromises.appendFile(this.accessLogFile, line, 'utf8');
-    } catch (err) {
-      throw err; // Re-throw so the caller's .catch() handles it.
+    } catch {
+      // File doesn't exist yet — no rotation needed.
     }
+
+    // Errors here propagate to the caller's .catch() in logAccess().
+    await fsPromises.appendFile(this.accessLogFile, line, 'utf8');
   }
 
   getAccessLogs(limit: number = 100): AccessLogEntry[] {
