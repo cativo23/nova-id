@@ -4,7 +4,7 @@ import type { RouteRecordRaw } from 'vue-router'
 import { VueQueryPlugin, QueryClient } from '@tanstack/vue-query'
 import '../style.css'
 import { validateEnv } from './config/env'
-import { logger } from './utils/logger'
+import { logger, errMessage } from './utils/logger'
 import { setGlobalError } from './state/errorState'
 import App from './App.vue'
 import Home from './views/Home.vue'
@@ -50,7 +50,7 @@ router.beforeEach(async (to, _from, next) => {
         }
       }
     } catch (error) {
-      logger.error('Navigation guard: Auth check failed', error)
+      logger.error('Navigation guard: Auth check failed', errMessage(error))
       next({ path: '/' })
       return
     }
@@ -69,7 +69,7 @@ const queryClient = new QueryClient({
 
 const app = createApp(App)
 app.config.errorHandler = (err, _instance, info) => {
-  logger.error('Uncaught error', err, info)
+  logger.error('Uncaught error', errMessage(err), String(info))
   setGlobalError(err)
 }
 app.use(router)
