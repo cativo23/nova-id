@@ -23,6 +23,7 @@ source-of-truth ruling) and would otherwise be re-litigated later from memory.
 | [0003](0003-three-layer-authorization-model.md) | Three-layer authorization model (Keto for platform & per-app access; each app's DB for domain roles) | Accepted |
 | [0004](0004-per-app-access-enforcement-dual-mode.md) | Enforce per-app access in two coexisting modes, with Keto as the single source of truth | Accepted |
 | [0005](0005-generated-api-client-and-workspace.md) | Generate a typed, tags-split TanStack Query client and distribute it as a pnpm workspace package | Accepted |
+| [0006](0006-bff-is-a-token-handler-consolidation-api.md) | The server tier is a shared token-handler / IdP consolidation API, not a per-frontend BFF | Accepted |
 
 ## Related decision records (pre-ADR)
 
