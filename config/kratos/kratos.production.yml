@@ -44,6 +44,11 @@ selfservice:
     - https://admin.cativo.dev
     - https://admin.cativo.dev/dashboard
     - https://api.cativo.dev
+    # The app is the neutral DEFAULT_RETURN_URL target (VITE_DEFAULT_RETURN_URL in
+    # the prod build); Kratos validates return_to against this list, so the app
+    # host must be allowed or context-less flows would 400.
+    - https://app.cativo.dev
+    - https://app.cativo.dev/
 
   methods:
     password:
