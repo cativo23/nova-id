@@ -9,7 +9,6 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { RolesService } from './roles.service';
-import { AuthenticatedGuard } from '../../guards/authenticated.guard';
 import { AppAdminGuard } from '../guards/app-admin.guard';
 import { RoleGuard } from '../../guards/role.guard';
 import { RequireRole } from '../../decorators/require-role.decorator';
@@ -18,12 +17,18 @@ import { AuthenticatedUser } from '../../common/types/authenticated-user';
 import { BootstrapAppAdminDto } from './dto/bootstrap-app-admin.dto';
 import { SetUserRoleDto } from './dto/set-user-role.dto';
 import { LogAccess } from '../log-access.decorator';
+import { AuditService } from '../../audit/audit.service';
+
+/** The single application managed by the demo roles module. */
+const DEMO_APP_ID = process.env.APP_ID ?? 'nova-id-test-app';
 
 @Controller('roles')
-@UseGuards(AuthenticatedGuard)
 @LogAccess()
 export class RolesController {
-  constructor(private readonly rolesService: RolesService) { }
+  constructor(
+    private readonly rolesService: RolesService,
+    private readonly audit: AuditService,
+  ) {}
 
   // Bootstrap endpoint: platform_admin can set the first app_admin
   @Post('bootstrap/app-admin')
@@ -35,6 +40,14 @@ export class RolesController {
   ) {
     const targetUserId = dto.userId || user.userId;
     const userRole = await this.rolesService.setAppRole(targetUserId, 'app_admin');
+    await this.audit.record({
+      actorId: user.userId,
+      action: 'membership.grant',
+      appId: DEMO_APP_ID,
+      targetId: targetUserId,
+      targetType: 'user',
+      metadata: { appRole: 'app_admin' },
+    });
     return {
       message: `User ${targetUserId} set as app_admin (bootstrap)`,
       userRole,
@@ -83,8 +96,17 @@ export class RolesController {
   async setUserRole(
     @Param('userId') userId: string,
     @Body() dto: SetUserRoleDto,
+    @GetUser() user: AuthenticatedUser,
   ) {
     const userRole = await this.rolesService.setAppRole(userId, dto.appRole);
+    await this.audit.record({
+      actorId: user.userId,
+      action: 'membership.grant',
+      appId: DEMO_APP_ID,
+      targetId: userId,
+      targetType: 'user',
+      metadata: { appRole: dto.appRole },
+    });
     return {
       message: `User role set to ${dto.appRole}`,
       userRole,
@@ -96,8 +118,17 @@ export class RolesController {
   async updateUserRole(
     @Param('userId') userId: string,
     @Body() dto: SetUserRoleDto,
+    @GetUser() user: AuthenticatedUser,
   ) {
     const userRole = await this.rolesService.setAppRole(userId, dto.appRole);
+    await this.audit.record({
+      actorId: user.userId,
+      action: 'membership.grant',
+      appId: DEMO_APP_ID,
+      targetId: userId,
+      targetType: 'user',
+      metadata: { appRole: dto.appRole },
+    });
     return {
       message: `User role updated to ${dto.appRole}`,
       userRole,
@@ -106,8 +137,18 @@ export class RolesController {
 
   @Delete('user/:userId')
   @UseGuards(AppAdminGuard)
-  async deleteUserRole(@Param('userId') userId: string) {
+  async deleteUserRole(
+    @Param('userId') userId: string,
+    @GetUser() user: AuthenticatedUser,
+  ) {
     await this.rolesService.deleteUserRole(userId);
+    await this.audit.record({
+      actorId: user.userId,
+      action: 'membership.revoke',
+      appId: DEMO_APP_ID,
+      targetId: userId,
+      targetType: 'user',
+    });
     return {
       message: `User role deleted for ${userId}. Will default to app_user.`,
     };

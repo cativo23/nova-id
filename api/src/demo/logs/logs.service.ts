@@ -1,6 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as fs from 'fs';
+import * as fsPromises from 'fs/promises';
 import * as path from 'path';
+
+/** Max file size before rotation (5 MiB). */
+const MAX_LOG_BYTES = 5 * 1024 * 1024;
 
 export interface AccessLogEntry {
   timestamp: string;
@@ -46,9 +50,34 @@ export class LogsService {
       this.accessLogs = this.accessLogs.slice(-1000);
     }
 
-    // Append to file
+    // Fire-and-forget async write so the event loop is never blocked (M-4).
     const logLine = JSON.stringify(entry) + '\n';
-    fs.appendFileSync(this.accessLogFile, logLine, 'utf8');
+    this.writeLogLine(logLine).catch((err: Error) => {
+      this.logger.error(`Failed to write access log: ${err.message}`);
+    });
+  }
+
+  /**
+   * Async file write with size-cap rotation.
+   *
+   * Before appending, stat the file; if it exceeds MAX_LOG_BYTES rotate it
+   * (rename access.log → access.log.1, start fresh).  This keeps the file
+   * permanently bounded without requiring an external log-rotation daemon.
+   */
+  private async writeLogLine(line: string): Promise<void> {
+    // Check current file size; rotate if over the cap.
+    try {
+      const stat = await fsPromises.stat(this.accessLogFile);
+      if (stat.size >= MAX_LOG_BYTES) {
+        const rotatedPath = `${this.accessLogFile}.1`;
+        await fsPromises.rename(this.accessLogFile, rotatedPath);
+      }
+    } catch {
+      // File doesn't exist yet — no rotation needed.
+    }
+
+    // Errors here propagate to the caller's .catch() in logAccess().
+    await fsPromises.appendFile(this.accessLogFile, line, 'utf8');
   }
 
   getAccessLogs(limit: number = 100): AccessLogEntry[] {

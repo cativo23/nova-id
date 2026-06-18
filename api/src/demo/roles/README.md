@@ -68,7 +68,15 @@ Requires: app_admin
 
 ## OAuth Integration
 
-When a user logs in via OAuth2 ("Login with Nova ID"), the `app_role` is included in the Hydra consent session and returned in token introspection. Oathkeeper's mutator reads it from `.Extra.ext.appRole` and sets `X-User-App-Role` header.
+`appRole` is **never** minted into a token and never set in any Oathkeeper header.
+Per [ADR-0002](../../../../docs/decisions/0002-idp-does-not-mint-approle.md), the
+IdP (Hydra consent session, Oathkeeper mutators) is Layer 2 and is intentionally
+kept unaware of application-level roles.
+
+`appRole` lives exclusively in the app's own database (SQLite, `data/app_roles.db`,
+Layer 3).  Every endpoint that needs it queries SQLite at request time via
+`RolesService.getAppRole()` — it is **never** read from a JWT claim or an
+Oathkeeper-forwarded header.
 
 ## Initial Setup
 

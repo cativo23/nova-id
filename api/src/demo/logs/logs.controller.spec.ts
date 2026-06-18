@@ -1,114 +1,79 @@
-import { ForbiddenException } from '@nestjs/common';
 import { LogsController } from './logs.controller';
 
 /**
- * Logs controller access-gate spec (ADR-0002 / ADR-0003, strict layering).
+ * Logs controller spec (ADR-0002 / ADR-0003, strict layering).
  *
- * The SOLE gate for /logs is app role app_admin read from SQLite.
- * platform_admin is an infra-layer role and MUST NOT grant log access —
- * the bypass was removed in this commit.
+ * Access gate is now enforced by AppAdminGuard (class-level @UseGuards),
+ * which is separately exercised in app-admin.guard.spec.ts.  These tests
+ * cover the controller's routing and delegation logic assuming the guard
+ * has already admitted the caller.
+ *
+ * Authorization behaviour:
+ *   - The SOLE gate is app role app_admin from SQLite (ADR-0002).
+ *   - platform_admin does NOT grant access (ADR-0003, strict layering).
+ * Both rules are enforced inside AppAdminGuard — see its spec for the
+ * full coverage matrix.
  */
 
-function makeController(appRoleFromDb: 'app_admin' | 'app_user') {
+function makeController() {
   const logsService = {
-    getAccessLogs: jest.fn().mockReturnValue([]),
-    getAccessLogsFiltered: jest.fn().mockReturnValue([]),
-    getAccessStats: jest.fn().mockReturnValue({}),
-    getAccessLogsByFrontend: jest.fn().mockReturnValue([]),
-    getAccessLogsByUser: jest.fn().mockReturnValue([]),
+    getAccessLogs: jest.fn().mockReturnValue([{ url: '/test' }]),
+    getAccessLogsFiltered: jest.fn().mockReturnValue([{ url: '/filtered' }]),
+    getAccessStats: jest.fn().mockReturnValue({ totalRequests: 42 }),
+    getAccessLogsByFrontend: jest.fn().mockReturnValue([{ url: '/fe' }]),
+    getAccessLogsByUser: jest.fn().mockReturnValue([{ url: '/user' }]),
   } as any;
 
-  const rolesService = {
-    getAppRole: jest.fn().mockResolvedValue(appRoleFromDb),
-  } as any;
-
-  return { controller: new LogsController(logsService, rolesService), rolesService, logsService };
+  return { controller: new LogsController(logsService), logsService };
 }
 
-function reqWith(user: object) {
-  return { user };
-}
-
-describe('LogsController access gate (ADR-0002 / ADR-0003)', () => {
+describe('LogsController routing (access gate = AppAdminGuard)', () => {
   describe('getLogs', () => {
-    it('allows a user whose SQLite app role is app_admin', async () => {
-      const { controller } = makeController('app_admin');
-      const result = await controller.getLogs(reqWith({ userId: 'u-admin' }));
-      expect(result).toEqual([]);
+    it('delegates to getAccessLogs when no filters are supplied', async () => {
+      const { controller, logsService } = makeController();
+      const result = await controller.getLogs();
+      expect(logsService.getAccessLogs).toHaveBeenCalledWith(100);
+      expect(result).toEqual([{ url: '/test' }]);
     });
 
-    it('denies a user whose SQLite app role is app_user', async () => {
-      const { controller } = makeController('app_user');
-      await expect(
-        controller.getLogs(reqWith({ userId: 'u-user' })),
-      ).rejects.toBeInstanceOf(ForbiddenException);
+    it('delegates to getAccessLogsFiltered when a filter is provided', async () => {
+      const { controller, logsService } = makeController();
+      const result = await controller.getLogs(undefined, undefined, 'GET');
+      expect(logsService.getAccessLogsFiltered).toHaveBeenCalledWith(
+        100,
+        expect.objectContaining({ method: 'GET' }),
+      );
+      expect(result).toEqual([{ url: '/filtered' }]);
     });
 
-    it('denies a platform_admin whose SQLite app role is app_user (bypass removed, ADR-0003)', async () => {
-      const { controller, rolesService } = makeController('app_user');
-      // role=platform_admin in the JWT/session — must NOT grant access to logs
-      await expect(
-        controller.getLogs(reqWith({ userId: 'u-padmin', role: 'platform_admin' })),
-      ).rejects.toBeInstanceOf(ForbiddenException);
-      // confirm SQLite was consulted (not short-circuited)
-      expect(rolesService.getAppRole).toHaveBeenCalledWith('u-padmin');
+    it('respects limit query param', async () => {
+      const { controller, logsService } = makeController();
+      await controller.getLogs('25');
+      expect(logsService.getAccessLogs).toHaveBeenCalledWith(25);
     });
   });
 
   describe('getStats', () => {
-    it('allows app_admin', async () => {
-      const { controller } = makeController('app_admin');
-      const result = await controller.getStats(reqWith({ userId: 'u-admin' }));
-      expect(result).toEqual({});
-    });
-
-    it('denies platform_admin with app_user SQLite role', async () => {
-      const { controller } = makeController('app_user');
-      await expect(
-        controller.getStats(reqWith({ userId: 'u-padmin', role: 'platform_admin' })),
-      ).rejects.toBeInstanceOf(ForbiddenException);
+    it('returns stats from service', async () => {
+      const { controller } = makeController();
+      const result = await controller.getStats();
+      expect(result).toEqual({ totalRequests: 42 });
     });
   });
 
   describe('getLogsByFrontend', () => {
-    it('allows app_admin', async () => {
-      const { controller } = makeController('app_admin');
-      const result = await controller.getLogsByFrontend(
-        reqWith({ userId: 'u-admin' }),
-        'frontend-app',
-      );
-      expect(result).toEqual([]);
-    });
-
-    it('denies platform_admin with app_user SQLite role', async () => {
-      const { controller } = makeController('app_user');
-      await expect(
-        controller.getLogsByFrontend(
-          reqWith({ userId: 'u-padmin', role: 'platform_admin' }),
-          'frontend-app',
-        ),
-      ).rejects.toBeInstanceOf(ForbiddenException);
+    it('delegates to service with frontend and limit', async () => {
+      const { controller, logsService } = makeController();
+      await controller.getLogsByFrontend('frontend-app', '50');
+      expect(logsService.getAccessLogsByFrontend).toHaveBeenCalledWith('frontend-app', 50);
     });
   });
 
   describe('getLogsByUser', () => {
-    it('allows app_admin', async () => {
-      const { controller } = makeController('app_admin');
-      const result = await controller.getLogsByUser(
-        reqWith({ userId: 'u-admin' }),
-        'some-user-id',
-      );
-      expect(result).toEqual([]);
-    });
-
-    it('denies platform_admin with app_user SQLite role', async () => {
-      const { controller } = makeController('app_user');
-      await expect(
-        controller.getLogsByUser(
-          reqWith({ userId: 'u-padmin', role: 'platform_admin' }),
-          'some-user-id',
-        ),
-      ).rejects.toBeInstanceOf(ForbiddenException);
+    it('delegates to service with userId and limit', async () => {
+      const { controller, logsService } = makeController();
+      await controller.getLogsByUser('user-uid', '10');
+      expect(logsService.getAccessLogsByUser).toHaveBeenCalledWith('user-uid', 10);
     });
   });
 });
