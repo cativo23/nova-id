@@ -12,9 +12,9 @@
         <span class="text-cyber-accent font-medium" aria-current="page">About</span>
       </nav>
 
-      <h1 class="text-2xl sm:text-3xl font-bold text-cyber-light tracking-tight mb-2">Cómo funciona</h1>
+      <h1 class="text-2xl sm:text-3xl font-bold text-cyber-light tracking-tight mb-2">How it works</h1>
       <p class="text-cyber-light/60 text-sm sm:text-base mb-8">
-        Esta app de pruebas te permite validar el flujo OAuth2/OIDC con Nova ID y probar endpoints protegidos.
+        This test app lets you validate the OAuth2/OIDC flow with Nova ID and call protected endpoints.
       </p>
 
       <section class="space-y-8">
@@ -23,14 +23,14 @@
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
-            Flujo de login (OAuth2 / OIDC)
+            Login flow (OAuth2 / OIDC)
           </h2>
           <ol class="list-decimal list-inside space-y-2 text-sm text-cyber-light/80">
-            <li>Haces clic en <strong class="text-cyber-light">Sign in with Nova ID</strong> en esta app.</li>
-            <li>Eres redirigido al servidor de autorización (Hydra) y, si hace falta, al login de Nova ID (Kratos).</li>
-            <li>Inicias sesión (o te registras) en Nova ID.</li>
-            <li>Apruebas el consentimiento para que esta app acceda a tu identidad (puede omitirse si ya lo hiciste).</li>
-            <li>Vuelves a esta app con un token; la sesión queda establecida y puedes llamar a la API de pruebas.</li>
+            <li>Click <strong class="text-cyber-light">Sign in with Nova ID</strong> in this app.</li>
+            <li>You are redirected to the authorization server (Hydra) and, if needed, to the Nova ID login (Kratos).</li>
+            <li>Sign in (or register) with Nova ID.</li>
+            <li>Approve the consent screen so this app can access your identity (skipped if you already consented).</li>
+            <li>You return to this app with a token; the session is established and you can call the test API.</li>
           </ol>
         </div>
 
@@ -39,32 +39,32 @@
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
-            Endpoints de la API de pruebas
+            Test API endpoints
           </h2>
           <ul class="space-y-3 text-sm text-cyber-light/80">
             <li class="flex items-start gap-2">
               <span class="inline-flex px-2 py-0.5 rounded text-xs font-bold bg-green-500/20 text-green-400 shrink-0">GET</span>
-              <span><strong class="text-cyber-light">/api-test/health</strong>, <strong class="text-cyber-light">/api-test/public</strong> — Públicos, sin autenticación.</span>
+              <span><strong class="text-cyber-light">/api-test/health</strong>, <strong class="text-cyber-light">/api-test/public</strong> — Public, no authentication required.</span>
             </li>
             <li class="flex items-start gap-2">
               <span class="inline-flex px-2 py-0.5 rounded text-xs font-bold bg-blue-500/20 text-blue-400 shrink-0">GET</span>
-              <span><strong class="text-cyber-light">/api-test/me</strong>, <strong class="text-cyber-light">/api-test/protected</strong> — Requieren sesión o token (usuario autenticado).</span>
+              <span><strong class="text-cyber-light">/api-test/me</strong>, <strong class="text-cyber-light">/api-test/protected</strong> — Require a session or token (authenticated user).</span>
             </li>
             <li class="flex items-start gap-2">
               <span class="inline-flex px-2 py-0.5 rounded text-xs font-bold bg-purple-500/20 text-purple-400 shrink-0">Admin</span>
-              <span><strong class="text-cyber-light">/api-test/admin-demo</strong> — Solo <em>platform_admin</em>.</span>
+              <span><strong class="text-cyber-light">/api-test/admin-demo</strong> — <em>platform_admin</em> only.</span>
             </li>
             <li class="flex items-start gap-2">
               <span class="inline-flex px-2 py-0.5 rounded text-xs font-bold bg-orange-500/20 text-orange-400 shrink-0">App admin</span>
-              <span><strong class="text-cyber-light">/api-test/app-admin-only</strong>, <strong class="text-cyber-light">/api-test/logs</strong> — Solo <em>app_admin</em> (rol de la app; <em>platform_admin</em> no da acceso de dominio — ADR-0003).</span>
+              <span><strong class="text-cyber-light">/api-test/app-admin-only</strong>, <strong class="text-cyber-light">/api-test/logs</strong> — <em>app_admin</em> only (app-level role; <em>platform_admin</em> does not grant domain access — ADR-0003).</span>
             </li>
           </ul>
         </div>
 
         <div class="bg-cyber-dark/60 border border-cyber-accent/20 rounded-2xl p-6 sm:p-8 shadow-xl shadow-black/10">
-          <h2 class="text-lg font-semibold text-cyber-accent mb-4">Documentación</h2>
+          <h2 class="text-lg font-semibold text-cyber-accent mb-4">Documentation</h2>
           <p class="text-sm text-cyber-light/70 mb-4">
-            Para más detalles sobre arquitectura, OAuth2 y RBAC, revisa la documentación del proyecto en el repositorio (por ejemplo <code class="px-1.5 py-0.5 rounded bg-cyber-bg/80 text-cyber-accent font-mono text-xs">docs/</code>).
+            For more details on architecture, OAuth2, and RBAC, see the project documentation in the repository (e.g. <code class="px-1.5 py-0.5 rounded bg-cyber-bg/80 text-cyber-accent font-mono text-xs">docs/</code>).
           </p>
           <router-link
             to="/"
@@ -73,7 +73,7 @@
             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
-            Volver al inicio
+            Back to home
           </router-link>
         </div>
       </section>

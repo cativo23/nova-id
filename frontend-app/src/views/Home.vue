@@ -109,18 +109,18 @@
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  Últimas llamadas API
+                  Latest API calls
                 </h2>
                 <router-link
                   to="/logs"
                   class="text-sm font-medium text-cyber-accent hover:text-cyber-accent/90 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-cyber-accent/50 rounded"
                 >
-                  Ver todas →
+                  View all →
                 </router-link>
               </div>
               <div v-if="recentLogsLoading" class="flex items-center gap-2 text-sm text-cyber-light/60 py-4">
                 <span class="inline-block w-4 h-4 border-2 border-cyber-accent/40 border-t-cyber-accent rounded-full animate-spin" aria-hidden="true" />
-                Cargando…
+                Loading…
               </div>
               <ul v-else-if="recentLogs.length > 0" class="space-y-2">
                 <li
@@ -141,7 +141,7 @@
                   </span>
                 </li>
               </ul>
-              <p v-else class="text-sm text-cyber-light/50 py-2">Aún no hay llamadas. Usa el API explorer abajo.</p>
+              <p v-else class="text-sm text-cyber-light/50 py-2">No calls yet. Use the API explorer below.</p>
             </section>
 
             <section class="bg-cyber-dark/60 border border-cyber-accent/20 rounded-2xl p-6 sm:p-8 overflow-hidden shadow-xl shadow-black/10 backdrop-blur-sm animate-fade-in-up" style="animation-delay: 0.1s" aria-labelledby="api-explorer-heading">
