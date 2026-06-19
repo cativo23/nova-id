@@ -8,7 +8,7 @@ Este documento describe la configuración de dominios locales y de producción p
 |----------|-------|------------|
 | Kratos Self-Service UI | `http://auth.local` | `https://auth.cativo.dev` |
 | Admin Dashboard | `http://admin.local` | `https://admin.cativo.dev` |
-| API Gateway (Oathkeeper) | `http://api.local` | `https://api.cativo.dev` |
+| API Gateway (Oathkeeper) | `http://api.local` | `https://id.cativo.dev` |
 
 ## Setup Local
 
@@ -72,7 +72,7 @@ Asegúrate de que estos dominios apunten a tu servidor:
 
 - `auth.cativo.dev` → IP del servidor
 - `admin.cativo.dev` → IP del servidor
-- `api.cativo.dev` → IP del servidor
+- `id.cativo.dev` → IP del servidor
 
 ### 2. Configurar Variables de Entorno
 
@@ -123,7 +123,7 @@ Este script:
 Abre en tu navegador:
 - https://auth.cativo.dev - Kratos Self-Service UI
 - https://admin.cativo.dev - Admin Dashboard
-- https://api.cativo.dev - API Gateway
+- https://id.cativo.dev - API Gateway
 
 ### Ver Logs
 

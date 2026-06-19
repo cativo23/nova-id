@@ -14,7 +14,7 @@ serve:
       allowed_origins:
         - https://auth.cativo.dev
         - https://admin.cativo.dev
-        - https://api.cativo.dev
+        - https://id.cativo.dev
       allowed_methods:
         - POST
         - GET
@@ -38,7 +38,7 @@ serve:
       allowed_origins:
         - https://auth.cativo.dev
         - https://admin.cativo.dev
-        - https://api.cativo.dev
+        - https://id.cativo.dev
       allowed_methods:
         - POST
         - GET
@@ -62,12 +62,12 @@ serve:
 
 urls:
   self:
-    issuer: https://api.cativo.dev
+    issuer: https://id.cativo.dev/
   consent: https://auth.cativo.dev/auth/consent
   login: https://auth.cativo.dev/auth/login
   logout: https://auth.cativo.dev/auth/logout
-  error: https://api.cativo.dev/error
-  post_logout_redirect: https://api.cativo.dev
+  error: https://id.cativo.dev/error
+  post_logout_redirect: https://id.cativo.dev
 
 strategies:
   access_token: jwt

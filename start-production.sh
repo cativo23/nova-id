@@ -35,7 +35,7 @@ echo ""
 
 # Check DNS configuration
 echo -e "${BLUE}📋 Checking DNS configuration...${NC}"
-DOMAINS=("auth.cativo.dev" "admin.cativo.dev" "api.cativo.dev")
+DOMAINS=("auth.cativo.dev" "admin.cativo.dev" "id.cativo.dev")
 echo "Make sure these domains point to this server:"
 for domain in "${DOMAINS[@]}"; do
     echo "  - ${domain}"
@@ -58,7 +58,7 @@ echo ""
 echo -e "${BLUE}📍 Available URLs:${NC}"
 echo "  - Auth UI:     https://auth.cativo.dev"
 echo "  - Admin:       https://admin.cativo.dev"
-echo "  - API Gateway: https://api.cativo.dev"
+echo "  - API Gateway: https://id.cativo.dev"
 echo ""
 echo -e "${BLUE}🔍 View logs:${NC}"
 echo "  docker compose -f docker-compose.production.yml logs -f"
