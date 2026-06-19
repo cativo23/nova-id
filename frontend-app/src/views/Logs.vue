@@ -88,7 +88,7 @@
         class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8"
       >
         <div class="bg-cyber-dark/80 border border-cyber-accent/20 rounded-xl p-6 shadow-lg animate-fade-in-up" style="animation-delay: 0.08s">
-          <h3 class="text-sm font-semibold text-cyber-light/80 mb-4">Por método HTTP</h3>
+          <h3 class="text-sm font-semibold text-cyber-light/80 mb-4">By HTTP method</h3>
           <div class="space-y-3">
             <div
               v-for="item in chartMethodEntries"
@@ -108,7 +108,7 @@
           </div>
         </div>
         <div class="bg-cyber-dark/80 border border-cyber-accent/20 rounded-xl p-6 shadow-lg animate-fade-in-up" style="animation-delay: 0.1s">
-          <h3 class="text-sm font-semibold text-cyber-light/80 mb-4">Por código de estado</h3>
+          <h3 class="text-sm font-semibold text-cyber-light/80 mb-4">By status code</h3>
           <div class="space-y-3">
             <div
               v-for="item in chartStatusEntries"
