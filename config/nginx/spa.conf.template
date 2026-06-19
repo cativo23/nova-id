@@ -1,0 +1,65 @@
+server {
+    listen 80;
+    server_name _;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    gzip on;
+    gzip_types text/css application/javascript application/json image/svg+xml;
+    gzip_min_length 1024;
+
+    # Static assets — long-lived cache with immutable marker.
+    # Matched before the SPA fallback so hashed filenames are cached aggressively.
+    location ~* \.(js|css|woff2?|svg|png|jpg|jpeg|gif|ico)$ {
+        expires 7d;
+        add_header Cache-Control "public, immutable";
+    }
+
+    # Same-origin gateway proxy — keeps cookies first-party, no CORS.
+    #
+    # Only /api/ is proxied. In production, both SPAs set VITE_OATHKEEPER_URL=/api
+    # and VITE_KRATOS_PUBLIC_URL=/api, so all cross-service calls go through
+    # /api/* regardless of the underlying service (Kratos, Hydra, NestJS, Keto).
+    # Oathkeeper's production rules then route /api/(self-service|sessions|schemas)
+    # to Kratos, /api/hydra-* to Hydra, /api/v1/* to the NestJS API, etc.
+    #
+    # /admin/*, /login, /consent and the SPA-owned /auth/* view routes fall
+    # through to index.html — proxying them to Oathkeeper would loop back here.
+    # The one /auth/ exception (self-service/sessions) is handled by the rule
+    # below, which is matched before this prefix because regex locations win.
+    location /api/ {
+        proxy_pass http://oathkeeper:4455;
+        proxy_http_version 1.1;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_pass_request_headers         on;
+    }
+
+    # Kratos self-service links under /auth/ — auth SPA only.
+    #
+    # Production Kratos public base_url is https://auth.cativo.dev/auth/ (see
+    # config/kratos/kratos.production.yml), so verification/recovery email links
+    # and self-service flow/action URLs are emitted under /auth/self-service/...
+    # and /auth/sessions/.... Those must reach Kratos via the gateway, not the
+    # SPA index.html fallback. Rewrite /auth/<rest> -> /api/<rest> so Oathkeeper's
+    # kratos-public rule routes them. The admin SPA never receives these requests
+    # (Kratos links target the auth host), so this rule is inert there — keeping
+    # one shared template is simpler than splitting per-SPA.
+    location ~ ^/auth/(self-service|sessions)/ {
+        rewrite ^/auth/(.*)$ /api/$1 break;
+        proxy_pass http://oathkeeper:4455;
+        proxy_http_version 1.1;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_pass_request_headers         on;
+    }
+
+    # SPA history-mode fallback — must be last.
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
