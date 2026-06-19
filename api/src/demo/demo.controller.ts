@@ -108,13 +108,13 @@ export class DemoController {
     return this.demoService.configureAppAdmin(user, dto);
   }
 
-  @Put(':id')
+  @Put('data/:id')
   @UseGuards(AppUserGuard)
   updateData(@GetUser() user: AuthenticatedUser, @Param('id') id: string, @Body() dto: DemoUpdateDataDto) {
     return this.demoService.updateData(user, id, dto);
   }
 
-  @Delete(':id')
+  @Delete('data/:id')
   @UseGuards(AppUserGuard)
   deleteData(@GetUser() user: AuthenticatedUser, @Param('id') id: string) {
     return this.demoService.deleteData(user, id);

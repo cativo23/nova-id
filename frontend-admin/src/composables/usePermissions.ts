@@ -1,4 +1,4 @@
-// Permissions helper — reads from BFF /api/me/permissions (A1.3+).
+// Permissions helper — reads from BFF /api/v1/me/permissions (A1.3+).
 // Keto is no longer called directly from the frontend; all permission logic
 // is server-side in the BFF (KetoService).
 //
