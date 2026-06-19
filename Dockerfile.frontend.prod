@@ -10,6 +10,31 @@
 # ── Stage 1: build ───────────────────────────────────────────────────────────
 FROM node:22-alpine AS builder
 ARG SPA
+
+# Production VITE_* build args. Values are non-secret (public URLs).
+# Vite bakes import.meta.env.VITE_* at build time, so they must be declared
+# here as ARG+ENV before `pnpm run build`. Passed by docker-compose.production.yml.
+# Same-origin model: each SPA's nginx reverse-proxies /api/* to Oathkeeper,
+# so API base paths use /api (relative) rather than absolute host URLs.
+#
+# -- Shared --
+ARG VITE_OATHKEEPER_URL
+ENV VITE_OATHKEEPER_URL=${VITE_OATHKEEPER_URL}
+
+# -- frontend-auth --
+ARG VITE_ALLOWED_REDIRECT_ORIGINS
+ENV VITE_ALLOWED_REDIRECT_ORIGINS=${VITE_ALLOWED_REDIRECT_ORIGINS}
+ARG VITE_DEFAULT_RETURN_URL
+ENV VITE_DEFAULT_RETURN_URL=${VITE_DEFAULT_RETURN_URL}
+
+# -- frontend-admin --
+ARG VITE_AUTH_UI_URL
+ENV VITE_AUTH_UI_URL=${VITE_AUTH_UI_URL}
+ARG VITE_KRATOS_BROWSER_URL
+ENV VITE_KRATOS_BROWSER_URL=${VITE_KRATOS_BROWSER_URL}
+ARG VITE_ADMIN_URL
+ENV VITE_ADMIN_URL=${VITE_ADMIN_URL}
+
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 

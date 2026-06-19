@@ -335,6 +335,15 @@ services:
       dockerfile: Dockerfile.frontend.prod
       args:
         SPA: frontend-auth
+        # API base — same-origin: nginx proxy_pass /api/* → oathkeeper:4455.
+        # Overrides the useAuth.ts fallback of 'http://localhost:4455'.
+        VITE_OATHKEEPER_URL: /api
+        # Open-redirect allowlist — comma-separated, parsed by safeRedirect.ts.
+        VITE_ALLOWED_REDIRECT_ORIGINS: "https://auth.cativo.dev,https://admin.cativo.dev,https://id.cativo.dev"
+        # Post-login fallback when no return_to / login_challenge is present.
+        # Defaults to 'http://app.ory.localhost' in code — must be prod URL.
+        # frontend-app is not deployed; auth.cativo.dev is the neutral fallback.
+        VITE_DEFAULT_RETURN_URL: "https://auth.cativo.dev"
     # nginx starts by default — no command override needed.
     # No bind-mounts in production — static files are baked into the image.
     networks:
@@ -358,6 +367,20 @@ services:
       dockerfile: Dockerfile.frontend.prod
       args:
         SPA: frontend-admin
+        # API base — same-origin: nginx proxy_pass /api/* → oathkeeper:4455.
+        # Overrides the useAuth.ts fallback of 'http://localhost:4455'.
+        VITE_OATHKEEPER_URL: /api
+        # Auth SPA URL — used for login redirect (Home.vue) and logout URL
+        # normalisation (useAuth.ts getAuthBaseUrl fallback chain).
+        VITE_AUTH_UI_URL: "https://auth.cativo.dev"
+        # Kratos browser (public) base for the auth SPA routes.
+        # Used by getAuthBaseUrl() and recovery link normalisation.
+        VITE_KRATOS_BROWSER_URL: "https://auth.cativo.dev/auth"
+        # Admin SPA URL — used as returnTo for verification email flows.
+        VITE_ADMIN_URL: "https://admin.cativo.dev"
+        # VITE_AUDIT_API_URL intentionally omitted: the API has no public HTTP
+        # audit ingestion endpoint (AuditService is internal). Leaving it unset
+        # triggers the no-op branch in useAuditLog.ts (if (!auditUrl) return).
     networks:
       - apps
       - web
