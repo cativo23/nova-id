@@ -148,6 +148,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # docker-compose.production.yml declares `env_file: [.env.production]` on every
+      # Ory service, and Compose v2 hard-errors when an env_file is missing. That file
+      # is gitignored (real secrets), so it's absent in CI. Build args (VITE_*) are
+      # literal in the compose file and env_file values are NOT used during `build`,
+      # so a placeholder stub from the committed template satisfies the existence check.
+      # env_file stays REQUIRED (not required:false) so production fails loudly on missing secrets.
+      - name: Stub .env.production for build (values irrelevant to build)
+        run: cp .env.production.example .env.production
+
       # Validate the compose file is syntactically valid before attempting the build.
       - name: Validate docker-compose.production.yml
         run: docker compose -f docker-compose.production.yml config >/dev/null
