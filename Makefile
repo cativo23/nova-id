@@ -13,13 +13,13 @@ dev-local: ## Start development with local domains (auth.ory.localhost, etc.) an
 	docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
 
 prod: ## Start production (standalone compose, Traefik; use start-production.sh for full preflight check)
-	docker compose -f docker-compose.production.yml up -d
+	docker compose --env-file .env.production -f docker-compose.production.yml up -d
 
 stop: ## Stop development stack (docker compose down)
 	docker compose down
 
 stop-prod: ## Stop production stack
-	docker compose -f docker-compose.production.yml down
+	docker compose --env-file .env.production -f docker-compose.production.yml down
 
 clean: ## Stop and remove all containers, volumes, and networks (dev stack)
 	docker compose down -v

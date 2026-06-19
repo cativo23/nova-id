@@ -48,9 +48,12 @@ echo ""
 export $(cat .env.production | grep -v '^#' | xargs)
 export ENVIRONMENT=production
 
-# Start services
+# Start services. --env-file makes Compose interpolate ${VAR} in the YAML from
+# .env.production (env_file: only injects into containers, NOT into interpolation;
+# and Compose only auto-reads a file literally named `.env`). Without this, secrets
+# like ${POSTGRES_PASSWORD} resolve to empty and Postgres refuses to initialize.
 echo -e "${BLUE}🐳 Starting Docker Compose services...${NC}"
-docker compose -f docker-compose.production.yml up -d
+docker compose --env-file .env.production -f docker-compose.production.yml up -d --build
 
 echo ""
 echo -e "${GREEN}✅ Nova ID Stack started successfully!${NC}"
@@ -61,8 +64,8 @@ echo "  - Admin:       https://admin.cativo.dev"
 echo "  - API Gateway: https://id.cativo.dev"
 echo ""
 echo -e "${BLUE}🔍 View logs:${NC}"
-echo "  docker compose -f docker-compose.production.yml logs -f"
+echo "  docker compose --env-file .env.production -f docker-compose.production.yml logs -f"
 echo ""
 echo -e "${BLUE}🛑 Stop services:${NC}"
-echo "  docker compose -f docker-compose.production.yml down"
+echo "  docker compose --env-file .env.production -f docker-compose.production.yml down"
 echo ""
