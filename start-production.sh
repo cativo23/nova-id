@@ -35,7 +35,7 @@ echo ""
 
 # Check DNS configuration
 echo -e "${BLUE}📋 Checking DNS configuration...${NC}"
-DOMAINS=("auth.cativo.dev" "admin.cativo.dev" "api.cativo.dev")
+DOMAINS=("auth.cativo.dev" "admin.cativo.dev" "id.cativo.dev")
 echo "Make sure these domains point to this server:"
 for domain in "${DOMAINS[@]}"; do
     echo "  - ${domain}"
@@ -50,7 +50,7 @@ export ENVIRONMENT=production
 
 # Start services
 echo -e "${BLUE}🐳 Starting Docker Compose services...${NC}"
-docker-compose -f docker-compose.yml -f docker-compose.production.yml up -d
+docker compose -f docker-compose.production.yml up -d
 
 echo ""
 echo -e "${GREEN}✅ Nova ID Stack started successfully!${NC}"
@@ -58,11 +58,11 @@ echo ""
 echo -e "${BLUE}📍 Available URLs:${NC}"
 echo "  - Auth UI:     https://auth.cativo.dev"
 echo "  - Admin:       https://admin.cativo.dev"
-echo "  - API Gateway: https://api.cativo.dev"
+echo "  - API Gateway: https://id.cativo.dev"
 echo ""
 echo -e "${BLUE}🔍 View logs:${NC}"
-echo "  docker-compose -f docker-compose.yml -f docker-compose.production.yml logs -f"
+echo "  docker compose -f docker-compose.production.yml logs -f"
 echo ""
 echo -e "${BLUE}🛑 Stop services:${NC}"
-echo "  docker-compose -f docker-compose.yml -f docker-compose.production.yml down"
+echo "  docker compose -f docker-compose.production.yml down"
 echo ""

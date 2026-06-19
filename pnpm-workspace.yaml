@@ -3,10 +3,13 @@ packages:
   - 'frontend-auth'
   - 'frontend-admin'
   - 'frontend-app'
-# pnpm 10+ blocks dependency build scripts by default. esbuild (Vite's bundler)
-# needs its postinstall to fetch/build its native binary — allow only that one.
-onlyBuiltDependencies:
-  - esbuild
+# pnpm 11 blocks dependency build scripts by default. esbuild (Vite's bundler)
+# needs its postinstall to fetch/build its native binary; vue-demi runs a postinstall
+# to set up Vue 2/3 interop. allowBuilds is the pnpm 11 field (onlyBuiltDependencies
+# is a pnpm 10 alias that pnpm 11.0.0 does not recognise).
+allowBuilds:
+  esbuild: true
+  vue-demi: true
 
 # pnpm re-runs `install` before every `pnpm run` script; the native build-script
 # gate (esbuild/vue-demi) makes that precheck exit non-zero even when node_modules

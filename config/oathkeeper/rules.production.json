@@ -6,179 +6,71 @@
       "url": "http://oathkeeper:4456"
     },
     "match": {
-      "url": "<(http|https)://api\\.cativo\\.dev/health/.*>",
+      "url": "<(http|https)://(id\\.cativo\\.dev|auth\\.cativo\\.dev|admin\\.cativo\\.dev|oathkeeper(:[0-9]+)?)/health/.*>",
       "methods": ["GET"]
     },
-    "authenticators": [
-      {
-        "handler": "noop"
-      }
-    ],
-    "authorizer": {
-      "handler": "allow"
-    },
-    "mutators": [
-      {
-        "handler": "noop"
-      }
-    ]
+    "authenticators": [{ "handler": "noop" }],
+    "authorizer": { "handler": "allow" },
+    "mutators": [{ "handler": "noop" }]
   },
   {
     "id": "kratos-public",
     "upstream": {
       "preserve_host": false,
+      "strip_path": "/api",
       "url": "http://kratos:4433"
     },
     "match": {
-      "url": "<(http|https)://(api\\.cativo\\.dev|oathkeeper(:[0-9]+)?)/(self-service|sessions|health|schemas).*>",
+      "url": "<(http|https)://(id\\.cativo\\.dev|auth\\.cativo\\.dev|admin\\.cativo\\.dev|oathkeeper(:[0-9]+)?)/api/(self-service|sessions|schemas).*>",
       "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
     },
-    "authenticators": [
-      {
-        "handler": "noop"
-      }
-    ],
-    "authorizer": {
-      "handler": "allow"
-    },
-    "mutators": [
-      {
-        "handler": "noop"
-      }
-    ]
+    "authenticators": [{ "handler": "noop" }],
+    "authorizer": { "handler": "allow" },
+    "mutators": [{ "handler": "noop" }]
   },
   {
-    "id": "hydra-public",
+    "id": "oauth2-public",
+    "upstream": {
+      "preserve_host": false,
+      "url": "http://hydra:4444"
+    },
+    "match": {
+      "url": "<(http|https)://(id\\.cativo\\.dev|auth\\.cativo\\.dev|admin\\.cativo\\.dev|oathkeeper(:[0-9]+)?)/oauth2/.*>",
+      "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+    },
+    "authenticators": [{ "handler": "noop" }],
+    "authorizer": { "handler": "allow" },
+    "mutators": [{ "handler": "noop" }]
+  },
+  {
+    "id": "hydra-public-proxy",
     "upstream": {
       "preserve_host": false,
       "strip_path": "/hydra-public",
       "url": "http://hydra:4444"
     },
     "match": {
-      "url": "<(http|https)://(api\\.cativo\\.dev|oathkeeper(:[0-9]+)?)/hydra-public/(oauth2|health|version|\\.well-known).*>",
+      "url": "<(http|https)://(id\\.cativo\\.dev|auth\\.cativo\\.dev|admin\\.cativo\\.dev|oathkeeper(:[0-9]+)?)/hydra-public/(oauth2|health|version|\\.well-known).*>",
       "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
     },
-    "authenticators": [
-      {
-        "handler": "noop"
-      }
-    ],
-    "authorizer": {
-      "handler": "allow"
-    },
-    "mutators": [
-      {
-        "handler": "noop"
-      }
-    ]
+    "authenticators": [{ "handler": "noop" }],
+    "authorizer": { "handler": "allow" },
+    "mutators": [{ "handler": "noop" }]
   },
   {
-    "id": "frontend-auth",
+    "id": "hydra-public",
     "upstream": {
       "preserve_host": false,
-      "url": "http://frontend-auth:5173"
+      "strip_path": "/api/hydra-public",
+      "url": "http://hydra:4444"
     },
     "match": {
-      "url": "<(http|https)://(api\\.cativo\\.dev|auth\\.cativo\\.dev)/auth/.*>",
-      "methods": ["GET", "POST", "PUT", "DELETE", "PATCH"]
+      "url": "<(http|https)://(id\\.cativo\\.dev|auth\\.cativo\\.dev|admin\\.cativo\\.dev|oathkeeper(:[0-9]+)?)/api/hydra-public/(oauth2|health|version|\\.well-known).*>",
+      "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
     },
-    "authenticators": [
-      {
-        "handler": "noop"
-      }
-    ],
-    "authorizer": {
-      "handler": "allow"
-    },
-    "mutators": [
-      {
-        "handler": "noop"
-      }
-    ]
-  },
-  {
-    "id": "frontend-admin",
-    "upstream": {
-      "preserve_host": false,
-      "url": "http://frontend-admin:5174"
-    },
-    "match": {
-      "url": "<(http|https)://(api\\.cativo\\.dev|admin\\.cativo\\.dev)/admin/.*>",
-      "methods": ["GET", "POST", "PUT", "DELETE", "PATCH"]
-    },
-    "authenticators": [
-      {
-        "handler": "cookie_session"
-      }
-    ],
-    "authorizer": {
-      "handler": "remote_json",
-      "config": {
-        "remote": "http://keto:4466/relation-tuples/check",
-        "payload": "{\"namespace\":\"Platform\",\"object\":\"nova\",\"relation\":\"administer\",\"subject_id\":\"user:{{ print .Subject }}\"}",
-        "forward_response_headers_to_upstream": ["Content-Type"]
-      }
-    },
-    "mutators": [
-      {
-        "handler": "header",
-        "config": {
-          "headers": {
-            "X-User-ID": "{{ print .Subject }}",
-            "X-User-Email": "{{ print .Extra.identity.traits.email }}",
-            "X-User-Role": "{{ if .Extra.identity.metadata_public }}{{ print .Extra.identity.metadata_public.role }}{{ end }}"
-          }
-        }
-      }
-    ]
-  },
-  {
-    "id": "hydra-login",
-    "upstream": {
-      "preserve_host": false,
-      "url": "http://frontend-auth:5173/auth/login"
-    },
-    "match": {
-      "url": "<(http|https)://api\\.cativo\\.dev/login>",
-      "methods": ["GET", "POST"]
-    },
-    "authenticators": [
-      {
-        "handler": "noop"
-      }
-    ],
-    "authorizer": {
-      "handler": "allow"
-    },
-    "mutators": [
-      {
-        "handler": "noop"
-      }
-    ]
-  },
-  {
-    "id": "hydra-consent",
-    "upstream": {
-      "preserve_host": false,
-      "url": "http://frontend-auth:5173/consent"
-    },
-    "match": {
-      "url": "<(http|https)://api\\.cativo\\.dev/consent>",
-      "methods": ["GET", "POST"]
-    },
-    "authenticators": [
-      {
-        "handler": "cookie_session"
-      }
-    ],
-    "authorizer": {
-      "handler": "allow"
-    },
-    "mutators": [
-      {
-        "handler": "noop"
-      }
-    ]
+    "authenticators": [{ "handler": "noop" }],
+    "authorizer": { "handler": "allow" },
+    "mutators": [{ "handler": "noop" }]
   },
   {
     "id": "public-api",
@@ -188,22 +80,12 @@
       "url": "http://api:8080"
     },
     "match": {
-      "url": "<(http|https)://(api\\.cativo\\.dev|oathkeeper(:[0-9]+)?)/api/(health|public)>",
+      "url": "<(http|https)://(id\\.cativo\\.dev|auth\\.cativo\\.dev|admin\\.cativo\\.dev|oathkeeper(:[0-9]+)?)/api/(health|public)>",
       "methods": ["GET", "OPTIONS"]
     },
-    "authenticators": [
-      {
-        "handler": "noop"
-      }
-    ],
-    "authorizer": {
-      "handler": "allow"
-    },
-    "mutators": [
-      {
-        "handler": "noop"
-      }
-    ]
+    "authenticators": [{ "handler": "noop" }],
+    "authorizer": { "handler": "allow" },
+    "mutators": [{ "handler": "noop" }]
   },
   {
     "id": "api-hydra-accept",
@@ -213,7 +95,7 @@
       "url": "http://api:8080"
     },
     "match": {
-      "url": "<(http|https)://(api\\.cativo\\.dev|oathkeeper(:[0-9]+)?)/api/v1/(hydra-accept-login|hydra-accept-consent)>",
+      "url": "<(http|https)://(id\\.cativo\\.dev|auth\\.cativo\\.dev|admin\\.cativo\\.dev|oathkeeper(:[0-9]+)?)/api/v1/(hydra-accept-login|hydra-accept-consent)>",
       "methods": ["POST", "OPTIONS"]
     },
     "authenticators": [
@@ -227,81 +109,8 @@
         }
       }
     ],
-    "authorizer": {
-      "handler": "allow"
-    },
-    "mutators": [
-      { "handler": "id_token" }
-    ]
-  },
-  {
-    "id": "me-permissions",
-    "upstream": {
-      "preserve_host": true,
-      "strip_path": "/api",
-      "url": "http://api:8080"
-    },
-    "match": {
-      "url": "<(http|https)://(api\\.cativo\\.dev|oathkeeper(:[0-9]+)?)/api/v1/me/permissions(/.*)?>",
-      "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
-    },
-    "authenticators": [
-      {
-        "handler": "cookie_session",
-        "config": {
-          "check_session_url": "http://kratos:4433/sessions/whoami",
-          "preserve_path": true,
-          "extra_from": "@this",
-          "subject_from": "identity.id"
-        }
-      },
-      {
-        "handler": "oauth2_introspection"
-      }
-    ],
-    "authorizer": {
-      "handler": "allow"
-    },
-    "mutators": [
-      { "handler": "id_token" }
-    ]
-  },
-  {
-    "id": "protected-admin",
-    "upstream": {
-      "preserve_host": true,
-      "strip_path": "/api",
-      "url": "http://api:8080"
-    },
-    "match": {
-      "url": "<(http|https)://(api\\.cativo\\.dev|oathkeeper(:[0-9]+)?)/api/v1/admin(?!-)(/.*)?>",
-      "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
-    },
-    "authenticators": [
-      {
-        "handler": "cookie_session",
-        "config": {
-          "check_session_url": "http://kratos:4433/sessions/whoami",
-          "preserve_path": true,
-          "extra_from": "@this",
-          "subject_from": "identity.id"
-        }
-      },
-      {
-        "handler": "oauth2_introspection"
-      }
-    ],
-    "authorizer": {
-      "handler": "remote_json",
-      "config": {
-        "remote": "http://keto:4466/relation-tuples/check",
-        "payload": "{\"namespace\":\"Platform\",\"object\":\"nova\",\"relation\":\"administer\",\"subject_id\":\"user:{{ print .Subject }}\"}",
-        "forward_response_headers_to_upstream": ["Content-Type"]
-      }
-    },
-    "mutators": [
-      { "handler": "id_token" }
-    ]
+    "authorizer": { "handler": "allow" },
+    "mutators": [{ "handler": "id_token" }]
   },
   {
     "id": "api-roles-bootstrap",
@@ -311,7 +120,7 @@
       "url": "http://api:8080"
     },
     "match": {
-      "url": "<(http|https)://(api\\.cativo\\.dev|oathkeeper(:[0-9]+)?)/api/roles/bootstrap(/.*)?$>",
+      "url": "<(http|https)://(id\\.cativo\\.dev|auth\\.cativo\\.dev|admin\\.cativo\\.dev|oathkeeper(:[0-9]+)?)/api/roles/bootstrap(/.*)?$>",
       "methods": ["POST", "OPTIONS"]
     },
     "authenticators": [
@@ -324,9 +133,7 @@
           "subject_from": "identity.id"
         }
       },
-      {
-        "handler": "oauth2_introspection"
-      }
+      { "handler": "oauth2_introspection" }
     ],
     "authorizer": {
       "handler": "remote_json",
@@ -336,24 +143,79 @@
         "forward_response_headers_to_upstream": ["Content-Type"]
       }
     },
-    "mutators": [ { "handler": "id_token" } ]
+    "mutators": [{ "handler": "id_token" }]
+  },
+  {
+    "id": "me-permissions",
+    "upstream": {
+      "preserve_host": true,
+      "strip_path": "/api",
+      "url": "http://api:8080"
+    },
+    "match": {
+      "url": "<(http|https)://(id\\.cativo\\.dev|auth\\.cativo\\.dev|admin\\.cativo\\.dev|oathkeeper(:[0-9]+)?)/api/v1/me/permissions(/.*)?>",
+      "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
+    },
+    "authenticators": [
+      {
+        "handler": "cookie_session",
+        "config": {
+          "check_session_url": "http://kratos:4433/sessions/whoami",
+          "preserve_path": true,
+          "extra_from": "@this",
+          "subject_from": "identity.id"
+        }
+      },
+      { "handler": "oauth2_introspection" }
+    ],
+    "authorizer": { "handler": "allow" },
+    "mutators": [{ "handler": "id_token" }]
+  },
+  {
+    "id": "protected-admin",
+    "upstream": {
+      "preserve_host": true,
+      "strip_path": "/api",
+      "url": "http://api:8080"
+    },
+    "match": {
+      "url": "<(http|https)://(id\\.cativo\\.dev|auth\\.cativo\\.dev|admin\\.cativo\\.dev|oathkeeper(:[0-9]+)?)/api/v1/admin(?!-)(/.*)?>",
+      "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
+    },
+    "authenticators": [
+      {
+        "handler": "cookie_session",
+        "config": {
+          "check_session_url": "http://kratos:4433/sessions/whoami",
+          "preserve_path": true,
+          "extra_from": "@this",
+          "subject_from": "identity.id"
+        }
+      },
+      { "handler": "oauth2_introspection" }
+    ],
+    "authorizer": {
+      "handler": "remote_json",
+      "config": {
+        "remote": "http://keto:4466/relation-tuples/check",
+        "payload": "{\"namespace\":\"Platform\",\"object\":\"nova\",\"relation\":\"administer\",\"subject_id\":\"user:{{ print .Subject }}\"}",
+        "forward_response_headers_to_upstream": ["Content-Type"]
+      }
+    },
+    "mutators": [{ "handler": "id_token" }]
   },
   {
     "id": "keto-read",
     "upstream": {
       "preserve_host": false,
-      "strip_path": "/keto/read",
+      "strip_path": "/api/keto/read",
       "url": "http://keto:4466"
     },
     "match": {
-      "url": "<(http|https)://(api\\.cativo\\.dev|oathkeeper(:[0-9]+)?)/keto/read/.*>",
+      "url": "<(http|https)://(id\\.cativo\\.dev|auth\\.cativo\\.dev|admin\\.cativo\\.dev|oathkeeper(:[0-9]+)?)/api/keto/read/.*>",
       "methods": ["GET", "POST"]
     },
-    "authenticators": [
-      {
-        "handler": "cookie_session"
-      }
-    ],
+    "authenticators": [{ "handler": "cookie_session" }],
     "authorizer": {
       "handler": "remote_json",
       "config": {

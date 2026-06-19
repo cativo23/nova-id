@@ -10,7 +10,7 @@ serve:
       allowed_origins:
         - https://auth.cativo.dev
         - https://admin.cativo.dev
-        - https://api.cativo.dev
+        - https://id.cativo.dev
       allowed_methods:
         - POST
         - GET
@@ -118,7 +118,7 @@ mutators:
   id_token:
     enabled: true
     config:
-      issuer_url: https://api.cativo.dev/
+      issuer_url: https://id.cativo.dev/
       jwks_url: file:///etc/config/oathkeeper/id_token.jwks.json
       claims: |
         {
