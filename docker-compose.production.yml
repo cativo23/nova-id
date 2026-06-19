@@ -1,66 +1,402 @@
-# Docker Compose override for production
-# Usage: docker-compose -f docker-compose.yml -f docker-compose.production.yml up
-# IMPORTANT: Connects to existing Traefik network (space-server_web)
-
-version: '3.8'
+# Self-contained production Compose file for Nova ID.
+#
+# Usage: docker compose -f docker-compose.production.yml up -d
+#
+# This file is intentionally NOT an override of docker-compose.yml.
+# Docker Compose list merging (volumes, ports, depends_on) makes a thin override
+# unable to shed the dev bind-mount `./api:/app`, which would shadow the built
+# /app/dist in the prod API image and break `node dist/main`. Standalone avoids
+# that class of bug entirely.
+#
+# Dev stack (make dev / make dev-local) continues to use docker-compose.yml
+# and docker-compose.local.yml — this file is production-only.
+#
+# Networks use distinct names from the dev stack so both can coexist on the same
+# host (useful for canary deploys or side-by-side testing):
+#   dev:  nova-id-ory-internal  /  nova-id-apps
+#   prod: nova-id-ory-internal-prod  /  nova-id-apps-prod
+#
+# api_logs is kept as a named volume for persistent log retention across container
+# restarts. The source bind-mount (./api:/app) and the anonymous /app/node_modules
+# volume from the dev service are NOT present here.
 
 services:
+
+  # ── Database ─────────────────────────────────────────────────────────────────
+
   postgres:
-    ports: []  # No exposed ports in production
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./config/init-sql/create-dbs.sql:/docker-entrypoint-initdb.d/create-dbs.sql:ro
+    # No published ports in production — DB is reachable only on ory-internal.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ory-internal
+    restart: unless-stopped
+
+  postgres-init:
+    image: postgres:15-alpine
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      ORY_PASSWORD: ${ORY_PASSWORD}
+      KRATOS_DB_PASSWORD: ${KRATOS_DB_PASSWORD}
+      HYDRA_DB_PASSWORD: ${HYDRA_DB_PASSWORD}
+      KETO_DB_PASSWORD: ${KETO_DB_PASSWORD}
+    command: >
+      sh -c "
+        until pg_isready -h postgres -U postgres; do sleep 1; done &&
+        bash /docker-entrypoint-initdb.d/create-users.sh
+      "
+    volumes:
+      - ./config/init-sql/create-users.sh:/docker-entrypoint-initdb.d/create-users.sh:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ory-internal
+    restart: "no"
+
+  # ── Kratos ───────────────────────────────────────────────────────────────────
+
+  kratos-migrate:
+    image: oryd/kratos:v25.4.0
+    environment:
+      # Ory path-mapped env vars: dots→underscores, uppercase. KRATOS_ prefix is
+      # NOT recognized — the correct names are SECRETS_*, DSN, etc.
+      - DSN=postgres://kratos_user:${KRATOS_DB_PASSWORD}@postgres:5432/kratos?sslmode=disable&max_conns=20&max_idle_conns=4
+      - SECRETS_COOKIE=${KRATOS_SECRETS_COOKIE}
+      - SECRETS_CIPHER=${KRATOS_SECRETS_CIPHER}
+      - SECRETS_DEFAULT=${KRATOS_SECRETS_DEFAULT}
+    # Config hardcoded to production — no ${ENVIRONMENT} variable substitution.
+    command: -c /etc/config/kratos/kratos.production.yml migrate sql -e --yes
+    volumes:
+      - ./config/kratos:/etc/config/kratos:ro
+    env_file:
+      - .env.production
+    depends_on:
+      postgres-init:
+        condition: service_completed_successfully
+    networks:
+      - ory-internal
+    restart: "no"
 
   kratos:
-    ports: []  # No exposed ports - only accessible through Oathkeeper
+    image: oryd/kratos:v25.4.0
+    environment:
+      # Ory path-mapped env vars: dots→underscores, uppercase. KRATOS_ prefix is
+      # NOT recognized — the correct names are SECRETS_*, DSN, COURIER_SMTP_*, etc.
+      - DSN=postgres://kratos_user:${KRATOS_DB_PASSWORD}@postgres:5432/kratos?sslmode=disable&max_conns=20&max_idle_conns=4
+      - SECRETS_COOKIE=${KRATOS_SECRETS_COOKIE}
+      - SECRETS_CIPHER=${KRATOS_SECRETS_CIPHER}
+      - SECRETS_DEFAULT=${KRATOS_SECRETS_DEFAULT}
+      - COURIER_SMTP_CONNECTION_URI=${SMTP_CONNECTION_URI}
+      - COURIER_SMTP_FROM_ADDRESS=${SMTP_FROM_ADDRESS}
+    # --watch-courier runs the mail courier worker for recovery/verification emails.
+    # --dev flag is intentionally absent in production.
+    command: serve -c /etc/config/kratos/kratos.production.yml --watch-courier
+    volumes:
+      - ./config/kratos:/etc/config/kratos:ro
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:4433/health/ready",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    env_file:
+      - .env.production
+    networks:
+      - ory-internal
+    depends_on:
+      kratos-migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  # ── Hydra ────────────────────────────────────────────────────────────────────
+
+  hydra-migrate:
+    image: oryd/hydra:v25.4.0
+    environment:
+      - DSN=postgres://hydra_user:${HYDRA_DB_PASSWORD}@postgres:5432/hydra?sslmode=disable&max_conns=20&max_idle_conns=4
+      - HYDRA_DB_PASSWORD=${HYDRA_DB_PASSWORD}
+      # Ory path-mapped env var: secrets.system ← SECRETS_SYSTEM. The HYDRA_ prefix is
+      # NOT recognized and Ory does NOT expand ${VAR} in YAML.
+      - SECRETS_SYSTEM=${HYDRA_SYSTEM_SECRET}
+    # Config hardcoded to production — no --dev flag.
+    command: migrate sql -e --yes -c /etc/config/hydra/hydra.production.yml
+    volumes:
+      - ./config/hydra:/etc/config/hydra:ro
+    env_file:
+      - .env.production
+    depends_on:
+      postgres-init:
+        condition: service_completed_successfully
+    networks:
+      - ory-internal
+    restart: "no"
 
   hydra:
-    ports: []  # No exposed ports - only accessible through Oathkeeper
+    image: oryd/hydra:v25.4.0
+    environment:
+      - DSN=postgres://hydra_user:${HYDRA_DB_PASSWORD}@postgres:5432/hydra?sslmode=disable&max_conns=20&max_idle_conns=4
+      - HYDRA_DB_PASSWORD=${HYDRA_DB_PASSWORD}
+      # Ory path-mapped env var: secrets.system ← SECRETS_SYSTEM.
+      - SECRETS_SYSTEM=${HYDRA_SYSTEM_SECRET}
+    # No --dev flag in production.
+    command: serve all -c /etc/config/hydra/hydra.production.yml
+    volumes:
+      - ./config/hydra:/etc/config/hydra:ro
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:4444/health/ready",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    env_file:
+      - .env.production
+    networks:
+      - ory-internal
+    depends_on:
+      hydra-migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  # ── Keto ─────────────────────────────────────────────────────────────────────
+
+  keto-migrate:
+    image: oryd/keto:v25.4.0
+    environment:
+      - DSN=postgres://keto_user:${KETO_DB_PASSWORD}@postgres:5432/keto?sslmode=disable&max_conns=20&max_idle_conns=4
+      - KETO_DB_PASSWORD=${KETO_DB_PASSWORD}
+    # Config hardcoded to production.
+    command: migrate up -c /etc/config/keto/keto.production.yml --yes
+    volumes:
+      - ./config/keto:/etc/config/keto:ro
+    env_file:
+      - .env.production
+    depends_on:
+      postgres-init:
+        condition: service_completed_successfully
+    networks:
+      - ory-internal
+    restart: "no"
 
   keto:
-    ports: []  # No exposed ports - only accessible through Oathkeeper
+    image: oryd/keto:v25.4.0
+    environment:
+      - DSN=postgres://keto_user:${KETO_DB_PASSWORD}@postgres:5432/keto?sslmode=disable&max_conns=20&max_idle_conns=4
+      - KETO_DB_PASSWORD=${KETO_DB_PASSWORD}
+    # Config hardcoded to production.
+    command: serve -c /etc/config/keto/keto.production.yml
+    volumes:
+      - ./config/keto:/etc/config/keto:ro
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:4466/health/ready",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    env_file:
+      - .env.production
+    networks:
+      - ory-internal
+    depends_on:
+      keto-migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  # ── Oathkeeper (gateway / PEP) ────────────────────────────────────────────────
+  # Oathkeeper is the single public entry point. Traefik routes id.cativo.dev to
+  # port 4455. It sits on ory-internal (to reach Kratos/Keto/Hydra) and apps (to
+  # proxy to the API) and web (for Traefik to discover it).
+
+  oathkeeper:
+    image: oryd/oathkeeper:v25.4.0
+    # Config hardcoded to production.
+    command: serve -c /etc/config/oathkeeper/oathkeeper.production.yml
+    volumes:
+      - ./config/oathkeeper:/etc/config/oathkeeper:ro
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:4456/health/ready",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    env_file:
+      - .env.production
+    networks:
+      - ory-internal
+      - apps
+      - web
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=space-server_web"
+      - "traefik.http.routers.oathkeeper.rule=Host(`id.cativo.dev`)"
+      - "traefik.http.routers.oathkeeper.entrypoints=websecure"
+      - "traefik.http.routers.oathkeeper.tls.certresolver=letsencryptresolver"
+      - "traefik.http.services.oathkeeper.loadbalancer.server.port=4455"
+    depends_on:
+      kratos:
+        condition: service_healthy
+      keto:
+        condition: service_healthy
+      hydra:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── NestJS API ────────────────────────────────────────────────────────────────
+  # Built from the production multi-stage Dockerfile (api/Dockerfile).
+  # ZERO TRUST: no published ports — reachable only via Oathkeeper on the apps
+  # and ory-internal networks.
 
   api:
-    ports: []  # No exposed ports - only reachable via Oathkeeper
-
-  frontend-auth:
-    ports: []  # No exposed ports - Traefik handles routing
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    command: ["node", "dist/main"]
+    # No source bind-mount. No anonymous /app/node_modules.
+    # api_logs provides persistent log retention across restarts.
+    volumes:
+      - api_logs:/app/logs
+    env_file:
+      - .env.production
+    environment:
+      - NODE_ENV=production
+      - PORT=8080
+      - OATHKEEPER_URL=http://oathkeeper:4455
+      - HYDRA_ADMIN_URL=http://hydra:4445
+      - KRATOS_ADMIN_URL=http://kratos:4434
+      - KETO_READ_URL=http://keto:4466
+      - AUDIT_DB_HOST=postgres
+      - AUDIT_DB_PORT=5432
+      - AUDIT_DB_NAME=nova_audit
+      - AUDIT_DB_USER=postgres
+      - AUDIT_DB_PASSWORD=${POSTGRES_PASSWORD}
     networks:
       - apps
-      - web  # Traefik network
+      - ory-internal
+    depends_on:
+      oathkeeper:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── Frontend SPAs (nginx) ─────────────────────────────────────────────────────
+  # Each SPA is a pre-built nginx:alpine image produced by Dockerfile.frontend.prod.
+  # They serve static assets on port 80; Traefik terminates TLS externally.
+  #
+  # Network reasoning: frontends need `web` so Traefik can discover them. They
+  # also need `apps` so their nginx proxy_pass rules can reach oathkeeper:4455
+  # (oathkeeper is on both ory-internal and apps; frontends are not on ory-internal
+  # — they must never reach Ory services directly). The `ory-internal` network is
+  # intentionally omitted from frontends to preserve the zero-trust boundary.
+
+  frontend-auth:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend.prod
+      args:
+        SPA: frontend-auth
+    # nginx starts by default — no command override needed.
+    # No bind-mounts in production — static files are baked into the image.
+    networks:
+      - apps
+      - web
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=space-server_web"
       - "traefik.http.routers.frontend-auth.rule=Host(`auth.cativo.dev`)"
       - "traefik.http.routers.frontend-auth.entrypoints=websecure"
-      - "traefik.http.routers.frontend-auth.tls.certresolver=letsencrypt"
-      - "traefik.http.services.frontend-auth.loadbalancer.server.port=5173"
+      - "traefik.http.routers.frontend-auth.tls.certresolver=letsencryptresolver"
+      - "traefik.http.services.frontend-auth.loadbalancer.server.port=80"
+    depends_on:
+      oathkeeper:
+        condition: service_healthy
+    restart: unless-stopped
 
   frontend-admin:
-    ports: []  # No exposed ports - Traefik handles routing
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend.prod
+      args:
+        SPA: frontend-admin
     networks:
       - apps
-      - web  # Traefik network
+      - web
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=space-server_web"
       - "traefik.http.routers.frontend-admin.rule=Host(`admin.cativo.dev`)"
       - "traefik.http.routers.frontend-admin.entrypoints=websecure"
-      - "traefik.http.routers.frontend-admin.tls.certresolver=letsencrypt"
-      - "traefik.http.services.frontend-admin.loadbalancer.server.port=5174"
+      - "traefik.http.routers.frontend-admin.tls.certresolver=letsencryptresolver"
+      - "traefik.http.services.frontend-admin.loadbalancer.server.port=80"
+    depends_on:
+      oathkeeper:
+        condition: service_healthy
+    restart: unless-stopped
 
-  oathkeeper:
-    ports: []  # No exposed ports - Traefik handles routing
-    networks:
-      - ory-internal
-      - apps
-      - web  # Traefik network
-    labels:
-      - "traefik.enable=true"
-      - "traefik.docker.network=space-server_web"
-      - "traefik.http.routers.oathkeeper.rule=Host(`api.cativo.dev`)"
-      - "traefik.http.routers.oathkeeper.entrypoints=websecure"
-      - "traefik.http.routers.oathkeeper.tls.certresolver=letsencrypt"
-      - "traefik.http.services.oathkeeper.loadbalancer.server.port=4455"
+# ── Volumes ───────────────────────────────────────────────────────────────────
+
+volumes:
+  postgres_data:
+    driver: local
+  api_logs:
+    driver: local
+
+# ── Networks ──────────────────────────────────────────────────────────────────
+#
+# Distinct names from the dev stack (nova-id-ory-internal / nova-id-apps) so
+# both stacks can coexist on the same host without network collisions:
+#   dev:  nova-id-ory-internal  /  nova-id-apps
+#   prod: nova-id-ory-internal-prod  /  nova-id-apps-prod
 
 networks:
+  ory-internal:
+    driver: bridge
+    name: nova-id-ory-internal-prod
+
+  apps:
+    driver: bridge
+    name: nova-id-apps-prod
+
   web:
     external: true
     name: space-server_web

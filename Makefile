@@ -12,14 +12,14 @@ dev: ## Start development (base stack, ports 5173/5174/5175, etc.)
 dev-local: ## Start development with local domains (auth.ory.localhost, etc.) and local-proxy on port 80
 	docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
 
-prod: ## Start production (base + production override, Traefik; use start-production.sh for full check)
-	docker compose -f docker-compose.yml -f docker-compose.production.yml up -d
+prod: ## Start production (standalone compose, Traefik; use start-production.sh for full preflight check)
+	docker compose -f docker-compose.production.yml up -d
 
 stop: ## Stop development stack (docker compose down)
 	docker compose down
 
 stop-prod: ## Stop production stack
-	docker compose -f docker-compose.yml -f docker-compose.production.yml down
+	docker compose -f docker-compose.production.yml down
 
 clean: ## Stop and remove all containers, volumes, and networks (dev stack)
 	docker compose down -v

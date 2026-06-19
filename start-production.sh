@@ -50,7 +50,7 @@ export ENVIRONMENT=production
 
 # Start services
 echo -e "${BLUE}🐳 Starting Docker Compose services...${NC}"
-docker-compose -f docker-compose.yml -f docker-compose.production.yml up -d
+docker compose -f docker-compose.production.yml up -d
 
 echo ""
 echo -e "${GREEN}✅ Nova ID Stack started successfully!${NC}"
@@ -61,8 +61,8 @@ echo "  - Admin:       https://admin.cativo.dev"
 echo "  - API Gateway: https://api.cativo.dev"
 echo ""
 echo -e "${BLUE}🔍 View logs:${NC}"
-echo "  docker-compose -f docker-compose.yml -f docker-compose.production.yml logs -f"
+echo "  docker compose -f docker-compose.production.yml logs -f"
 echo ""
 echo -e "${BLUE}🛑 Stop services:${NC}"
-echo "  docker-compose -f docker-compose.yml -f docker-compose.production.yml down"
+echo "  docker compose -f docker-compose.production.yml down"
 echo ""
