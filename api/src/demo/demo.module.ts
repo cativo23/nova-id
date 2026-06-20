@@ -6,7 +6,6 @@ import { DemoController } from './demo.controller';
 import { DemoService } from './demo.service';
 import { UserRole } from './roles/entities/user-role.entity';
 import { DemoMembershipAudit } from './audit/demo-membership-audit.entity';
-import { DemoAuditService } from './audit/demo-audit.service';
 import { LoggingInterceptor } from './logging.interceptor';
 import { InitDemoSchema1750100000000 } from './migrations/1750100000000-InitDemoSchema';
 
@@ -37,18 +36,20 @@ import { InitDemoSchema1750100000000 } from './migrations/1750100000000-InitDemo
       synchronize: false,
       migrationsRun: true,
     }),
-    TypeOrmModule.forFeature([DemoMembershipAudit], 'demo'),
+    // RolesModule provides+exports DemoAuditService (with its own forFeature).
+    // No duplicate forFeature([DemoMembershipAudit]) needed here.
     RolesModule,
     LogsModule,
   ],
   controllers: [DemoController],
   providers: [
     DemoService,
-    DemoAuditService,
     // LoggingInterceptor registered here so @UseInterceptors(LoggingInterceptor)
     // on DemoController resolves via DI (LogsService is provided by LogsModule above).
     LoggingInterceptor,
   ],
-  exports: [RolesModule, LogsModule, DemoAuditService],
+  // DemoAuditService is provided+exported by RolesModule (imported above).
+  // Re-exporting RolesModule exposes DemoAuditService to any module that imports DemoModule.
+  exports: [RolesModule, LogsModule],
 })
 export class DemoModule {}

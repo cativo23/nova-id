@@ -22,6 +22,12 @@ import { LogsService } from '../logs/logs.service';
     // LoggingInterceptor + LogsService are registered here (not imported via LogsModule
     // to avoid a circular dependency: LogsModule → RolesModule → LogsModule).
     // LogsService has no injected dependencies, so it resolves cleanly here.
+    //
+    // FRAGILE: LogsService is registered directly (not via LogsModule) as a
+    // circular-dependency workaround. If LogsService ever gains a NestJS-injected
+    // constructor dependency, this duplicate-provider shortcut will break at boot
+    // (the dependency won't be resolvable in RolesModule's DI scope). At that point,
+    // extract a shared LogsSharedModule or use forwardRef() instead of this pattern.
     LogsService,
     LoggingInterceptor,
   ],
