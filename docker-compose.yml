@@ -273,8 +273,38 @@ services:
       - AUDIT_DB_NAME=nova_audit
       - AUDIT_DB_USER=postgres
       - AUDIT_DB_PASSWORD=${POSTGRES_PASSWORD}
-      # Demo app Postgres connection (demo_app DB — decoupled from IdP internals).
-      # demo_user is a least-privilege role with no access to IdP databases.
+    networks:
+      - apps
+      - ory-internal
+    depends_on:
+      - oathkeeper
+      - postgres
+    restart: unless-stopped
+
+  # ── Demo Relying-Party Backend ─────────────────────────────────────────────
+  # Standalone NestJS service that owns demo_app Postgres and serves the
+  # /api-test/* resource endpoints. Reachable ONLY via Oathkeeper — no
+  # published ports, no ory-internal network access.
+  demo-api:
+    build:
+      context: ./demo-api
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./demo-api:/app
+      - /app/node_modules
+      - demo_api_logs:/app/logs
+    command: sh -c "npm install && npm run start:dev"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=development
+      - PORT=8080
+      # JWKS endpoint — Oathkeeper decision API, reachable on the apps network.
+      - JWKS_URL=http://oathkeeper:4456/.well-known/jwks.json
+      # Issuer must match oathkeeper id_token mutator issuer_url.
+      - OAUTH_ISSUER=https://id.cativo.dev/
+      # Demo Postgres connection (demo_app DB, demo_user least-privilege).
+      # demo_user has no access to IdP databases (kratos/hydra/keto/nova_audit).
       - DEMO_DB_HOST=postgres
       - DEMO_DB_PORT=5432
       - DEMO_DB_NAME=demo_app
@@ -282,10 +312,11 @@ services:
       - DEMO_DB_PASSWORD=${DEMO_DB_PASSWORD}
     networks:
       - apps
-      - ory-internal
     depends_on:
-      - oathkeeper
-      - postgres
+      oathkeeper:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
 
   oathkeeper:
@@ -440,6 +471,8 @@ volumes:
   postgres_data:
     driver: local
   api_logs:
+    driver: local
+  demo_api_logs:
     driver: local
   # pnpm-workspace node_modules: one shared root volume + per-SPA volumes.
   # These mask the host's old npm node_modules so pnpm's symlink farm stays clean.

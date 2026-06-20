@@ -310,8 +310,40 @@ services:
       - AUDIT_DB_NAME=nova_audit
       - AUDIT_DB_USER=postgres
       - AUDIT_DB_PASSWORD=${POSTGRES_PASSWORD}
-      # Demo app Postgres connection (demo_app DB — decoupled from IdP internals).
-      # demo_user is a least-privilege role with no access to IdP databases.
+    networks:
+      - apps
+      - ory-internal
+    depends_on:
+      oathkeeper:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── Demo Relying-Party Backend ────────────────────────────────────────────────
+  # Standalone NestJS service that owns demo_app Postgres and serves the
+  # /api-test/* resource endpoints. Reachable ONLY via Oathkeeper — no
+  # published ports, no ory-internal network access.
+
+  demo-api:
+    build:
+      context: ./demo-api
+      dockerfile: Dockerfile
+    command: ["node", "dist/main"]
+    volumes:
+      - demo_api_logs:/app/logs
+    env_file:
+      - .env.production
+    environment:
+      - NODE_ENV=production
+      - PORT=8080
+      # JWKS endpoint — Oathkeeper decision API, reachable on the apps network.
+      # Oathkeeper is on both ory-internal and apps; demo-api is apps-only.
+      - JWKS_URL=http://oathkeeper:4456/.well-known/jwks.json
+      # Issuer must match oathkeeper id_token mutator issuer_url (production).
+      - OAUTH_ISSUER=https://id.cativo.dev/
+      # Demo Postgres connection (demo_app DB, demo_user least-privilege).
+      # demo_user has no access to IdP databases (kratos/hydra/keto/nova_audit).
       - DEMO_DB_HOST=postgres
       - DEMO_DB_PORT=5432
       - DEMO_DB_NAME=demo_app
@@ -319,7 +351,6 @@ services:
       - DEMO_DB_PASSWORD=${DEMO_DB_PASSWORD}
     networks:
       - apps
-      - ory-internal
     depends_on:
       oathkeeper:
         condition: service_healthy
@@ -447,6 +478,8 @@ volumes:
   postgres_data:
     driver: local
   api_logs:
+    driver: local
+  demo_api_logs:
     driver: local
 
 # ── Networks ──────────────────────────────────────────────────────────────────
