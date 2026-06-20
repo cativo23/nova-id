@@ -11,11 +11,12 @@ node_modules/
 dist/
 build/
 
-# Logs (runtime directories only — source under api/src/ is never ignored)
+# Logs (runtime directories only — source under api/src/ and demo-api/src/ is never ignored)
 *.log
 logs/
 *.log.*
 !api/src/**
+!demo-api/src/**
 
 # Docker
 .docker/
