@@ -87,8 +87,8 @@ jobs:
       AUDIT_DB_NAME: nova_audit
       DEMO_DB_HOST: localhost
       DEMO_DB_PORT: "5432"
-      DEMO_DB_USER: postgres
-      DEMO_DB_PASSWORD: postgres
+      DEMO_DB_USER: demo_user
+      DEMO_DB_PASSWORD: ci_demo_password
       DEMO_DB_NAME: demo_app
       # openapi:verify boots the full AppModule. OryModule's providers resolve these
       # via ConfigService.getOrThrow at boot (api/src/ory/ory.module.ts), so they must
@@ -120,9 +120,18 @@ jobs:
         run: npm ci
 
       # demo_app DB is not the Postgres service's POSTGRES_DB default (nova_audit).
-      # Create it explicitly so DemoModule migrations can run on boot (migrationsRun:true).
-      - name: Create demo_app database
-        run: psql -h localhost -U postgres -c "CREATE DATABASE demo_app;"
+      # Create it and provision demo_user (least-privilege role) so DemoModule
+      # migrations run as demo_user — verifying the grants are sufficient.
+      - name: Create demo_app database and demo_user role
+        run: |
+          psql -h localhost -U postgres -c "CREATE DATABASE demo_app;"
+          psql -h localhost -U postgres -c "CREATE USER demo_user WITH PASSWORD 'ci_demo_password';"
+          psql -h localhost -U postgres -c "GRANT CONNECT ON DATABASE demo_app TO demo_user;"
+          psql -h localhost -U postgres -d demo_app -c "GRANT USAGE, CREATE ON SCHEMA public TO demo_user;"
+          psql -h localhost -U postgres -d demo_app -c "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO demo_user;"
+          psql -h localhost -U postgres -d demo_app -c "GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO demo_user;"
+          psql -h localhost -U postgres -d demo_app -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO demo_user;"
+          psql -h localhost -U postgres -d demo_app -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO demo_user;"
         env:
           PGPASSWORD: postgres
 
