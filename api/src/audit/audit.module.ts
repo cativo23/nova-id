@@ -9,8 +9,8 @@ import { CreateAuditLogs1781750293893 } from './migrations/1781750293893-CreateA
  * the nova_audit Postgres database.
  *
  * Naming this connection 'audit' is critical: it prevents TypeORM from
- * treating it as the default connection and avoids conflicts with the
- * existing SQLite 'default' connection registered by DemoModule.
+ * treating it as the unnamed 'default' connection and avoids conflicts with the
+ * named 'demo' Postgres connection registered by DemoModule.
  *
  * Schema management: migrations only, in ALL environments.
  * - synchronize: false — never auto-mutate the schema. Use `npm run migration:generate`

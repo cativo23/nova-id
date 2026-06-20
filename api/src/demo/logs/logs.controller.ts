@@ -4,7 +4,7 @@ import { AppAdminGuard } from '../guards/app-admin.guard';
 
 /**
  * Access gate: AppAdminGuard (class-level) enforces that the caller
- * has app role app_admin in SQLite (ADR-0002 / ADR-0003, strict layering).
+ * has app role app_admin in demo_app Postgres (ADR-0002 / ADR-0003, strict layering).
  * platform_admin does NOT grant access — only SQLite app_admin does.
  *
  * The global AuthenticatedGuard (registered as APP_GUARD in AppModule)
