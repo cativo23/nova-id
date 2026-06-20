@@ -15,6 +15,7 @@ serve:
         - https://auth.cativo.dev
         - https://admin.cativo.dev
         - https://id.cativo.dev
+        - https://app.cativo.dev
       allowed_methods:
         - POST
         - GET

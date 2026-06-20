@@ -1,9 +1,10 @@
 # syntax=docker/dockerfile:1
-# Production multi-stage image for Nova ID SPAs (frontend-auth, frontend-admin).
+# Production multi-stage image for Nova ID SPAs (frontend-auth, frontend-admin, frontend-app).
 #
 # Build with:
 #   docker build -f Dockerfile.frontend.prod --build-arg SPA=frontend-auth -t nova-fe-auth:latest .
 #   docker build -f Dockerfile.frontend.prod --build-arg SPA=frontend-admin -t nova-fe-admin:latest .
+#   docker build -f Dockerfile.frontend.prod --build-arg SPA=frontend-app -t nova-fe-app:latest .
 #
 # Build context must be the repo root (pnpm workspace root).
 
@@ -34,6 +35,12 @@ ARG VITE_KRATOS_BROWSER_URL
 ENV VITE_KRATOS_BROWSER_URL=${VITE_KRATOS_BROWSER_URL}
 ARG VITE_ADMIN_URL
 ENV VITE_ADMIN_URL=${VITE_ADMIN_URL}
+
+# -- frontend-app (demo relying-party) --
+ARG VITE_APP_URL
+ENV VITE_APP_URL=${VITE_APP_URL}
+ARG VITE_NOVA_ID_CLIENT_ID
+ENV VITE_NOVA_ID_CLIENT_ID=${VITE_NOVA_ID_CLIENT_ID}
 
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"

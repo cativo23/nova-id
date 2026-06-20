@@ -396,6 +396,43 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # Demo relying-party — the living proof of the IdP. A full OAuth2/OIDC client
+  # (public + PKCE) that runs "Login with Nova ID" against id.cativo.dev and calls
+  # a sample resource server under /api-test/*. nginx proxies /api/* and /api-test/*
+  # to Oathkeeper (same-origin), so no browser CORS to the gateway is needed.
+  frontend-app:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend.prod
+      args:
+        SPA: frontend-app
+        # API base — same-origin: nginx proxy_pass /api/* → oathkeeper:4455.
+        VITE_OATHKEEPER_URL: /api
+        # Public origin of this app — drives the OAuth redirect_uri
+        # (`${VITE_APP_URL}/callback`, see Home.vue / useHydraOAuth.ts). MUST match
+        # the redirect_uris registered on the Hydra client.
+        VITE_APP_URL: "https://app.cativo.dev"
+        # OAuth2 client_id registered in Hydra (public client, PKCE, no secret).
+        VITE_NOVA_ID_CLIENT_ID: "nova-id-test-app"
+        # VITE_HYDRA_PUBLIC_URL intentionally omitted: useHydraOAuth.ts falls back to
+        # `${origin}/api/hydra-public` for non-.ory.localhost hosts, which routes via
+        # this nginx /api/* → oathkeeper hydra-public rule. Same for VITE_API_TEST_URL
+        # (defaults to `${origin}/api-test`).
+    networks:
+      - apps
+      - web
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=space-server_web"
+      - "traefik.http.routers.frontend-app.rule=Host(`app.cativo.dev`)"
+      - "traefik.http.routers.frontend-app.entrypoints=websecure"
+      - "traefik.http.routers.frontend-app.tls.certresolver=letsencryptresolver"
+      - "traefik.http.services.frontend-app.loadbalancer.server.port=80"
+    depends_on:
+      oathkeeper:
+        condition: service_healthy
+    restart: unless-stopped
+
 # ── Volumes ───────────────────────────────────────────────────────────────────
 
 volumes:
