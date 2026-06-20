@@ -243,7 +243,7 @@
       "url": "http://hydra:4444"
     },
     "match": {
-      "url": "<(http|https)://(id\\.cativo\\.dev|auth\\.cativo\\.dev|admin\\.cativo\\.dev|app\\.cativo\\.dev|oathkeeper(:[0-9]+)?)/\\.well-known/(openid-configuration|jwks\\.json).*>",
+      "url": "<(http|https)://(id\\.cativo\\.dev|oathkeeper(:[0-9]+)?)/\\.well-known/(openid-configuration|jwks\\.json)>",
       "methods": ["GET", "OPTIONS"]
     },
     "authenticators": [{ "handler": "noop" }],
@@ -258,7 +258,7 @@
       "url": "http://api:8080"
     },
     "match": {
-      "url": "<(http|https)://(id\\.cativo\\.dev|auth\\.cativo\\.dev|admin\\.cativo\\.dev|app\\.cativo\\.dev|oathkeeper(:[0-9]+)?)/api-test/(health|public)>",
+      "url": "<(http|https)://(app\\.cativo\\.dev|oathkeeper(:[0-9]+)?)/api-test/(health|public)>",
       "methods": ["GET", "OPTIONS"]
     },
     "authenticators": [{ "handler": "noop" }],
@@ -273,7 +273,7 @@
       "url": "http://api:8080"
     },
     "match": {
-      "url": "<(http|https)://(id\\.cativo\\.dev|auth\\.cativo\\.dev|admin\\.cativo\\.dev|app\\.cativo\\.dev|oathkeeper(:[0-9]+)?)/api-test/(?!health|public).*>",
+      "url": "<(http|https)://(app\\.cativo\\.dev|oathkeeper(:[0-9]+)?)/api-test/(?!health|public).*>",
       "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
     },
     "authenticators": [
