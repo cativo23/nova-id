@@ -192,6 +192,17 @@ jobs:
         env:
           PGPASSWORD: postgres
 
+      # Run TypeORM migrations against CI Postgres as demo_user to verify
+      # the schema is consistent and least-privilege grants are sufficient.
+      - name: Run demo-api migrations
+        run: npm run migration:run
+        env:
+          DEMO_DB_HOST: localhost
+          DEMO_DB_PORT: "5432"
+          DEMO_DB_USER: demo_user
+          DEMO_DB_PASSWORD: ci_demo_password
+          DEMO_DB_NAME: demo_app
+
       - name: Build
         run: npm run build
 
