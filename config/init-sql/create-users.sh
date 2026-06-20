@@ -51,3 +51,8 @@ GRANT ALL ON SCHEMA public TO ory_user;
 EOF
 
 echo "Database users created successfully"
+
+# Grant schema privileges for demo_app (uses postgres superuser — same as nova_audit)
+psql -h postgres -U postgres -d demo_app <<EOF
+GRANT ALL ON SCHEMA public TO postgres;
+EOF
