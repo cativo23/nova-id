@@ -3,8 +3,12 @@ import { RolesController } from './roles.controller';
 /**
  * RolesController audit-logging spec (Task 1 — M-1).
  *
- * Verifies AuditService.record is called with the correct action and
+ * Verifies DemoAuditService.record is called with the correct action and
  * metadata on every mutating handler.
+ *
+ * NOTE: The audit sink was migrated from IdP's AuditService to the
+ * demo-owned DemoAuditService (Phase 1 demo-api extraction). The interface
+ * is identical (record()), so the test shape is unchanged.
  */
 
 const DEMO_APP_ID = 'nova-id-test-app';

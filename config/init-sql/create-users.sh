@@ -22,6 +22,9 @@ BEGIN
     IF NOT EXISTS (SELECT FROM pg_user WHERE usename = 'keto_user') THEN
         CREATE USER keto_user WITH PASSWORD '${KETO_DB_PASSWORD}';
     END IF;
+    IF NOT EXISTS (SELECT FROM pg_user WHERE usename = 'demo_user') THEN
+        CREATE USER demo_user WITH PASSWORD '${DEMO_DB_PASSWORD}';
+    END IF;
 END
 \$\$;
 
@@ -32,6 +35,10 @@ GRANT ALL PRIVILEGES ON DATABASE keto TO ory_user;
 GRANT ALL PRIVILEGES ON DATABASE kratos TO kratos_user;
 GRANT ALL PRIVILEGES ON DATABASE hydra TO hydra_user;
 GRANT ALL PRIVILEGES ON DATABASE keto TO keto_user;
+-- demo_user gets CONNECT on demo_app only. No schema or table privileges are
+-- granted on kratos/hydra/keto, so even if PUBLIC CONNECT is in effect,
+-- demo_user cannot read or write any IdP data (permission denied at schema level).
+GRANT CONNECT ON DATABASE demo_app TO demo_user;
 EOF
 
 # Grant schema privileges
@@ -51,3 +58,16 @@ GRANT ALL ON SCHEMA public TO ory_user;
 EOF
 
 echo "Database users created successfully"
+
+# Grant schema and table privileges for demo_app to demo_user (least-privilege).
+# USAGE + CREATE on schema allows TypeORM to run migrations (CREATE TABLE etc.).
+# ALTER DEFAULT PRIVILEGES covers tables created in future migrations.
+psql -h postgres -U postgres -d demo_app <<EOF
+GRANT USAGE, CREATE ON SCHEMA public TO demo_user;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO demo_user;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO demo_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+    GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO demo_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+    GRANT USAGE, SELECT ON SEQUENCES TO demo_user;
+EOF

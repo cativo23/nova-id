@@ -7,8 +7,8 @@ function ctxWith(user: any) {
   } as any;
 }
 
-describe('AppAdminGuard (SQLite sole source, ADR-0002)', () => {
-  it('ignores a forged user.appRole claim and uses SQLite', async () => {
+describe('AppAdminGuard (demo_app Postgres sole source, ADR-0002)', () => {
+  it('ignores a forged user.appRole claim and uses demo_app DB', async () => {
     const rolesService = { getAppRole: jest.fn().mockResolvedValue('app_user') };
     const guard = new AppAdminGuard({} as any, rolesService as any);
 

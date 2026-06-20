@@ -8,7 +8,10 @@ export class RolesService {
   private readonly logger = new Logger(RolesService.name);
 
   constructor(
-    @InjectRepository(UserRole)
+    // 'demo' connection name required — UserRole is registered on the named
+    // 'demo' Postgres connection. Omitting it resolves to the unnamed default
+    // (which doesn't exist) and crashes Nest DI at boot.
+    @InjectRepository(UserRole, 'demo')
     private readonly userRoleRepository: Repository<UserRole>,
   ) { }
 

@@ -16,7 +16,7 @@ export class AppUserGuard implements CanActivate {
       throw new ForbiddenException('User not authenticated');
     }
 
-    // SQLite is the sole source of appRole (ADR-0002) — never read from JWT claim
+    // demo_app Postgres is the sole source of appRole (ADR-0002) — never read from JWT claim
     const appRole = await this.rolesService.getAppRole(user.userId);
 
     // Both app_admin and app_user can access endpoints protected by AppUserGuard

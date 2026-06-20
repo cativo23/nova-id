@@ -1,6 +1,7 @@
 import {
-  Controller, Get, Post, Put, Delete, Body, Param, UseGuards,
+  Controller, Get, Post, Put, Delete, Body, Param, UseGuards, UseInterceptors,
 } from '@nestjs/common';
+import { LoggingInterceptor } from './logging.interceptor';
 import { DemoService } from './demo.service';
 import { RolesService } from './roles/roles.service';
 import { GetUser } from '../decorators/get-user.decorator';
@@ -14,6 +15,7 @@ import { DemoConfigureDto } from './dto/demo-configure.dto';
 import { DemoUpdateDataDto } from './dto/demo-update-data.dto';
 
 @Controller()
+@UseInterceptors(LoggingInterceptor)
 export class DemoController {
   constructor(
     private readonly demoService: DemoService,
