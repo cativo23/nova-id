@@ -33,7 +33,10 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./config/init-sql/create-dbs.sql:/docker-entrypoint-initdb.d/create-dbs.sql:ro
-    # No published ports in production — DB is reachable only on ory-internal.
+    # No published ports in production. Reachable on ory-internal (Ory stack) and
+    # apps (so demo-api — a separate consumer on apps-only — can reach its own
+    # demo_app DB). Cross-DB access is blocked by per-DB grants: demo_user has no
+    # privileges on kratos/hydra/keto/nova_audit, so apps-network reach is harmless.
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
@@ -41,6 +44,7 @@ services:
       retries: 5
     networks:
       - ory-internal
+      - apps
     restart: unless-stopped
 
   postgres-init:
