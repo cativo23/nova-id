@@ -24,7 +24,10 @@
     "migration:generate": "typeorm-ts-node-commonjs migration:generate -d src/audit/audit.datasource.ts",
     "migration:run": "typeorm-ts-node-commonjs migration:run -d src/audit/audit.datasource.ts",
     "migration:revert": "typeorm-ts-node-commonjs migration:revert -d src/audit/audit.datasource.ts",
-    "migration:show": "typeorm-ts-node-commonjs migration:show -d src/audit/audit.datasource.ts"
+    "migration:show": "typeorm-ts-node-commonjs migration:show -d src/audit/audit.datasource.ts",
+    "migration:run:demo": "typeorm-ts-node-commonjs migration:run -d src/demo/data-source.ts",
+    "migration:revert:demo": "typeorm-ts-node-commonjs migration:revert -d src/demo/data-source.ts",
+    "migration:show:demo": "typeorm-ts-node-commonjs migration:show -d src/demo/data-source.ts"
   },
   "engines": {
     "node": ">=22"
