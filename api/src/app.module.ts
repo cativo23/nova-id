@@ -9,7 +9,6 @@ import { AuthModule } from './auth/auth.module';
 import { OryModule } from './ory/ory.module';
 import { AdminModule } from './admin/admin.module';
 import { MeModule } from './me/me.module';
-import { DemoModule } from './demo/demo.module';
 import { AuthenticatedGuard } from './guards/authenticated.guard';
 
 /**
@@ -31,7 +30,6 @@ import { AuthenticatedGuard } from './guards/authenticated.guard';
     OryModule,
     AdminModule,
     MeModule,
-    DemoModule,
   ],
   controllers: [AppController],
   providers: [
