@@ -70,7 +70,6 @@ jobs:
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          # nova_audit is the default DB; demo_app is created by the init script below.
           POSTGRES_DB: nova_audit
         ports:
           - 5432:5432
@@ -85,11 +84,6 @@ jobs:
       AUDIT_DB_USER: postgres
       AUDIT_DB_PASSWORD: postgres
       AUDIT_DB_NAME: nova_audit
-      DEMO_DB_HOST: localhost
-      DEMO_DB_PORT: "5432"
-      DEMO_DB_USER: demo_user
-      DEMO_DB_PASSWORD: ci_demo_password
-      DEMO_DB_NAME: demo_app
       # openapi:verify boots the full AppModule. OryModule's providers resolve these
       # via ConfigService.getOrThrow at boot (api/src/ory/ory.module.ts), so they must
       # exist or the app crashes before the spec is generated. The values are never
@@ -119,22 +113,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # demo_app DB is not the Postgres service's POSTGRES_DB default (nova_audit).
-      # Create it and provision demo_user (least-privilege role) so DemoModule
-      # migrations run as demo_user — verifying the grants are sufficient.
-      - name: Create demo_app database and demo_user role
-        run: |
-          psql -h localhost -U postgres -c "CREATE DATABASE demo_app;"
-          psql -h localhost -U postgres -c "CREATE USER demo_user WITH PASSWORD 'ci_demo_password';"
-          psql -h localhost -U postgres -c "GRANT CONNECT ON DATABASE demo_app TO demo_user;"
-          psql -h localhost -U postgres -d demo_app -c "GRANT USAGE, CREATE ON SCHEMA public TO demo_user;"
-          psql -h localhost -U postgres -d demo_app -c "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO demo_user;"
-          psql -h localhost -U postgres -d demo_app -c "GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO demo_user;"
-          psql -h localhost -U postgres -d demo_app -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO demo_user;"
-          psql -h localhost -U postgres -d demo_app -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO demo_user;"
-        env:
-          PGPASSWORD: postgres
-
       - name: Build
         run: npm run build
 
@@ -151,6 +129,86 @@ jobs:
       # Enforces the ADR-0001 one-way module boundary (IdP must not import demo).
       - name: Check module boundary (ADR-0001)
         run: npm run boundary:check
+
+  # ---------------------------------------------------------------------------
+  # demo-api — standalone NestJS relying-party backend.
+  # npm project in demo-api/ (not part of the pnpm workspace).
+  # ---------------------------------------------------------------------------
+  demo-api:
+    name: Demo API (build + test)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: demo_app
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      NODE_ENV: test
+      DEMO_DB_HOST: localhost
+      DEMO_DB_PORT: "5432"
+      DEMO_DB_USER: demo_user
+      DEMO_DB_PASSWORD: ci_demo_password
+      DEMO_DB_NAME: demo_app
+      # DemoAuthenticatedGuard reads these at boot (ConfigService.get).
+      # JwksClient is lazy — no network call at bootstrap — so placeholder URLs suffice.
+      JWKS_URL: http://localhost:4456/.well-known/jwks.json
+      OAUTH_ISSUER: https://id.cativo.dev/
+    defaults:
+      run:
+        working-directory: ./demo-api
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: demo-api/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Provision demo_user so TypeORM migrations run as demo_user in CI,
+      # verifying the least-privilege grants are sufficient.
+      - name: Provision demo_user in Postgres
+        working-directory: .
+        run: |
+          psql -h localhost -U postgres -d demo_app -c "CREATE USER demo_user WITH PASSWORD 'ci_demo_password';"
+          psql -h localhost -U postgres -d demo_app -c "GRANT CONNECT ON DATABASE demo_app TO demo_user;"
+          psql -h localhost -U postgres -d demo_app -c "GRANT USAGE, CREATE ON SCHEMA public TO demo_user;"
+          psql -h localhost -U postgres -d demo_app -c "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO demo_user;"
+          psql -h localhost -U postgres -d demo_app -c "GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO demo_user;"
+          psql -h localhost -U postgres -d demo_app -c "ALTER DEFAULT PRIVILEGES FOR ROLE demo_user IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO demo_user;"
+          psql -h localhost -U postgres -d demo_app -c "ALTER DEFAULT PRIVILEGES FOR ROLE demo_user IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO demo_user;"
+        env:
+          PGPASSWORD: postgres
+
+      # Run TypeORM migrations against CI Postgres as demo_user to verify
+      # the schema is consistent and least-privilege grants are sufficient.
+      - name: Run demo-api migrations
+        run: npm run migration:run
+        env:
+          DEMO_DB_HOST: localhost
+          DEMO_DB_PORT: "5432"
+          DEMO_DB_USER: demo_user
+          DEMO_DB_PASSWORD: ci_demo_password
+          DEMO_DB_NAME: demo_app
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm test
 
   # ---------------------------------------------------------------------------
   # Production Docker image build — verifies all three production Dockerfiles

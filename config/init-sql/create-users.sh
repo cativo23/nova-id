@@ -61,13 +61,15 @@ echo "Database users created successfully"
 
 # Grant schema and table privileges for demo_app to demo_user (least-privilege).
 # USAGE + CREATE on schema allows TypeORM to run migrations (CREATE TABLE etc.).
-# ALTER DEFAULT PRIVILEGES covers tables created in future migrations.
+# FOR ROLE demo_user ensures the default privileges apply to objects created by
+# demo_user (not the executor postgres). Without FOR ROLE, the grants would only
+# apply when the postgres role creates objects, not when demo_user does.
 psql -h postgres -U postgres -d demo_app <<EOF
 GRANT USAGE, CREATE ON SCHEMA public TO demo_user;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO demo_user;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO demo_user;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public
+ALTER DEFAULT PRIVILEGES FOR ROLE demo_user IN SCHEMA public
     GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO demo_user;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public
+ALTER DEFAULT PRIVILEGES FOR ROLE demo_user IN SCHEMA public
     GRANT USAGE, SELECT ON SEQUENCES TO demo_user;
 EOF

@@ -7,11 +7,23 @@
     },
     "match": {
       "url": "<(http|https)://(id\\.cativo\\.dev|auth\\.cativo\\.dev|admin\\.cativo\\.dev|oathkeeper(:[0-9]+)?)/health/.*>",
-      "methods": ["GET"]
+      "methods": [
+        "GET"
+      ]
     },
-    "authenticators": [{ "handler": "noop" }],
-    "authorizer": { "handler": "allow" },
-    "mutators": [{ "handler": "noop" }]
+    "authenticators": [
+      {
+        "handler": "noop"
+      }
+    ],
+    "authorizer": {
+      "handler": "allow"
+    },
+    "mutators": [
+      {
+        "handler": "noop"
+      }
+    ]
   },
   {
     "id": "kratos-public",
@@ -22,11 +34,28 @@
     },
     "match": {
       "url": "<(http|https)://(id\\.cativo\\.dev|auth\\.cativo\\.dev|admin\\.cativo\\.dev|app\\.cativo\\.dev|oathkeeper(:[0-9]+)?)/api/(self-service|sessions|schemas).*>",
-      "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
+      "methods": [
+        "GET",
+        "POST",
+        "PUT",
+        "DELETE",
+        "PATCH",
+        "OPTIONS"
+      ]
     },
-    "authenticators": [{ "handler": "noop" }],
-    "authorizer": { "handler": "allow" },
-    "mutators": [{ "handler": "noop" }]
+    "authenticators": [
+      {
+        "handler": "noop"
+      }
+    ],
+    "authorizer": {
+      "handler": "allow"
+    },
+    "mutators": [
+      {
+        "handler": "noop"
+      }
+    ]
   },
   {
     "id": "oauth2-public",
@@ -36,11 +65,27 @@
     },
     "match": {
       "url": "<(http|https)://(id\\.cativo\\.dev|auth\\.cativo\\.dev|admin\\.cativo\\.dev|app\\.cativo\\.dev|oathkeeper(:[0-9]+)?)/oauth2/.*>",
-      "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+      "methods": [
+        "GET",
+        "POST",
+        "PUT",
+        "DELETE",
+        "OPTIONS"
+      ]
     },
-    "authenticators": [{ "handler": "noop" }],
-    "authorizer": { "handler": "allow" },
-    "mutators": [{ "handler": "noop" }]
+    "authenticators": [
+      {
+        "handler": "noop"
+      }
+    ],
+    "authorizer": {
+      "handler": "allow"
+    },
+    "mutators": [
+      {
+        "handler": "noop"
+      }
+    ]
   },
   {
     "id": "hydra-public-proxy",
@@ -51,11 +96,27 @@
     },
     "match": {
       "url": "<(http|https)://(id\\.cativo\\.dev|auth\\.cativo\\.dev|admin\\.cativo\\.dev|app\\.cativo\\.dev|oathkeeper(:[0-9]+)?)/hydra-public/(oauth2|health|version|\\.well-known).*>",
-      "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+      "methods": [
+        "GET",
+        "POST",
+        "PUT",
+        "DELETE",
+        "OPTIONS"
+      ]
     },
-    "authenticators": [{ "handler": "noop" }],
-    "authorizer": { "handler": "allow" },
-    "mutators": [{ "handler": "noop" }]
+    "authenticators": [
+      {
+        "handler": "noop"
+      }
+    ],
+    "authorizer": {
+      "handler": "allow"
+    },
+    "mutators": [
+      {
+        "handler": "noop"
+      }
+    ]
   },
   {
     "id": "hydra-public",
@@ -66,11 +127,27 @@
     },
     "match": {
       "url": "<(http|https)://(id\\.cativo\\.dev|auth\\.cativo\\.dev|admin\\.cativo\\.dev|app\\.cativo\\.dev|oathkeeper(:[0-9]+)?)/api/hydra-public/(oauth2|health|version|\\.well-known).*>",
-      "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+      "methods": [
+        "GET",
+        "POST",
+        "PUT",
+        "DELETE",
+        "OPTIONS"
+      ]
     },
-    "authenticators": [{ "handler": "noop" }],
-    "authorizer": { "handler": "allow" },
-    "mutators": [{ "handler": "noop" }]
+    "authenticators": [
+      {
+        "handler": "noop"
+      }
+    ],
+    "authorizer": {
+      "handler": "allow"
+    },
+    "mutators": [
+      {
+        "handler": "noop"
+      }
+    ]
   },
   {
     "id": "public-api",
@@ -81,11 +158,24 @@
     },
     "match": {
       "url": "<(http|https)://(id\\.cativo\\.dev|auth\\.cativo\\.dev|admin\\.cativo\\.dev|app\\.cativo\\.dev|oathkeeper(:[0-9]+)?)/api/(health|public)>",
-      "methods": ["GET", "OPTIONS"]
+      "methods": [
+        "GET",
+        "OPTIONS"
+      ]
     },
-    "authenticators": [{ "handler": "noop" }],
-    "authorizer": { "handler": "allow" },
-    "mutators": [{ "handler": "noop" }]
+    "authenticators": [
+      {
+        "handler": "noop"
+      }
+    ],
+    "authorizer": {
+      "handler": "allow"
+    },
+    "mutators": [
+      {
+        "handler": "noop"
+      }
+    ]
   },
   {
     "id": "api-hydra-accept",
@@ -96,7 +186,10 @@
     },
     "match": {
       "url": "<(http|https)://(id\\.cativo\\.dev|auth\\.cativo\\.dev|admin\\.cativo\\.dev|oathkeeper(:[0-9]+)?)/api/v1/(hydra-accept-login|hydra-accept-consent)>",
-      "methods": ["POST", "OPTIONS"]
+      "methods": [
+        "POST",
+        "OPTIONS"
+      ]
     },
     "authenticators": [
       {
@@ -109,19 +202,28 @@
         }
       }
     ],
-    "authorizer": { "handler": "allow" },
-    "mutators": [{ "handler": "id_token" }]
+    "authorizer": {
+      "handler": "allow"
+    },
+    "mutators": [
+      {
+        "handler": "id_token"
+      }
+    ]
   },
   {
     "id": "api-roles-bootstrap",
     "upstream": {
       "preserve_host": true,
       "strip_path": "/api",
-      "url": "http://api:8080"
+      "url": "http://demo-api:8080"
     },
     "match": {
       "url": "<(http|https)://(id\\.cativo\\.dev|auth\\.cativo\\.dev|admin\\.cativo\\.dev|oathkeeper(:[0-9]+)?)/api/roles/bootstrap(/.*)?$>",
-      "methods": ["POST", "OPTIONS"]
+      "methods": [
+        "POST",
+        "OPTIONS"
+      ]
     },
     "authenticators": [
       {
@@ -133,17 +235,25 @@
           "subject_from": "identity.id"
         }
       },
-      { "handler": "oauth2_introspection" }
+      {
+        "handler": "oauth2_introspection"
+      }
     ],
     "authorizer": {
       "handler": "remote_json",
       "config": {
         "remote": "http://keto:4466/relation-tuples/check",
         "payload": "{\"namespace\":\"Platform\",\"object\":\"nova\",\"relation\":\"administer\",\"subject_id\":\"user:{{ print .Subject }}\"}",
-        "forward_response_headers_to_upstream": ["Content-Type"]
+        "forward_response_headers_to_upstream": [
+          "Content-Type"
+        ]
       }
     },
-    "mutators": [{ "handler": "id_token" }]
+    "mutators": [
+      {
+        "handler": "id_token"
+      }
+    ]
   },
   {
     "id": "me-permissions",
@@ -154,7 +264,14 @@
     },
     "match": {
       "url": "<(http|https)://(id\\.cativo\\.dev|auth\\.cativo\\.dev|admin\\.cativo\\.dev|oathkeeper(:[0-9]+)?)/api/v1/me/permissions(/.*)?>",
-      "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
+      "methods": [
+        "GET",
+        "POST",
+        "PUT",
+        "DELETE",
+        "PATCH",
+        "OPTIONS"
+      ]
     },
     "authenticators": [
       {
@@ -166,10 +283,18 @@
           "subject_from": "identity.id"
         }
       },
-      { "handler": "oauth2_introspection" }
+      {
+        "handler": "oauth2_introspection"
+      }
     ],
-    "authorizer": { "handler": "allow" },
-    "mutators": [{ "handler": "id_token" }]
+    "authorizer": {
+      "handler": "allow"
+    },
+    "mutators": [
+      {
+        "handler": "id_token"
+      }
+    ]
   },
   {
     "id": "protected-admin",
@@ -180,7 +305,14 @@
     },
     "match": {
       "url": "<(http|https)://(id\\.cativo\\.dev|auth\\.cativo\\.dev|admin\\.cativo\\.dev|oathkeeper(:[0-9]+)?)/api/v1/admin(?!-)(/.*)?>",
-      "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
+      "methods": [
+        "GET",
+        "POST",
+        "PUT",
+        "DELETE",
+        "PATCH",
+        "OPTIONS"
+      ]
     },
     "authenticators": [
       {
@@ -192,17 +324,25 @@
           "subject_from": "identity.id"
         }
       },
-      { "handler": "oauth2_introspection" }
+      {
+        "handler": "oauth2_introspection"
+      }
     ],
     "authorizer": {
       "handler": "remote_json",
       "config": {
         "remote": "http://keto:4466/relation-tuples/check",
         "payload": "{\"namespace\":\"Platform\",\"object\":\"nova\",\"relation\":\"administer\",\"subject_id\":\"user:{{ print .Subject }}\"}",
-        "forward_response_headers_to_upstream": ["Content-Type"]
+        "forward_response_headers_to_upstream": [
+          "Content-Type"
+        ]
       }
     },
-    "mutators": [{ "handler": "id_token" }]
+    "mutators": [
+      {
+        "handler": "id_token"
+      }
+    ]
   },
   {
     "id": "keto-read",
@@ -213,15 +353,24 @@
     },
     "match": {
       "url": "<(http|https)://(id\\.cativo\\.dev|auth\\.cativo\\.dev|admin\\.cativo\\.dev|oathkeeper(:[0-9]+)?)/api/keto/read/.*>",
-      "methods": ["GET", "POST"]
+      "methods": [
+        "GET",
+        "POST"
+      ]
     },
-    "authenticators": [{ "handler": "cookie_session" }],
+    "authenticators": [
+      {
+        "handler": "cookie_session"
+      }
+    ],
     "authorizer": {
       "handler": "remote_json",
       "config": {
         "remote": "http://keto:4466/relation-tuples/check",
         "payload": "{\"namespace\":\"Platform\",\"object\":\"nova\",\"relation\":\"administer\",\"subject_id\":\"user:{{ print .Subject }}\"}",
-        "forward_response_headers_to_upstream": ["Content-Type"]
+        "forward_response_headers_to_upstream": [
+          "Content-Type"
+        ]
       }
     },
     "mutators": [
@@ -244,37 +393,70 @@
     },
     "match": {
       "url": "<(http|https)://(id\\.cativo\\.dev|oathkeeper(:[0-9]+)?)/\\.well-known/(openid-configuration|jwks\\.json)>",
-      "methods": ["GET", "OPTIONS"]
+      "methods": [
+        "GET",
+        "OPTIONS"
+      ]
     },
-    "authenticators": [{ "handler": "noop" }],
-    "authorizer": { "handler": "allow" },
-    "mutators": [{ "handler": "noop" }]
+    "authenticators": [
+      {
+        "handler": "noop"
+      }
+    ],
+    "authorizer": {
+      "handler": "allow"
+    },
+    "mutators": [
+      {
+        "handler": "noop"
+      }
+    ]
   },
   {
     "id": "api-test-public",
     "upstream": {
       "preserve_host": true,
       "strip_path": "/api-test",
-      "url": "http://api:8080"
+      "url": "http://demo-api:8080"
     },
     "match": {
       "url": "<(http|https)://(app\\.cativo\\.dev|oathkeeper(:[0-9]+)?)/api-test/(health|public)>",
-      "methods": ["GET", "OPTIONS"]
+      "methods": [
+        "GET",
+        "OPTIONS"
+      ]
     },
-    "authenticators": [{ "handler": "noop" }],
-    "authorizer": { "handler": "allow" },
-    "mutators": [{ "handler": "noop" }]
+    "authenticators": [
+      {
+        "handler": "noop"
+      }
+    ],
+    "authorizer": {
+      "handler": "allow"
+    },
+    "mutators": [
+      {
+        "handler": "noop"
+      }
+    ]
   },
   {
     "id": "api-test",
     "upstream": {
       "preserve_host": true,
       "strip_path": "/api-test",
-      "url": "http://api:8080"
+      "url": "http://demo-api:8080"
     },
     "match": {
       "url": "<(http|https)://(app\\.cativo\\.dev|oathkeeper(:[0-9]+)?)/api-test/(?!health|public).*>",
-      "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
+      "methods": [
+        "GET",
+        "POST",
+        "PUT",
+        "DELETE",
+        "PATCH",
+        "OPTIONS"
+      ]
     },
     "authenticators": [
       {
@@ -286,16 +468,24 @@
           "subject_from": "identity.id"
         }
       },
-      { "handler": "oauth2_introspection" }
+      {
+        "handler": "oauth2_introspection"
+      }
     ],
     "authorizer": {
       "handler": "remote_json",
       "config": {
         "remote": "http://keto:4466/relation-tuples/check",
         "payload": "{\"namespace\":\"App\",\"object\":\"nova-id-test-app\",\"relation\":\"access\",\"subject_id\":\"user:{{ print .Subject }}\"}",
-        "forward_response_headers_to_upstream": ["Content-Type"]
+        "forward_response_headers_to_upstream": [
+          "Content-Type"
+        ]
       }
     },
-    "mutators": [{ "handler": "id_token" }]
+    "mutators": [
+      {
+        "handler": "id_token"
+      }
+    ]
   }
 ]
