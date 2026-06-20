@@ -293,8 +293,12 @@ services:
     command: ["node", "dist/main"]
     # No source bind-mount. No anonymous /app/node_modules.
     # api_logs provides persistent log retention across restarts.
+    # api_demo_data persists the SQLite demo roles store (app_roles.db)
+    # across container recreates — without this, role grants granted in
+    # production would be lost on every `docker compose up --force-recreate`.
     volumes:
       - api_logs:/app/logs
+      - api_demo_data:/app/data
     env_file:
       - .env.production
     environment:
@@ -439,6 +443,8 @@ volumes:
   postgres_data:
     driver: local
   api_logs:
+    driver: local
+  api_demo_data:
     driver: local
 
 # ── Networks ──────────────────────────────────────────────────────────────────
