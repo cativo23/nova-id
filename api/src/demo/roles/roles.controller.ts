@@ -7,6 +7,7 @@ import {
   Body,
   Param,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { RolesService } from './roles.service';
 import { AppAdminGuard } from '../guards/app-admin.guard';
@@ -17,17 +18,19 @@ import { AuthenticatedUser } from '../../common/types/authenticated-user';
 import { BootstrapAppAdminDto } from './dto/bootstrap-app-admin.dto';
 import { SetUserRoleDto } from './dto/set-user-role.dto';
 import { LogAccess } from '../log-access.decorator';
-import { AuditService } from '../../audit/audit.service';
+import { DemoAuditService } from '../audit/demo-audit.service';
+import { LoggingInterceptor } from '../logging.interceptor';
 
 /** The single application managed by the demo roles module. */
 const DEMO_APP_ID = process.env.APP_ID ?? 'nova-id-test-app';
 
 @Controller('roles')
 @LogAccess()
+@UseInterceptors(LoggingInterceptor)
 export class RolesController {
   constructor(
     private readonly rolesService: RolesService,
-    private readonly audit: AuditService,
+    private readonly audit: DemoAuditService,
   ) {}
 
   // Bootstrap endpoint: platform_admin can set the first app_admin
@@ -63,7 +66,7 @@ export class RolesController {
       userId: user.userId,
       email: user.email,
       platformRole: user.role, // From Keto (platform_user, platform_admin, etc.)
-      appRole, // From SQLite (app_admin, app_user) - always from DB for accuracy
+      appRole, // From Postgres demo_app (app_admin, app_user) — always from DB for accuracy
     };
   }
 
