@@ -255,7 +255,7 @@ services:
       - ./api:/app
       - /app/node_modules
       - api_logs:/app/logs
-    command: sh -c "mkdir -p /app/data && chmod 777 /app/data && npm install && npm run start:dev"
+    command: sh -c "npm install && npm run start:dev"
     env_file:
       - .env
     environment:
@@ -272,6 +272,12 @@ services:
       - AUDIT_DB_NAME=nova_audit
       - AUDIT_DB_USER=postgres
       - AUDIT_DB_PASSWORD=${POSTGRES_PASSWORD}
+      # Demo app Postgres connection (demo_app DB — decoupled from IdP internals).
+      - DEMO_DB_HOST=postgres
+      - DEMO_DB_PORT=5432
+      - DEMO_DB_NAME=demo_app
+      - DEMO_DB_USER=postgres
+      - DEMO_DB_PASSWORD=${POSTGRES_PASSWORD}
     networks:
       - apps
       - ory-internal

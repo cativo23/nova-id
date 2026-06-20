@@ -70,6 +70,7 @@ jobs:
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
+          # nova_audit is the default DB; demo_app is created by the init script below.
           POSTGRES_DB: nova_audit
         ports:
           - 5432:5432
@@ -84,6 +85,11 @@ jobs:
       AUDIT_DB_USER: postgres
       AUDIT_DB_PASSWORD: postgres
       AUDIT_DB_NAME: nova_audit
+      DEMO_DB_HOST: localhost
+      DEMO_DB_PORT: "5432"
+      DEMO_DB_USER: postgres
+      DEMO_DB_PASSWORD: postgres
+      DEMO_DB_NAME: demo_app
       # openapi:verify boots the full AppModule. OryModule's providers resolve these
       # via ConfigService.getOrThrow at boot (api/src/ory/ory.module.ts), so they must
       # exist or the app crashes before the spec is generated. The values are never
@@ -113,11 +119,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # DemoModule's SQLite DB lives in api/data/ which is gitignored and therefore
-      # absent on a fresh checkout. sqlite3 won't create the parent directory itself,
-      # so we pre-create it here to prevent a boot-time SQLITE_CANTOPEN error.
-      - name: Create demo SQLite data dir
-        run: mkdir -p data
+      # demo_app DB is not the Postgres service's POSTGRES_DB default (nova_audit).
+      # Create it explicitly so DemoModule migrations can run on boot (migrationsRun:true).
+      - name: Create demo_app database
+        run: psql -h localhost -U postgres -c "CREATE DATABASE demo_app;"
+        env:
+          PGPASSWORD: postgres
 
       - name: Build
         run: npm run build
