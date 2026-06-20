@@ -332,8 +332,6 @@ services:
     command: ["node", "dist/main"]
     volumes:
       - demo_api_logs:/app/logs
-    env_file:
-      - .env.production
     environment:
       - NODE_ENV=production
       - PORT=8080
@@ -349,6 +347,10 @@ services:
       - DEMO_DB_NAME=demo_app
       - DEMO_DB_USER=demo_user
       - DEMO_DB_PASSWORD=${DEMO_DB_PASSWORD}
+      # CORS allowlist for browser clients of the demo relying-party.
+      - CORS_ALLOWED_ORIGINS=https://app.cativo.dev
+      # Demo app ID registered in Keto / Hydra for access checks.
+      - APP_ID=nova-id-test-app
     networks:
       - apps
     depends_on:
