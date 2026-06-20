@@ -23,6 +23,10 @@
           NOVA ID – Full Architecture
         </h1>
         <p class="text-cyber-muted font-mono text-sm tracking-wider">Identity Provider + Zero Trust Gateway for N Systems</p>
+        <p class="mt-2 text-xs font-mono text-tokyo-green/80">
+          <span class="text-tokyo-green">● Live today:</span> auth · admin · app (this demo) · id (gateway) — all on *.cativo.dev behind Traefik (LE TLS).
+          <span class="text-tokyo-light/50">Blog / Shop / CRM / mobile below are illustrative roadmap examples.</span>
+        </p>
       </div>
 
       <!-- Diagram -->
@@ -50,6 +54,17 @@
             <div class="rounded-lg border border-dashed border-tokyo-light/25 bg-tokyo-bg/80 px-3 py-2 text-center min-w-[100px]">
               <span class="block font-medium text-tokyo-light/50 text-xs sm:text-sm">+ more</span>
               <span class="block text-[10px] text-tokyo-light/40 mt-0.5">SPAs, mobile, etc.</span>
+            </div>
+          </div>
+          <div class="flex justify-center mb-2">
+            <svg class="w-6 h-8 text-tokyo-accent/60 animate-pulse-soft" fill="none" viewBox="0 0 24 32" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v24M8 20l4 4 4-4" />
+            </svg>
+          </div>
+          <div class="flex justify-center mb-2">
+            <div class="rounded-lg border-2 border-tokyo-accent/60 bg-tokyo-accent/10 px-4 py-3 text-center min-w-[200px] max-w-[320px] shadow-neon-cyan animate-glow-pulse">
+              <span class="block font-semibold text-tokyo-accent text-sm sm:text-base">Traefik</span>
+              <span class="block text-xs text-tokyo-light/60 mt-0.5 font-mono">Public TLS ingress · routes *.cativo.dev · Let's Encrypt</span>
             </div>
           </div>
           <div class="flex justify-center mb-2">
@@ -108,7 +123,8 @@
               <span class="block text-[10px] text-tokyo-light/60 mt-0.5">RBAC</span>
             </div>
             <div class="rounded-lg border border-tokyo-light/20 bg-tokyo-dark/90 px-3 py-2 text-center min-w-[90px]">
-              <span class="block font-semibold text-tokyo-light/70 text-xs sm:text-sm">AppRegistry</span>
+              <span class="block font-semibold text-tokyo-light/70 text-xs sm:text-sm">NestJS BFF</span>
+              <span class="block text-[10px] text-tokyo-light/50 mt-0.5">ADR-0006</span>
             </div>
           </div>
           <p class="text-center text-xs text-cyber-muted font-mono tracking-wider">
@@ -120,10 +136,14 @@
       <!-- Layer 1: Clients/Users -->
       <div class="mb-6 opacity-0 animate-fade-in-up" style="animation-delay: 220ms; animation-fill-mode: forwards">
         <div class="arch-card bg-tokyo-storm/80 border border-tokyo-accent/35 rounded-xl p-6 backdrop-blur-sm hover:border-tokyo-accent/55 hover:shadow-glow transition-all duration-300">
-          <h2 class="text-xl font-bold mb-4 flex items-center gap-2 font-mono tracking-wide">
+          <h2 class="text-xl font-bold mb-1 flex items-center gap-2 font-mono tracking-wide">
             <GlobeIcon class="w-6 h-6 text-tokyo-accent shrink-0" />
             <span class="text-tokyo-accent">Layer 1:</span> Clients / External Applications
           </h2>
+          <p class="text-xs font-mono text-tokyo-light/50 mb-4">
+            <span class="inline-block px-1.5 py-0.5 rounded bg-tokyo-accent/10 border border-tokyo-accent/25 text-tokyo-accent/70 mr-1">Illustrative</span>
+            The IdP supports these client types; only the Demo App (app.cativo.dev) is deployed today.
+          </p>
           <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div class="bg-tokyo-dark/70 rounded-lg p-4 border border-tokyo-accent/35 hover:border-tokyo-accent/55 hover:shadow-neon-cyan/50 transition-all duration-200">
               <div class="flex items-center gap-2 mb-3">
@@ -200,7 +220,7 @@
                     <ZapIcon class="w-5 h-5 text-tokyo-yellow shrink-0" />
                     <h4 class="font-bold text-tokyo-light">Oathkeeper (Gateway)</h4>
                   </div>
-                  <div class="text-xs text-cyber-muted mb-2 font-mono">api.cativo.dev – Single public entry point</div>
+                  <div class="text-xs text-cyber-muted mb-2 font-mono">id.cativo.dev – Single API gateway / Policy Enforcement Point (PEP)</div>
                   <div class="text-xs space-y-1">
                     <div class="text-tokyo-green">✓ Validates OAuth tokens</div>
                     <div class="text-tokyo-green">✓ Validates Kratos sessions</div>
@@ -254,15 +274,15 @@
                   <div class="text-xs text-cyber-muted">Authorization (ReBAC)</div>
                 </div>
                 <div class="bg-tokyo-dark rounded-lg p-3 border border-tokyo-light/15 hover:border-tokyo-light/30 transition-all duration-200 font-mono text-sm">
-                  <div class="font-semibold mb-1 text-tokyo-light">AppRegistry Service</div>
-                  <div class="text-xs text-cyber-muted">System Management API</div>
+                  <div class="font-semibold mb-1 text-tokyo-light">NestJS BFF</div>
+                  <div class="text-xs text-cyber-muted">IdP consolidation API (ADR-0006) · /api/v1/*</div>
                 </div>
                 <div class="bg-tokyo-dark rounded-lg p-3 border border-tokyo-light/15 hover:border-tokyo-light/30 transition-all duration-200 font-mono text-sm">
                   <div class="flex items-center gap-2">
                     <DatabaseIcon class="w-4 h-4 text-tokyo-light/70 shrink-0" />
                     <div class="font-semibold">PostgreSQL</div>
                   </div>
-                  <div class="text-xs text-cyber-muted">Kratos + Hydra + Keto + AppRegistry</div>
+                  <div class="text-xs text-cyber-muted">Kratos + Hydra + Keto (shared) + audit store</div>
                 </div>
               </div>
             </div>
@@ -385,22 +405,25 @@
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div class="bg-tokyo-dark/80 rounded-lg p-4 border border-tokyo-red/45 hover:border-tokyo-red/65 transition-all duration-200">
             <div class="font-semibold mb-2 text-tokyo-red font-mono">🌐 Public network</div>
-            <div class="text-xs text-tokyo-light/80 font-mono">Only Oathkeeper exposed (port 4455)</div>
+            <div class="text-xs text-tokyo-light/80 space-y-1 font-mono">
+              <div>• Traefik only (TLS terminator)</div>
+              <div>• Routes *.cativo.dev → SPA nginx + Oathkeeper</div>
+              <div>• All backends stay private</div>
+            </div>
           </div>
           <div class="bg-tokyo-dark/80 rounded-lg p-4 border border-tokyo-yellow/45 hover:border-tokyo-yellow/65 transition-all duration-200">
             <div class="font-semibold mb-2 text-tokyo-yellow font-mono">🔒 Apps network</div>
             <div class="text-xs text-tokyo-light/80 space-y-1 font-mono">
-              <div>• Oathkeeper</div>
-              <div>• Application backends (APIs &amp; microservices)</div>
-              <div>• Frontends</div>
+              <div>• Oathkeeper (PEP)</div>
+              <div>• NestJS BFF (ADR-0006)</div>
+              <div>• SPA nginx containers (auth / admin / app)</div>
             </div>
           </div>
           <div class="bg-tokyo-dark/80 rounded-lg p-4 border border-tokyo-accent-2/45 hover:border-tokyo-accent-2/65 transition-all duration-200">
             <div class="font-semibold mb-2 text-tokyo-accent-2 font-mono">🛡️ Ory internal network</div>
             <div class="text-xs text-tokyo-light/80 space-y-1 font-mono">
               <div>• Kratos, Hydra, Keto</div>
-              <div>• PostgreSQL</div>
-              <div>• AppRegistry</div>
+              <div>• PostgreSQL 15</div>
             </div>
           </div>
         </div>
@@ -424,11 +447,11 @@
             <div class="space-y-2 text-sm font-mono">
               <div class="flex items-start gap-2">
                 <span class="text-tokyo-green mt-1">1.</span>
-                <span class="text-tokyo-light/80">Register in AppRegistry (1 API call)</span>
+                <span class="text-tokyo-light/80">Register the app via the NestJS BFF onboarding (ADR-0006)</span>
               </div>
               <div class="flex items-start gap-2">
                 <span class="text-tokyo-green mt-1">2.</span>
-                <span class="text-tokyo-light/80">Get OAuth Client ID/Secret</span>
+                <span class="text-tokyo-light/80">Get an OAuth2 client (public + PKCE, no secret for SPAs)</span>
               </div>
               <div class="flex items-start gap-2">
                 <span class="text-tokyo-green mt-1">3.</span>
@@ -496,25 +519,25 @@ const badgeGreen = 'bg-tokyo-green text-tokyo-bg';
 const badgeYellow = 'bg-tokyo-yellow text-tokyo-bg';
 
 const loginFlowSteps = [
-  { step: 1, badgeClass: badgeCyan, text: 'User → Blog App → Click "Login with Nova ID"' },
-  { step: 2, badgeClass: badgeCyan, text: 'Redirect → auth.cativo.dev/oauth2/auth' },
-  { step: 3, badgeClass: badgePurple, text: 'Hydra → Kratos login screen' },
+  { step: 1, badgeClass: badgeCyan, text: 'User on Demo App (app.cativo.dev) clicks "Login with Nova ID"' },
+  { step: 2, badgeClass: badgeCyan, text: 'Redirect → id.cativo.dev/oauth2/auth (public client, PKCE S256, openid profile email offline_access)' },
+  { step: 3, badgeClass: badgePurple, text: 'Hydra delegates to Kratos login UI at auth.cativo.dev' },
   { step: 4, badgeClass: badgePurple, text: 'User enters credentials' },
-  { step: 5, badgeClass: badgePurple, text: 'Consent screen (permissions)' },
-  { step: 6, badgeClass: badgeGreen, text: 'Hydra → authorization code' },
-  { step: 7, badgeClass: badgeGreen, text: 'Blog App → exchange code for token' },
+  { step: 5, badgeClass: badgePurple, text: 'Consent skipped (demo client pre-approved)' },
+  { step: 6, badgeClass: badgeGreen, text: 'Hydra issues authorization code → app.cativo.dev/callback' },
+  { step: 7, badgeClass: badgeGreen, text: 'Demo App exchanges code + PKCE verifier for tokens at id.cativo.dev/oauth2/token' },
   { step: 8, badgeClass: badgeGreen, text: 'User logged in ✅' },
 ];
 
 const apiFlowSteps = [
-  { step: 1, badgeClass: badgeCyan, text: 'Blog App → GET /api/posts (Bearer token)' },
-  { step: 2, badgeClass: badgeYellow, text: 'Oathkeeper validates token with Hydra' },
-  { step: 3, badgeClass: badgeYellow, text: 'Oathkeeper checks permissions (Keto)' },
-  { step: 4, badgeClass: badgeYellow, text: 'Oathkeeper injects headers' },
-  { step: 5, badgeClass: badgeGreen, text: 'Forward → Blog API (with headers)' },
-  { step: 6, badgeClass: badgeGreen, text: 'Blog API trusts X-User-ID' },
-  { step: 7, badgeClass: badgeGreen, text: 'Blog API applies business logic' },
-  { step: 8, badgeClass: badgeGreen, text: 'Response → Blog App ✅' },
+  { step: 1, badgeClass: badgeCyan, text: 'Demo App calls protected resource via same-origin nginx (/api-test/*)' },
+  { step: 2, badgeClass: badgeYellow, text: 'Oathkeeper authenticates (Kratos cookie session OR OAuth2 introspection)' },
+  { step: 3, badgeClass: badgeYellow, text: 'Oathkeeper checks Keto permission (App:nova-id-test-app#access)' },
+  { step: 4, badgeClass: badgeYellow, text: 'Oathkeeper injects signed id_token / trusted headers' },
+  { step: 5, badgeClass: badgeGreen, text: 'Forward → NestJS demo API' },
+  { step: 6, badgeClass: badgeGreen, text: 'API trusts gateway-injected identity (no token re-validation)' },
+  { step: 7, badgeClass: badgeGreen, text: 'API applies business logic' },
+  { step: 8, badgeClass: badgeGreen, text: 'Response → Demo App ✅' },
 ];
 
 // Inline icon components (no external deps)

@@ -26,6 +26,15 @@ export class DemoSeedService implements OnApplicationBootstrap {
   constructor(private readonly rolesService: RolesService) {}
 
   async onApplicationBootstrap(): Promise<void> {
+    // Never seed the local demo fixtures in production. The *.nova.test demo
+    // identities do not exist in a real deployment, so this would only emit
+    // noisy "identity not found" warnings on every boot. Production app-admin
+    // grants are provisioned explicitly per identity, not via this fixture seed.
+    if (process.env.NODE_ENV === 'production') {
+      this.logger.debug('NODE_ENV=production — skipping demo SQLite seed.');
+      return;
+    }
+
     const kratosAdminUrl = process.env.KRATOS_ADMIN_URL;
     if (!kratosAdminUrl) {
       this.logger.debug('KRATOS_ADMIN_URL not set — skipping demo SQLite seed.');

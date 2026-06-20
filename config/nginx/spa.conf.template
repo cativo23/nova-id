@@ -37,6 +37,25 @@ server {
         proxy_pass_request_headers         on;
     }
 
+    # Demo relying-party (frontend-app) API surface — same-origin like /api/.
+    #
+    # The demo app (app.cativo.dev) exercises the IdP as a real OAuth2 client and
+    # calls its sample resource server under /api-test/* (see useApiTest.ts). Those
+    # must reach Oathkeeper, which routes /api-test/(health|public) and the
+    # access-gated /api-test/* to the NestJS demo controller. This block is shared
+    # across all SPA images but is inert for auth/admin: Oathkeeper's rules are
+    # host-scoped, so /api-test/* on auth.cativo.dev / admin.cativo.dev has no
+    # matching rule and 404s. Only app.cativo.dev has the api-test rules.
+    location /api-test/ {
+        proxy_pass http://oathkeeper:4455;
+        proxy_http_version 1.1;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_pass_request_headers         on;
+    }
+
     # Kratos self-service links under /auth/ — auth SPA only.
     #
     # Production Kratos public base_url is https://auth.cativo.dev/auth/ (see
