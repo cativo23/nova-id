@@ -1,6 +1,8 @@
 # Self-contained production Compose file for Nova ID.
 #
-# Usage: docker compose -f docker-compose.production.yml up -d
+# Usage: IMAGE_TAG=v1.2.0 docker compose --env-file .env.production -f docker-compose.production.yml up -d --no-build
+# Routine deploys: use scripts/deploy-prod.sh <version-tag> (handles pull, up, oathkeeper restart, smoke).
+# Images are pre-built by .github/workflows/release.yml and pushed to Docker Hub.
 #
 # This file is intentionally NOT an override of docker-compose.yml.
 # Docker Compose list merging (volumes, ports, depends_on) makes a thin override
