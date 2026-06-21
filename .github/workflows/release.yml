@@ -101,7 +101,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Trivy scan — api (fail on CRITICAL or HIGH)
-        uses: aquasecurity/trivy-action@0.20.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: '${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-api:${{ steps.tag.outputs.version }}'
           format: table
@@ -165,7 +165,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Trivy scan — demo-api (fail on CRITICAL or HIGH)
-        uses: aquasecurity/trivy-action@0.20.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: '${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-demo-api:${{ steps.tag.outputs.version }}'
           format: table
@@ -234,7 +234,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Trivy scan — frontend-auth (fail on CRITICAL or HIGH)
-        uses: aquasecurity/trivy-action@0.20.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: '${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-frontend-auth:${{ steps.tag.outputs.version }}'
           format: table
@@ -304,7 +304,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Trivy scan — frontend-admin (fail on CRITICAL or HIGH)
-        uses: aquasecurity/trivy-action@0.20.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: '${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-frontend-admin:${{ steps.tag.outputs.version }}'
           format: table
@@ -374,7 +374,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Trivy scan — frontend-app (fail on CRITICAL or HIGH)
-        uses: aquasecurity/trivy-action@0.20.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: '${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-frontend-app:${{ steps.tag.outputs.version }}'
           format: table
