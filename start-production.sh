@@ -52,8 +52,11 @@ export ENVIRONMENT=production
 # .env.production (env_file: only injects into containers, NOT into interpolation;
 # and Compose only auto-reads a file literally named `.env`). Without this, secrets
 # like ${POSTGRES_PASSWORD} resolve to empty and Postgres refuses to initialize.
+#
+# Images must be pre-pulled by scripts/deploy-prod.sh or a manual `docker pull`.
+# This script never builds images — production uses registry-pulled images only.
 echo -e "${BLUE}🐳 Starting Docker Compose services...${NC}"
-docker compose --env-file .env.production -f docker-compose.production.yml up -d --build
+docker compose --env-file .env.production -f docker-compose.production.yml up -d --no-build
 
 echo ""
 echo -e "${GREEN}✅ Nova ID Stack started successfully!${NC}"

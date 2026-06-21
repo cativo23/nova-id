@@ -327,6 +327,119 @@ The **local-proxy (nginx)** in `config/nginx/local-proxy.conf` is only for expos
 
 ---
 
+## Production CD Runbook (B3)
+
+Deploys to the production host use a **registry-first pull model**.
+Images are pre-built by GitHub Actions on tag push; the server only pulls and
+restarts containers — it never runs `docker build`.
+
+Connection details (host, SSH port, deploy user) are stored in GitHub Actions
+secrets `POLARIS2_HOST`, `POLARIS2_PORT`, and `POLARIS2_USER`. The deploy
+workflow SSHes in automatically — no manual SSH needed for routine releases.
+
+### Normal deploy (tag-triggered)
+
+Push a version tag from `main`:
+
+```bash
+git checkout main
+git pull
+git tag v1.2.0
+git push origin v1.2.0
+```
+
+The tag push triggers **`release.yml`** only. Deploy is chained after the build,
+not triggered independently, so the two can never race:
+
+1. **`release.yml`** runs 5 parallel jobs — one per image — each building,
+   Trivy-scanning (fail on CRITICAL/HIGH), and pushing the immutable version
+   tag + `:latest` to Docker Hub.
+2. When **all 5** build jobs succeed, `release.yml`'s final `deploy` job calls
+   **`deploy.yml`** as a reusable workflow (`needs:` the 5 builds + `uses:`).
+3. `deploy.yml` SSHes into the production host and runs
+   `scripts/deploy-prod.sh v1.2.0`.
+
+Because the `deploy` job `needs` all 5 builds, deploy runs **only after every
+image is built and pushed** — `deploy-prod.sh` can safely `docker pull` the tag
+with no build/pull race.
+
+The deploy script: pulls images → `docker compose up -d --no-build` →
+restarts Oathkeeper → smoke-tests 4 URLs → writes `.deploy-version`.
+On smoke failure: auto-rollback to the previous version.
+
+### Manual rollback / redeploy
+
+Run **`deploy.yml`** directly (it never auto-runs on tag push — it only runs as
+release.yml's chained job or via this manual dispatch).
+
+**Option A — workflow_dispatch** (preferred; leaves an audit trail in GitHub):
+1. Go to **Actions → Deploy to Production → Run workflow**
+2. Enter the target tag (e.g. `v1.1.0`) in the `ref` field. The images for that
+   tag must already exist on Docker Hub (they do for any previously released tag).
+
+**Option B — direct SSH** (emergency only, requires the deploy key):
+```bash
+ssh -i ~/.ssh/nova_id_deploy -p <POLARIS2_PORT> <POLARIS2_USER>@<POLARIS2_HOST> v1.1.0
+```
+The SSH command= restriction on the server only allows running `deploy-prod.sh`;
+the version tag is passed as `SSH_ORIGINAL_COMMAND`.
+
+### Check what version is running
+
+SSH into the production host and inspect:
+
+```bash
+# In ~/deploy/nova-id-deploy
+cat .deploy-version
+docker compose --env-file .env.production -f docker-compose.production.yml ps
+```
+
+### Smoke test URLs
+
+All four must return HTTP 200 for a deploy to be considered healthy:
+
+| URL | Service |
+|-----|---------|
+| `https://id.cativo.dev/health/alive` | Oathkeeper gateway alive |
+| `https://id.cativo.dev/.well-known/openid-configuration` | OIDC metadata |
+| `https://id.cativo.dev/api/health` | BFF (NestJS) health |
+| `https://app.cativo.dev/api-test/health` | demo-api health |
+
+### First-time bootstrap (one-time only)
+
+After the very first deploy to a new server, Ory databases must be initialised.
+This is **not** done by `deploy-prod.sh` — use:
+
+```bash
+# On the production host, in ~/deploy/nova-id-deploy
+bash scripts/bootstrap-prod.sh --first-boot
+bash scripts/deploy-prod.sh v1.0.0
+bash scripts/bootstrap-prod.sh --assign-admin carlos@example.com
+```
+
+### JWKS rotation (planned maintenance window required)
+
+The Oathkeeper id_token signing key lives at
+`config/oathkeeper/id_token.jwks.json`. Rotating it **invalidates all active
+sessions**. Never rotate on a routine deploy.
+
+1. Plan a maintenance window and notify users.
+2. On the production host: `bash scripts/generate-jwks.sh` (generates new key).
+3. `chmod 644 config/oathkeeper/id_token.jwks.json`
+4. Push the new JWKS file in a tagged release and deploy normally.
+5. All logged-in users will be logged out — expected.
+
+`deploy-prod.sh` **aborts** if JWKS is missing — it never auto-generates it.
+
+### Secret rotation (Docker Hub PAT)
+
+```bash
+# After creating a new PAT at hub.docker.com:
+gh secret set DOCKERHUB_TOKEN --body "<new-token>"
+```
+
+---
+
 ## Next steps
 
 - [Getting Started](GETTING_STARTED.md) — Install and first login  
