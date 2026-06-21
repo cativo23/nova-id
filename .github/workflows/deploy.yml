@@ -1,0 +1,96 @@
+# .github/workflows/deploy.yml
+#
+# Triggered by push of a v* tag (after release.yml completes) or
+# workflow_dispatch with a ref input for surgical rollback/redeploy.
+#
+# SSHs into polaris2 using a restricted deploy-only ed25519 keypair stored in
+# GitHub Actions secrets. Connection parameters (host, port, user) are stored
+# as GitHub Actions variables — non-sensitive but kept out of source for
+# flexibility. The server's authorized_keys command= restriction ensures this
+# key can ONLY run scripts/deploy-prod.sh — no shell access.
+#
+# The deploy script is responsible for pull, up, smoke tests, and rollback.
+# This workflow only provides the trigger and the SSH transport.
+
+name: Deploy to Production
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Version tag to deploy (e.g. v1.2.0) — use for rollback'
+        required: true
+        default: ''
+
+# One deploy at a time globally — a new tag push waits if a deploy is running.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy ${{ github.event.inputs.ref || github.ref_name }} to polaris2
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Determine version tag
+        id: version
+        # Route workflow_dispatch input through an env var to avoid shell injection.
+        # Then validate the format — reject anything that isn't a semver tag.
+        env:
+          INPUT_REF: ${{ github.event.inputs.ref }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${INPUT_REF}"
+          else
+            TAG="${GITHUB_REF_NAME}"
+          fi
+          # Validate: must be vMAJOR.MINOR.PATCH[-prerelease] — no shell metacharacters.
+          if [[ ! "${TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([-+][A-Za-z0-9._-]+)?$ ]]; then
+            echo "::error::Invalid version tag: '${TAG}'. Expected format: v<major>.<minor>.<patch>"
+            exit 1
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Install SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.POLARIS2_SSH_KEY }}
+
+      - name: Add polaris2 to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -p ${{ vars.POLARIS2_PORT }} ${{ vars.POLARIS2_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to polaris2
+        # TAG is validated above (semver pattern). Pass via env var, not inline
+        # interpolation, to prevent any residual shell injection risk.
+        env:
+          DEPLOY_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          ssh -p ${{ vars.POLARIS2_PORT }} \
+            ${{ vars.POLARIS2_USER }}@${{ vars.POLARIS2_HOST }} \
+            "${DEPLOY_TAG}"
+        # The authorized_keys command= on the server maps any SSH connection
+        # to: deploy-prod.sh ${SSH_ORIGINAL_COMMAND}
+        # So passing the tag as the "command" sends it to the script as $1.
+
+      - name: Report deploy outcome
+        if: always()
+        env:
+          DEPLOY_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          EXIT_CODE=$?
+          if [ $EXIT_CODE -eq 0 ]; then
+            echo "Deploy of ${DEPLOY_TAG} succeeded."
+          elif [ $EXIT_CODE -eq 2 ]; then
+            echo "DEPLOY FAILED — auto-rollback succeeded. Check deploy logs."
+            exit 1
+          else
+            echo "DEPLOY FAILED — auto-rollback also failed. Manual intervention required."
+            exit 1
+          fi
