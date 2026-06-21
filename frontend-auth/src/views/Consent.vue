@@ -156,6 +156,7 @@ const acceptConsent = async () => {
       window.location.href = result.redirect_to
     } else {
       error.value = 'No redirect URL in response'
+      processing.value = false
     }
   } catch (err) {
     const e = err as { response?: { data?: { message?: string } }; message?: string }

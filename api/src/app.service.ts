@@ -142,6 +142,12 @@ export class AppService {
         error: 'access_denied',
         error_description: body.error_description ?? 'The user denied the request',
       });
+      await this.audit.record({
+        actorId: user.userId,
+        action: 'consent.user_reject',
+        appId: null,
+        targetType: 'app',
+      });
       return { redirect_to: result.redirect_to };
     } catch (error) {
       this.logger.error('Error rejecting consent:', error.response?.data || error.message);

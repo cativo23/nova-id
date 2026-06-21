@@ -1,10 +1,11 @@
-import { IsString, IsOptional } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class RejectHydraConsentDto {
   @ApiProperty()
   @IsString()
-  consent_challenge: string;
+  @IsNotEmpty()
+  consent_challenge!: string;
 
   @ApiProperty({ required: false })
   @IsOptional()
