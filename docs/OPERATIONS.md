@@ -348,21 +348,34 @@ git tag v1.2.0
 git push origin v1.2.0
 ```
 
-GitHub Actions runs two sequential workflows:
-1. **release.yml** — builds 5 Docker images, Trivy-scans each for CRITICAL/HIGH
-   vulnerabilities, pushes immutable version tags + `:latest` to Docker Hub.
-2. **deploy.yml** — SSHes into the production host, runs
+The tag push triggers **`release.yml`** only. Deploy is chained after the build,
+not triggered independently, so the two can never race:
+
+1. **`release.yml`** runs 5 parallel jobs — one per image — each building,
+   Trivy-scanning (fail on CRITICAL/HIGH), and pushing the immutable version
+   tag + `:latest` to Docker Hub.
+2. When **all 5** build jobs succeed, `release.yml`'s final `deploy` job calls
+   **`deploy.yml`** as a reusable workflow (`needs:` the 5 builds + `uses:`).
+3. `deploy.yml` SSHes into the production host and runs
    `scripts/deploy-prod.sh v1.2.0`.
+
+Because the `deploy` job `needs` all 5 builds, deploy runs **only after every
+image is built and pushed** — `deploy-prod.sh` can safely `docker pull` the tag
+with no build/pull race.
 
 The deploy script: pulls images → `docker compose up -d --no-build` →
 restarts Oathkeeper → smoke-tests 4 URLs → writes `.deploy-version`.
 On smoke failure: auto-rollback to the previous version.
 
-### Manual rollback
+### Manual rollback / redeploy
+
+Run **`deploy.yml`** directly (it never auto-runs on tag push — it only runs as
+release.yml's chained job or via this manual dispatch).
 
 **Option A — workflow_dispatch** (preferred; leaves an audit trail in GitHub):
 1. Go to **Actions → Deploy to Production → Run workflow**
-2. Enter the previous tag (e.g. `v1.1.0`) in the `ref` field
+2. Enter the target tag (e.g. `v1.1.0`) in the `ref` field. The images for that
+   tag must already exist on Docker Hub (they do for any previously released tag).
 
 **Option B — direct SSH** (emergency only, requires the deploy key):
 ```bash
