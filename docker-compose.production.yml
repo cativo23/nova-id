@@ -292,9 +292,9 @@ services:
   # and ory-internal networks.
 
   api:
-    build:
-      context: ./api
-      dockerfile: Dockerfile
+    # Image pulled by deploy-prod.sh; IMAGE_TAG exported before `docker compose up`.
+    # Never built on the server — use scripts/deploy-prod.sh to deploy.
+    image: cativo23/nova-id-api:${IMAGE_TAG:?IMAGE_TAG must be set}
     command: ["node", "dist/main"]
     # No source bind-mount. No anonymous /app/node_modules.
     # api_logs provides persistent log retention across restarts.
@@ -330,9 +330,8 @@ services:
   # published ports, no ory-internal network access.
 
   demo-api:
-    build:
-      context: ./demo-api
-      dockerfile: Dockerfile
+    # Image pulled by deploy-prod.sh; IMAGE_TAG exported before `docker compose up`.
+    image: cativo23/nova-id-demo-api:${IMAGE_TAG:?IMAGE_TAG must be set}
     command: ["node", "dist/main"]
     volumes:
       - demo_api_logs:/app/logs
@@ -375,20 +374,10 @@ services:
   # intentionally omitted from frontends to preserve the zero-trust boundary.
 
   frontend-auth:
-    build:
-      context: .
-      dockerfile: Dockerfile.frontend.prod
-      args:
-        SPA: frontend-auth
-        # API base — same-origin: nginx proxy_pass /api/* → oathkeeper:4455.
-        # Overrides the useAuth.ts fallback of 'http://localhost:4455'.
-        VITE_OATHKEEPER_URL: /api
-        # Open-redirect allowlist — comma-separated, parsed by safeRedirect.ts.
-        VITE_ALLOWED_REDIRECT_ORIGINS: "https://auth.cativo.dev,https://admin.cativo.dev,https://id.cativo.dev"
-        # Post-login fallback when no return_to / login_challenge is present.
-        # Defaults to 'http://app.ory.localhost' in code — must be prod URL.
-        # frontend-app is not deployed; auth.cativo.dev is the neutral fallback.
-        VITE_DEFAULT_RETURN_URL: "https://auth.cativo.dev"
+    # Image pulled by deploy-prod.sh; IMAGE_TAG exported before `docker compose up`.
+    # VITE_* build-args are baked into the image by release.yml — see
+    # .github/workflows/release.yml job build-frontend-auth.
+    image: cativo23/nova-id-frontend-auth:${IMAGE_TAG:?IMAGE_TAG must be set}
     # nginx starts by default — no command override needed.
     # No bind-mounts in production — static files are baked into the image.
     networks:
@@ -407,25 +396,10 @@ services:
     restart: unless-stopped
 
   frontend-admin:
-    build:
-      context: .
-      dockerfile: Dockerfile.frontend.prod
-      args:
-        SPA: frontend-admin
-        # API base — same-origin: nginx proxy_pass /api/* → oathkeeper:4455.
-        # Overrides the useAuth.ts fallback of 'http://localhost:4455'.
-        VITE_OATHKEEPER_URL: /api
-        # Auth SPA URL — used for login redirect (Home.vue) and logout URL
-        # normalisation (useAuth.ts getAuthBaseUrl fallback chain).
-        VITE_AUTH_UI_URL: "https://auth.cativo.dev"
-        # Kratos browser (public) base for the auth SPA routes.
-        # Used by getAuthBaseUrl() and recovery link normalisation.
-        VITE_KRATOS_BROWSER_URL: "https://auth.cativo.dev/auth"
-        # Admin SPA URL — used as returnTo for verification email flows.
-        VITE_ADMIN_URL: "https://admin.cativo.dev"
-        # VITE_AUDIT_API_URL intentionally omitted: the API has no public HTTP
-        # audit ingestion endpoint (AuditService is internal). Leaving it unset
-        # triggers the no-op branch in useAuditLog.ts (if (!auditUrl) return).
+    # Image pulled by deploy-prod.sh; IMAGE_TAG exported before `docker compose up`.
+    # VITE_* build-args are baked into the image by release.yml — see
+    # .github/workflows/release.yml job build-frontend-admin.
+    image: cativo23/nova-id-frontend-admin:${IMAGE_TAG:?IMAGE_TAG must be set}
     networks:
       - apps
       - web
@@ -446,26 +420,10 @@ services:
   # a sample resource server under /api-test/*. nginx proxies /api/* and /api-test/*
   # to Oathkeeper (same-origin), so no browser CORS to the gateway is needed.
   frontend-app:
-    build:
-      context: .
-      dockerfile: Dockerfile.frontend.prod
-      args:
-        SPA: frontend-app
-        # API base — same-origin: nginx proxy_pass /api/* → oathkeeper:4455.
-        VITE_OATHKEEPER_URL: /api
-        # Public origin of this app — drives the OAuth redirect_uri
-        # (`${VITE_APP_URL}/callback`, see Home.vue / useHydraOAuth.ts). MUST match
-        # the redirect_uris registered on the Hydra client.
-        VITE_APP_URL: "https://app.cativo.dev"
-        # OAuth2 client_id registered in Hydra (public client, PKCE, no secret).
-        VITE_NOVA_ID_CLIENT_ID: "nova-id-test-app"
-        # Real id_token issuer (Hydra urls.self.issuer) — used to validate the `iss`
-        # claim. NOT the proxy base (${origin}/api/hydra-public) used to reach Hydra.
-        VITE_OAUTH_ISSUER: "https://id.cativo.dev/"
-        # VITE_HYDRA_PUBLIC_URL intentionally omitted: useHydraOAuth.ts falls back to
-        # `${origin}/api/hydra-public` for non-.ory.localhost hosts, which routes via
-        # this nginx /api/* → oathkeeper hydra-public rule. Same for VITE_API_TEST_URL
-        # (defaults to `${origin}/api-test`).
+    # Image pulled by deploy-prod.sh; IMAGE_TAG exported before `docker compose up`.
+    # VITE_* build-args are baked into the image by release.yml — see
+    # .github/workflows/release.yml job build-frontend-app.
+    image: cativo23/nova-id-frontend-app:${IMAGE_TAG:?IMAGE_TAG must be set}
     networks:
       - apps
       - web
