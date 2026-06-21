@@ -4,10 +4,11 @@
 # workflow_dispatch with a ref input for surgical rollback/redeploy.
 #
 # SSHs into polaris2 using a restricted deploy-only ed25519 keypair stored in
-# GitHub Actions secrets. Connection parameters (host, port, user) are stored
-# as GitHub Actions variables — non-sensitive but kept out of source for
-# flexibility. The server's authorized_keys command= restriction ensures this
-# key can ONLY run scripts/deploy-prod.sh — no shell access.
+# GitHub Actions secrets. Connection parameters (host, port, user) are also
+# stored as GitHub Actions secrets — this keeps the production infra out of the
+# workflow run logs (GitHub masks secret values), which matters for a PUBLIC
+# repo. The server's authorized_keys command= restriction ensures this key can
+# ONLY run scripts/deploy-prod.sh — no shell access.
 #
 # The deploy script is responsible for pull, up, smoke tests, and rollback.
 # This workflow only provides the trigger and the SSH transport.
@@ -64,7 +65,7 @@ jobs:
       - name: Add polaris2 to known_hosts
         run: |
           mkdir -p ~/.ssh
-          ssh-keyscan -p ${{ vars.POLARIS2_PORT }} ${{ vars.POLARIS2_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -p ${{ secrets.POLARIS2_PORT }} ${{ secrets.POLARIS2_HOST }} >> ~/.ssh/known_hosts
 
       - name: Deploy to polaris2
         # TAG is validated above (semver pattern). Pass via env var, not inline
@@ -72,8 +73,8 @@ jobs:
         env:
           DEPLOY_TAG: ${{ steps.version.outputs.tag }}
         run: |
-          ssh -p ${{ vars.POLARIS2_PORT }} \
-            ${{ vars.POLARIS2_USER }}@${{ vars.POLARIS2_HOST }} \
+          ssh -p ${{ secrets.POLARIS2_PORT }} \
+            ${{ secrets.POLARIS2_USER }}@${{ secrets.POLARIS2_HOST }} \
             "${DEPLOY_TAG}"
         # The authorized_keys command= on the server maps any SSH connection
         # to: deploy-prod.sh ${SSH_ORIGINAL_COMMAND}
