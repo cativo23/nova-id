@@ -20,6 +20,19 @@
 
 name: Release — Build, Scan & Push
 
+# Job topology: 5 flat, parallel jobs — one per image — deliberately NOT a matrix.
+# api and demo-api differ by build context AND Dockerfile. The 3 frontends share
+# Dockerfile.frontend.prod but differ only by build-args (SPA + VITE_*). A matrix
+# was considered and rejected: collapsing all 5 into one matrix would force a
+# single context/Dockerfile/build-arg shape, hurting readability and making the
+# per-image differences implicit. The duplication here is intentional and explicit.
+# Do not refactor to a matrix without a concrete reason.
+
+# Least privilege: this workflow only reads the repo and pushes to an external
+# registry (Docker Hub) via DOCKERHUB_* secrets. It never writes to GitHub.
+permissions:
+  contents: read
+
 on:
   push:
     tags:
@@ -72,7 +85,9 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build api image (do not push yet — Trivy scans first)
+      # Build once with load:true so Trivy scans the exact bytes we later push.
+      # No second build — the push step pushes this same local image.
+      - name: Build api image (load locally — Trivy scans before any push)
         uses: docker/build-push-action@v5
         with:
           context: ./api
@@ -80,32 +95,29 @@ jobs:
           push: false
           load: true
           tags: |
-            ${{ env.IMAGE_PREFIX }}-api:${{ steps.tag.outputs.version }}
-            ${{ env.IMAGE_PREFIX }}-api:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-api:${{ steps.tag.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-api:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Trivy scan — api (fail on CRITICAL or HIGH)
         uses: aquasecurity/trivy-action@0.20.0
         with:
-          image-ref: '${{ env.IMAGE_PREFIX }}-api:${{ steps.tag.outputs.version }}'
+          image-ref: '${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-api:${{ steps.tag.outputs.version }}'
           format: table
           exit-code: '1'
           ignore-unfixed: true
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH'
 
-      - name: Push api image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./api
-          file: ./api/Dockerfile
-          push: true
-          tags: |
-            ${{ env.IMAGE_PREFIX }}-api:${{ steps.tag.outputs.version }}
-            ${{ env.IMAGE_PREFIX }}-api:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      # Push the already-built, already-scanned local image — no rebuild.
+      - name: Push scanned api image
+        env:
+          IMAGE_REF: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-api
+          VERSION: ${{ steps.tag.outputs.version }}
+        run: |
+          docker push "${IMAGE_REF}:${VERSION}"
+          docker push "${IMAGE_REF}:latest"
 
   # ── Demo API ─────────────────────────────────────────────────────────────
   build-demo-api:
@@ -138,7 +150,8 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build demo-api image
+      # Build once with load:true so Trivy scans the exact bytes we later push.
+      - name: Build demo-api image (load locally — Trivy scans before any push)
         uses: docker/build-push-action@v5
         with:
           context: ./demo-api
@@ -146,32 +159,29 @@ jobs:
           push: false
           load: true
           tags: |
-            ${{ env.IMAGE_PREFIX }}-demo-api:${{ steps.tag.outputs.version }}
-            ${{ env.IMAGE_PREFIX }}-demo-api:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-demo-api:${{ steps.tag.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-demo-api:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Trivy scan — demo-api (fail on CRITICAL or HIGH)
         uses: aquasecurity/trivy-action@0.20.0
         with:
-          image-ref: '${{ env.IMAGE_PREFIX }}-demo-api:${{ steps.tag.outputs.version }}'
+          image-ref: '${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-demo-api:${{ steps.tag.outputs.version }}'
           format: table
           exit-code: '1'
           ignore-unfixed: true
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH'
 
-      - name: Push demo-api image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./demo-api
-          file: ./demo-api/Dockerfile
-          push: true
-          tags: |
-            ${{ env.IMAGE_PREFIX }}-demo-api:${{ steps.tag.outputs.version }}
-            ${{ env.IMAGE_PREFIX }}-demo-api:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      # Push the already-built, already-scanned local image — no rebuild.
+      - name: Push scanned demo-api image
+        env:
+          IMAGE_REF: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-demo-api
+          VERSION: ${{ steps.tag.outputs.version }}
+        run: |
+          docker push "${IMAGE_REF}:${VERSION}"
+          docker push "${IMAGE_REF}:latest"
 
   # ── frontend-auth SPA ────────────────────────────────────────────────────
   build-frontend-auth:
@@ -204,7 +214,8 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build frontend-auth image
+      # Build once with load:true so Trivy scans the exact bytes we later push.
+      - name: Build frontend-auth image (load locally — Trivy scans before any push)
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -217,37 +228,29 @@ jobs:
             VITE_ALLOWED_REDIRECT_ORIGINS=https://auth.cativo.dev,https://admin.cativo.dev,https://id.cativo.dev
             VITE_DEFAULT_RETURN_URL=https://auth.cativo.dev
           tags: |
-            ${{ env.IMAGE_PREFIX }}-frontend-auth:${{ steps.tag.outputs.version }}
-            ${{ env.IMAGE_PREFIX }}-frontend-auth:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-frontend-auth:${{ steps.tag.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-frontend-auth:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Trivy scan — frontend-auth (fail on CRITICAL or HIGH)
         uses: aquasecurity/trivy-action@0.20.0
         with:
-          image-ref: '${{ env.IMAGE_PREFIX }}-frontend-auth:${{ steps.tag.outputs.version }}'
+          image-ref: '${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-frontend-auth:${{ steps.tag.outputs.version }}'
           format: table
           exit-code: '1'
           ignore-unfixed: true
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH'
 
-      - name: Push frontend-auth image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./Dockerfile.frontend.prod
-          push: true
-          build-args: |
-            SPA=frontend-auth
-            VITE_OATHKEEPER_URL=/api
-            VITE_ALLOWED_REDIRECT_ORIGINS=https://auth.cativo.dev,https://admin.cativo.dev,https://id.cativo.dev
-            VITE_DEFAULT_RETURN_URL=https://auth.cativo.dev
-          tags: |
-            ${{ env.IMAGE_PREFIX }}-frontend-auth:${{ steps.tag.outputs.version }}
-            ${{ env.IMAGE_PREFIX }}-frontend-auth:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      # Push the already-built, already-scanned local image — no rebuild.
+      - name: Push scanned frontend-auth image
+        env:
+          IMAGE_REF: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-frontend-auth
+          VERSION: ${{ steps.tag.outputs.version }}
+        run: |
+          docker push "${IMAGE_REF}:${VERSION}"
+          docker push "${IMAGE_REF}:latest"
 
   # ── frontend-admin SPA ───────────────────────────────────────────────────
   build-frontend-admin:
@@ -280,7 +283,8 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build frontend-admin image
+      # Build once with load:true so Trivy scans the exact bytes we later push.
+      - name: Build frontend-admin image (load locally — Trivy scans before any push)
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -294,38 +298,29 @@ jobs:
             VITE_KRATOS_BROWSER_URL=https://auth.cativo.dev/auth
             VITE_ADMIN_URL=https://admin.cativo.dev
           tags: |
-            ${{ env.IMAGE_PREFIX }}-frontend-admin:${{ steps.tag.outputs.version }}
-            ${{ env.IMAGE_PREFIX }}-frontend-admin:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-frontend-admin:${{ steps.tag.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-frontend-admin:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Trivy scan — frontend-admin (fail on CRITICAL or HIGH)
         uses: aquasecurity/trivy-action@0.20.0
         with:
-          image-ref: '${{ env.IMAGE_PREFIX }}-frontend-admin:${{ steps.tag.outputs.version }}'
+          image-ref: '${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-frontend-admin:${{ steps.tag.outputs.version }}'
           format: table
           exit-code: '1'
           ignore-unfixed: true
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH'
 
-      - name: Push frontend-admin image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./Dockerfile.frontend.prod
-          push: true
-          build-args: |
-            SPA=frontend-admin
-            VITE_OATHKEEPER_URL=/api
-            VITE_AUTH_UI_URL=https://auth.cativo.dev
-            VITE_KRATOS_BROWSER_URL=https://auth.cativo.dev/auth
-            VITE_ADMIN_URL=https://admin.cativo.dev
-          tags: |
-            ${{ env.IMAGE_PREFIX }}-frontend-admin:${{ steps.tag.outputs.version }}
-            ${{ env.IMAGE_PREFIX }}-frontend-admin:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      # Push the already-built, already-scanned local image — no rebuild.
+      - name: Push scanned frontend-admin image
+        env:
+          IMAGE_REF: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-frontend-admin
+          VERSION: ${{ steps.tag.outputs.version }}
+        run: |
+          docker push "${IMAGE_REF}:${VERSION}"
+          docker push "${IMAGE_REF}:latest"
 
   # ── frontend-app SPA (demo relying-party) ────────────────────────────────
   build-frontend-app:
@@ -358,7 +353,8 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build frontend-app image
+      # Build once with load:true so Trivy scans the exact bytes we later push.
+      - name: Build frontend-app image (load locally — Trivy scans before any push)
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -372,35 +368,26 @@ jobs:
             VITE_NOVA_ID_CLIENT_ID=nova-id-test-app
             VITE_OAUTH_ISSUER=https://id.cativo.dev/
           tags: |
-            ${{ env.IMAGE_PREFIX }}-frontend-app:${{ steps.tag.outputs.version }}
-            ${{ env.IMAGE_PREFIX }}-frontend-app:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-frontend-app:${{ steps.tag.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-frontend-app:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Trivy scan — frontend-app (fail on CRITICAL or HIGH)
         uses: aquasecurity/trivy-action@0.20.0
         with:
-          image-ref: '${{ env.IMAGE_PREFIX }}-frontend-app:${{ steps.tag.outputs.version }}'
+          image-ref: '${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-frontend-app:${{ steps.tag.outputs.version }}'
           format: table
           exit-code: '1'
           ignore-unfixed: true
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH'
 
-      - name: Push frontend-app image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./Dockerfile.frontend.prod
-          push: true
-          build-args: |
-            SPA=frontend-app
-            VITE_OATHKEEPER_URL=/api
-            VITE_APP_URL=https://app.cativo.dev
-            VITE_NOVA_ID_CLIENT_ID=nova-id-test-app
-            VITE_OAUTH_ISSUER=https://id.cativo.dev/
-          tags: |
-            ${{ env.IMAGE_PREFIX }}-frontend-app:${{ steps.tag.outputs.version }}
-            ${{ env.IMAGE_PREFIX }}-frontend-app:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      # Push the already-built, already-scanned local image — no rebuild.
+      - name: Push scanned frontend-app image
+        env:
+          IMAGE_REF: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-frontend-app
+          VERSION: ${{ steps.tag.outputs.version }}
+        run: |
+          docker push "${IMAGE_REF}:${VERSION}"
+          docker push "${IMAGE_REF}:latest"

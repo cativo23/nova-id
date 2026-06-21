@@ -294,7 +294,7 @@ services:
   api:
     # Image pulled by deploy-prod.sh; IMAGE_TAG exported before `docker compose up`.
     # Never built on the server — use scripts/deploy-prod.sh to deploy.
-    image: cativo23/nova-id-api:${IMAGE_TAG:-latest}
+    image: cativo23/nova-id-api:${IMAGE_TAG:?IMAGE_TAG must be set}
     command: ["node", "dist/main"]
     # No source bind-mount. No anonymous /app/node_modules.
     # api_logs provides persistent log retention across restarts.
@@ -331,7 +331,7 @@ services:
 
   demo-api:
     # Image pulled by deploy-prod.sh; IMAGE_TAG exported before `docker compose up`.
-    image: cativo23/nova-id-demo-api:${IMAGE_TAG:-latest}
+    image: cativo23/nova-id-demo-api:${IMAGE_TAG:?IMAGE_TAG must be set}
     command: ["node", "dist/main"]
     volumes:
       - demo_api_logs:/app/logs
@@ -377,7 +377,7 @@ services:
     # Image pulled by deploy-prod.sh; IMAGE_TAG exported before `docker compose up`.
     # VITE_* build-args are baked into the image by release.yml — see
     # .github/workflows/release.yml job build-frontend-auth.
-    image: cativo23/nova-id-frontend-auth:${IMAGE_TAG:-latest}
+    image: cativo23/nova-id-frontend-auth:${IMAGE_TAG:?IMAGE_TAG must be set}
     # nginx starts by default — no command override needed.
     # No bind-mounts in production — static files are baked into the image.
     networks:
@@ -399,7 +399,7 @@ services:
     # Image pulled by deploy-prod.sh; IMAGE_TAG exported before `docker compose up`.
     # VITE_* build-args are baked into the image by release.yml — see
     # .github/workflows/release.yml job build-frontend-admin.
-    image: cativo23/nova-id-frontend-admin:${IMAGE_TAG:-latest}
+    image: cativo23/nova-id-frontend-admin:${IMAGE_TAG:?IMAGE_TAG must be set}
     networks:
       - apps
       - web
@@ -423,7 +423,7 @@ services:
     # Image pulled by deploy-prod.sh; IMAGE_TAG exported before `docker compose up`.
     # VITE_* build-args are baked into the image by release.yml — see
     # .github/workflows/release.yml job build-frontend-app.
-    image: cativo23/nova-id-frontend-app:${IMAGE_TAG:-latest}
+    image: cativo23/nova-id-frontend-app:${IMAGE_TAG:?IMAGE_TAG must be set}
     networks:
       - apps
       - web

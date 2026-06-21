@@ -211,10 +211,16 @@ jobs:
         run: npm test
 
   # ---------------------------------------------------------------------------
-  # Production Docker image build — verifies all three production Dockerfiles
-  # compile successfully. Build-only: no images are pushed or deployed.
+  # Production Docker image build — verifies all 5 production Dockerfiles compile
+  # successfully on every PR. Build-only: no images are pushed or deployed.
   # Trivy scan omitted: no registry push in CI, so scanning build-time artifacts
-  # adds runtime cost without actionable signal until B3 (CD) lands.
+  # adds runtime cost without actionable signal — release.yml scans on tag push.
+  #
+  # Direct `docker build` (NOT the prod compose) is used on purpose: after B3 the
+  # compose app services are `image:` refs with a fail-loud ${IMAGE_TAG:?...}, so
+  # `docker compose -f docker-compose.production.yml config/build` would error
+  # without a tag. This job builds the Dockerfiles directly with the SAME
+  # build-args release.yml bakes in — keep them in sync with release.yml.
   # ---------------------------------------------------------------------------
   build-prod-images:
     name: Build production images (build-only, no push)
@@ -222,21 +228,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # docker-compose.production.yml declares `env_file: [.env.production]` on every
-      # Ory service, and Compose v2 hard-errors when an env_file is missing. That file
-      # is gitignored (real secrets), so it's absent in CI. Build args (VITE_*) are
-      # literal in the compose file and env_file values are NOT used during `build`,
-      # so a placeholder stub from the committed template satisfies the existence check.
-      # env_file stays REQUIRED (not required:false) so production fails loudly on missing secrets.
-      - name: Stub .env.production for build (values irrelevant to build)
-        run: cp .env.production.example .env.production
-
-      # Validate the compose file is syntactically valid before attempting the build.
-      - name: Validate docker-compose.production.yml
-        run: docker compose -f docker-compose.production.yml config >/dev/null
-
-      # After B3: app services use image: refs (no build: context). The compose
-      # file is still validated above. Full image builds happen in release.yml.
-      # This step is now a no-op but kept to confirm the file is parse-valid.
-      - name: Validate compose build spec (no-op post-B3)
-        run: docker compose -f docker-compose.production.yml build --dry-run 2>/dev/null || true
+      # Real build gate: a broken Dockerfile or build-arg fails the PR here.
+      # Frontend build-args mirror .github/workflows/release.yml exactly.
+      - name: Build production images (CI gate — no push)
+        run: |
+          docker build -f api/Dockerfile -t nova-id-api:ci api/
+          docker build -f demo-api/Dockerfile -t nova-id-demo-api:ci demo-api/
+          docker build -f Dockerfile.frontend.prod \
+            --build-arg SPA=frontend-auth \
+            --build-arg VITE_OATHKEEPER_URL=/api \
+            --build-arg VITE_ALLOWED_REDIRECT_ORIGINS=https://auth.cativo.dev,https://admin.cativo.dev,https://id.cativo.dev \
+            --build-arg VITE_DEFAULT_RETURN_URL=https://auth.cativo.dev \
+            -t nova-id-frontend-auth:ci .
+          docker build -f Dockerfile.frontend.prod \
+            --build-arg SPA=frontend-admin \
+            --build-arg VITE_OATHKEEPER_URL=/api \
+            --build-arg VITE_AUTH_UI_URL=https://auth.cativo.dev \
+            --build-arg VITE_KRATOS_BROWSER_URL=https://auth.cativo.dev/auth \
+            --build-arg VITE_ADMIN_URL=https://admin.cativo.dev \
+            -t nova-id-frontend-admin:ci .
+          docker build -f Dockerfile.frontend.prod \
+            --build-arg SPA=frontend-app \
+            --build-arg VITE_OATHKEEPER_URL=/api \
+            --build-arg VITE_APP_URL=https://app.cativo.dev \
+            --build-arg VITE_NOVA_ID_CLIENT_ID=nova-id-test-app \
+            --build-arg VITE_OAUTH_ISSUER=https://id.cativo.dev/ \
+            -t nova-id-frontend-app:ci .
