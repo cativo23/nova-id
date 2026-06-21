@@ -91,15 +91,6 @@ const processing = ref(false)
 const error = ref<string | null>(null)
 const loading = ref(true) // Track loading state to prevent UI flash
 
-// Use gateway path /api/hydra-admin so requests are same-origin and go through Oathkeeper.
-// Calling localhost:4445 from auth.ory.localhost causes cross-origin + ERR_BLOCKED_BY_CLIENT.
-function getHydraAdminBaseUrl() {
-  const env = import.meta.env.VITE_HYDRA_ADMIN_URL
-  if (env) return String(env).replace(/\/$/, '')
-  if (typeof window !== 'undefined') return window.location.origin + '/api/hydra-admin'
-  return 'http://localhost:4445'
-}
-
 onMounted(async () => {
   const challenge = Array.isArray(route.query.consent_challenge)
     ? route.query.consent_challenge[0]
@@ -111,11 +102,10 @@ onMounted(async () => {
   }
 
   consentChallenge.value = challenge
-  const base = getHydraAdminBaseUrl()
 
   try {
-    // Get consent request info from Hydra via Oathkeeper (same-origin, cookie_session)
-    const response = await fetch(`${base}/oauth2/auth/requests/consent?consent_challenge=${encodeURIComponent(challenge)}`, {
+    // Get consent request info via BFF endpoint (same-origin, cookie_session via Oathkeeper)
+    const response = await fetch(`/api/v1/hydra-consent-info?consent_challenge=${encodeURIComponent(challenge)}`, {
       method: 'GET',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' }
@@ -166,6 +156,7 @@ const acceptConsent = async () => {
       window.location.href = result.redirect_to
     } else {
       error.value = 'No redirect URL in response'
+      processing.value = false
     }
   } catch (err) {
     const e = err as { response?: { data?: { message?: string } }; message?: string }
@@ -178,28 +169,25 @@ const acceptConsent = async () => {
 const rejectConsent = async () => {
   processing.value = true
   error.value = null
-  const base = getHydraAdminBaseUrl()
 
   try {
-    // Reject the consent via Oathkeeper → Hydra
-    const response = await fetch(`${base}/oauth2/auth/requests/consent/reject?consent_challenge=${encodeURIComponent(consentChallenge.value ?? '')}`, {
-      method: 'PUT',
+    // Reject the consent via BFF endpoint (same-origin, cookie_session via Oathkeeper)
+    const response = await fetch(`/api/v1/hydra-reject-consent`, {
+      method: 'POST',
       credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json'
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        error: 'access_denied',
-        error_description: 'The user denied the request'
-      })
+        consent_challenge: consentChallenge.value ?? '',
+        error_description: 'The user denied the request',
+      }),
     })
-    
+
     if (!response.ok) {
       throw new Error(`Failed to reject consent: ${response.statusText}`)
     }
-    
+
     const result = await response.json()
-    
+
     // Redirect to the redirect_uri
     if (result.redirect_to) {
       window.location.href = result.redirect_to
@@ -209,6 +197,7 @@ const rejectConsent = async () => {
   } catch (err) {
     error.value = (err as Error).message || 'Failed to reject consent'
     logger.error('Error rejecting consent:', errMessage(err))
+  } finally {
     processing.value = false
   }
 }

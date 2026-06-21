@@ -185,9 +185,43 @@
       "url": "http://api:8080"
     },
     "match": {
-      "url": "<(http|https)://(id\\.cativo\\.dev|auth\\.cativo\\.dev|admin\\.cativo\\.dev|oathkeeper(:[0-9]+)?)/api/v1/(hydra-accept-login|hydra-accept-consent)>",
+      "url": "<(http|https)://(id\\.cativo\\.dev|auth\\.cativo\\.dev|admin\\.cativo\\.dev|oathkeeper(:[0-9]+)?)/api/v1/(hydra-accept-login|hydra-accept-consent|hydra-reject-consent)>",
       "methods": [
         "POST",
+        "OPTIONS"
+      ]
+    },
+    "authenticators": [
+      {
+        "handler": "cookie_session",
+        "config": {
+          "check_session_url": "http://kratos:4433/sessions/whoami",
+          "preserve_path": true,
+          "extra_from": "@this",
+          "subject_from": "identity.id"
+        }
+      }
+    ],
+    "authorizer": {
+      "handler": "allow"
+    },
+    "mutators": [
+      {
+        "handler": "id_token"
+      }
+    ]
+  },
+  {
+    "id": "api-hydra-consent-info",
+    "upstream": {
+      "preserve_host": true,
+      "strip_path": "/api",
+      "url": "http://api:8080"
+    },
+    "match": {
+      "url": "<(http|https)://(id\\.cativo\\.dev|auth\\.cativo\\.dev|admin\\.cativo\\.dev|oathkeeper(:[0-9]+)?)/api/v1/hydra-consent-info>",
+      "methods": [
+        "GET",
         "OPTIONS"
       ]
     },
