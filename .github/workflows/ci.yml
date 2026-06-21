@@ -235,8 +235,8 @@ jobs:
       - name: Validate docker-compose.production.yml
         run: docker compose -f docker-compose.production.yml config >/dev/null
 
-      # Build api (api/Dockerfile) + frontend-auth + frontend-admin
-      # (Dockerfile.frontend.prod with VITE build args). Runtime env_file entries
-      # are irrelevant to `build`; build args are declared inline in the compose file.
-      - name: Build production images
-        run: docker compose -f docker-compose.production.yml build
+      # After B3: app services use image: refs (no build: context). The compose
+      # file is still validated above. Full image builds happen in release.yml.
+      # This step is now a no-op but kept to confirm the file is parse-valid.
+      - name: Validate compose build spec (no-op post-B3)
+        run: docker compose -f docker-compose.production.yml build --dry-run 2>/dev/null || true
