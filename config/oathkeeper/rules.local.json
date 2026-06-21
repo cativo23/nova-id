@@ -471,8 +471,9 @@
       "url": "http://api:8080"
     },
     "match": {
-      "url": "<(http|https)://(api\\.ory\\.localhost|admin\\.ory\\.localhost|auth\\.ory\\.localhost|app\\.ory\\.localhost|localhost(:[0-9]+)?|oathkeeper(:[0-9]+)?)/api/v1/(hydra-accept-login|hydra-accept-consent)>",
+      "url": "<(http|https)://(api\\.ory\\.localhost|admin\\.ory\\.localhost|auth\\.ory\\.localhost|app\\.ory\\.localhost|localhost(:[0-9]+)?|oathkeeper(:[0-9]+)?)/api/v1/(hydra-accept-login|hydra-accept-consent|hydra-reject-consent|hydra-consent-info)>",
       "methods": [
+        "GET",
         "POST",
         "OPTIONS"
       ]
