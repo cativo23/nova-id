@@ -2,6 +2,7 @@ import {
   Controller, Get, Post, Put, Delete, Body, Param, UseGuards, UseInterceptors,
 } from '@nestjs/common';
 import { LoggingInterceptor } from './logging.interceptor';
+import { LogAccess } from './log-access.decorator';
 import { DemoService } from './demo.service';
 import { RolesService } from './roles/roles.service';
 import { GetUser } from '../decorators/get-user.decorator';
@@ -15,6 +16,7 @@ import { DemoConfigureDto } from './dto/demo-configure.dto';
 import { DemoUpdateDataDto } from './dto/demo-update-data.dto';
 
 @Controller()
+@LogAccess()
 @UseInterceptors(LoggingInterceptor)
 export class DemoController {
   constructor(
