@@ -181,13 +181,13 @@ const rejectConsent = async () => {
         error_description: 'The user denied the request',
       }),
     })
-    
+
     if (!response.ok) {
       throw new Error(`Failed to reject consent: ${response.statusText}`)
     }
-    
+
     const result = await response.json()
-    
+
     // Redirect to the redirect_uri
     if (result.redirect_to) {
       window.location.href = result.redirect_to
@@ -197,6 +197,7 @@ const rejectConsent = async () => {
   } catch (err) {
     error.value = (err as Error).message || 'Failed to reject consent'
     logger.error('Error rejecting consent:', errMessage(err))
+  } finally {
     processing.value = false
   }
 }
