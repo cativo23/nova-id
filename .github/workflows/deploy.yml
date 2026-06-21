@@ -26,6 +26,10 @@ on:
         required: true
         default: ''
 
+# Least privilege: this workflow uses only SSH; it never touches GITHUB_TOKEN.
+permissions:
+  contents: read
+
 # One deploy at a time globally — a new tag push waits if a deploy is running.
 concurrency:
   group: deploy-production
@@ -68,30 +72,48 @@ jobs:
           ssh-keyscan -p ${{ secrets.POLARIS2_PORT }} ${{ secrets.POLARIS2_HOST }} >> ~/.ssh/known_hosts
 
       - name: Deploy to polaris2
+        id: deploy
+        # continue-on-error so we can capture the ssh exit code and translate the
+        # deploy-prod.sh exit contract into a clear outcome in the next step.
+        # Each run: block is a fresh shell, so $? in a later step is NOT this
+        # step's exit code — the code must be exported via $GITHUB_OUTPUT here.
+        continue-on-error: true
         # TAG is validated above (semver pattern). Pass via env var, not inline
         # interpolation, to prevent any residual shell injection risk.
         env:
           DEPLOY_TAG: ${{ steps.version.outputs.tag }}
         run: |
+          set +e
           ssh -p ${{ secrets.POLARIS2_PORT }} \
             ${{ secrets.POLARIS2_USER }}@${{ secrets.POLARIS2_HOST }} \
             "${DEPLOY_TAG}"
-        # The authorized_keys command= on the server maps any SSH connection
-        # to: deploy-prod.sh ${SSH_ORIGINAL_COMMAND}
-        # So passing the tag as the "command" sends it to the script as $1.
+          code=$?
+          echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
+          exit 0
+        # The authorized_keys command= on the server is the SAFE form (no var
+        # appended): command="…/scripts/deploy-prod.sh". sshd sets the tag in
+        # $SSH_ORIGINAL_COMMAND, which deploy-prod.sh reads and regex-validates.
 
       - name: Report deploy outcome
         if: always()
         env:
           DEPLOY_TAG: ${{ steps.version.outputs.tag }}
+          # deploy-prod.sh exit contract:
+          #   0 = success
+          #   2 = deploy failed but auto-rollback to previous succeeded
+          #   3 = deploy failed AND rollback failed (stack in unknown state)
+          #   1 = guard/precondition failure or no previous version to roll back to
+          EXIT_CODE: ${{ steps.deploy.outputs.exit_code }}
         run: |
-          EXIT_CODE=$?
-          if [ $EXIT_CODE -eq 0 ]; then
+          if [ "${EXIT_CODE}" = "0" ]; then
             echo "Deploy of ${DEPLOY_TAG} succeeded."
-          elif [ $EXIT_CODE -eq 2 ]; then
-            echo "DEPLOY FAILED — auto-rollback succeeded. Check deploy logs."
+          elif [ "${EXIT_CODE}" = "2" ]; then
+            echo "::warning::Deploy of ${DEPLOY_TAG} FAILED — auto-rollback to the previous version succeeded. Stack is serving the previous release. Investigate the deploy logs."
+            exit 1
+          elif [ "${EXIT_CODE}" = "3" ]; then
+            echo "::error::Deploy of ${DEPLOY_TAG} FAILED and auto-rollback ALSO failed. Stack is in an UNKNOWN state — manual intervention required immediately."
             exit 1
           else
-            echo "DEPLOY FAILED — auto-rollback also failed. Manual intervention required."
+            echo "::error::Deploy of ${DEPLOY_TAG} FAILED (exit ${EXIT_CODE:-<none>}). No auto-rollback occurred (guard failure, missing previous version, or transport error). Check the deploy logs."
             exit 1
           fi

@@ -7,10 +7,18 @@
 #   ./scripts/deploy-prod.sh <version-tag>
 #   ./scripts/deploy-prod.sh v1.2.0
 #
-# Invoked by GitHub Actions via restricted SSH command= in authorized_keys.
-# The version tag arrives as $SSH_ORIGINAL_COMMAND when the restricted key is
-# used (authorized_keys: command="…/deploy-prod.sh ${SSH_ORIGINAL_COMMAND}").
-# When called manually (or via the command= wrapper) $1 holds the version.
+# Invoked by GitHub Actions via a restricted SSH command= in authorized_keys.
+# The version tag arrives as $SSH_ORIGINAL_COMMAND, which this script reads and
+# regex-validates itself. When called manually, $1 holds the version instead.
+#
+# authorized_keys line on polaris2 — use this SAFE form. Note there is NO
+# ${SSH_ORIGINAL_COMMAND} appended to the command=: appending it would make
+# sshd execute  deploy-prod.sh v1.0.0; rm -rf ~  if an attacker sent
+# `ssh host 'v1.0.0; rm -rf ~'`, BEFORE the script's regex could reject it.
+# The script reads $SSH_ORIGINAL_COMMAND from the environment, so the safe
+# form passes nothing on the command line:
+#
+#   command="/home/<user>/deploy/nova-id-deploy/scripts/deploy-prod.sh",no-port-forwarding,no-agent-forwarding,no-pty,no-X11-forwarding ssh-ed25519 AAAA...
 #
 # What this script does:
 #   1. Guards: asserts location, .env.production, JWKS exist.
@@ -37,7 +45,11 @@ set -euo pipefail
 
 DEPLOY_DIR="/home/cativo23/deploy/nova-id-deploy"
 COMPOSE_CMD="docker compose --env-file .env.production -f docker-compose.production.yml"
-LOCK_FILE="/tmp/nova-id-deploy.lock"
+# Lock lives under the deploy dir (persistent, never tmpreaped). The file is
+# created once and NEVER deleted — flock releases the lock when the fd closes,
+# and unlinking a held lock inode would let a concurrent deploy break mutual
+# exclusion.
+LOCK_FILE="${DEPLOY_DIR}/.deploy.lock"
 IMAGE_PREFIX="cativo23/nova-id"
 IMAGES=(api demo-api frontend-auth frontend-admin frontend-app)
 
@@ -118,7 +130,9 @@ if ! flock -n 9; then
   error "Another deploy is already running (lock: ${LOCK_FILE}). Aborting."
   exit 1
 fi
-trap 'flock -u 9; rm -f "${LOCK_FILE}"' EXIT
+# Release on exit by closing the fd. Do NOT rm the lock file — unlinking a held
+# lock inode would let a third deploy acquire a fresh inode and run concurrently.
+trap 'flock -u 9' EXIT
 
 # ── Smoke function (reusable for both deploy and rollback) ───────────────────
 
@@ -176,10 +190,13 @@ success "All 5 images pulled."
 # (Config files: oathkeeper rules, kratos YAML, etc. live in the repo checkout.)
 
 info "Updating repo checkout to ${VERSION}..."
-git fetch --tags --prune origin
+# --force ensures the local tag is overwritten if it ever drifted from origin,
+# so the checkout matches the exact commit the released image was built from.
+git fetch --tags --force --prune origin
 # Force-sync to the tag (polaris2 is a git clone; deploys discard any local drift).
+# Use the fully-qualified refs/tags/ ref so a same-named branch can never win.
 # Detached HEAD at the tag is intentional — deploy dirs are not development envs.
-git reset --hard "${VERSION}"
+git reset --hard "refs/tags/${VERSION}"
 success "Repo at ${VERSION}."
 
 # ── Up the stack (image-pull mode, no build) ─────────────────────────────────
@@ -220,7 +237,7 @@ for img in "${IMAGES[@]}"; do
   docker pull "${IMAGE_PREFIX}-${img}:${PREVIOUS}" || true
 done
 
-git reset --hard "${PREVIOUS}"
+git reset --hard "refs/tags/${PREVIOUS}"
 export IMAGE_TAG="${PREVIOUS}"
 ${COMPOSE_CMD} up -d --no-build --remove-orphans
 ${COMPOSE_CMD} restart oathkeeper
