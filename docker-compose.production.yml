@@ -459,6 +459,9 @@ services:
         VITE_APP_URL: "https://app.cativo.dev"
         # OAuth2 client_id registered in Hydra (public client, PKCE, no secret).
         VITE_NOVA_ID_CLIENT_ID: "nova-id-test-app"
+        # Real id_token issuer (Hydra urls.self.issuer) — used to validate the `iss`
+        # claim. NOT the proxy base (${origin}/api/hydra-public) used to reach Hydra.
+        VITE_OAUTH_ISSUER: "https://id.cativo.dev/"
         # VITE_HYDRA_PUBLIC_URL intentionally omitted: useHydraOAuth.ts falls back to
         # `${origin}/api/hydra-public` for non-.ory.localhost hosts, which routes via
         # this nginx /api/* → oathkeeper hydra-public rule. Same for VITE_API_TEST_URL
