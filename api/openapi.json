@@ -65,6 +65,70 @@
         ]
       }
     },
+    "/v1/hydra-consent-info": {
+      "get": {
+        "operationId": "getHydraConsentInfo",
+        "summary": "Get Hydra consent request info (server-side proxy)",
+        "parameters": [
+          {
+            "name": "consent_challenge",
+            "required": true,
+            "in": "query",
+            "description": "Hydra consent challenge token",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HydraConsentInfoResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/v1/hydra-reject-consent": {
+      "post": {
+        "operationId": "rejectHydraConsent",
+        "summary": "Reject a Hydra consent challenge",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectHydraConsentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HydraRedirectResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/v1/admin/users": {
       "get": {
         "operationId": "AdminUsersController_list",
@@ -492,6 +556,51 @@
             "items": {
               "type": "string"
             }
+          }
+        },
+        "required": [
+          "consent_challenge"
+        ]
+      },
+      "HydraConsentClientDto": {
+        "type": "object",
+        "properties": {
+          "client_id": {
+            "type": "string"
+          },
+          "client_name": {
+            "type": "string"
+          }
+        }
+      },
+      "HydraConsentInfoResponseDto": {
+        "type": "object",
+        "properties": {
+          "skip": {
+            "type": "boolean"
+          },
+          "requested_scope": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "client": {
+            "$ref": "#/components/schemas/HydraConsentClientDto"
+          },
+          "subject": {
+            "type": "string"
+          }
+        }
+      },
+      "RejectHydraConsentDto": {
+        "type": "object",
+        "properties": {
+          "consent_challenge": {
+            "type": "string"
+          },
+          "error_description": {
+            "type": "string"
           }
         },
         "required": [
