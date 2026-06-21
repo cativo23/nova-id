@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Version, Query, BadRequestException, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Body, Version, Query, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBody, ApiOkResponse } from '@nestjs/swagger';
 import { AppService } from './app.service';
 import { Public } from './decorators/public.decorator';
@@ -9,6 +9,7 @@ import { AcceptHydraConsentDto } from './dto/accept-hydra-consent.dto';
 import { HydraRedirectResponseDto } from './dto/hydra-redirect-response.dto';
 import { HydraConsentInfoResponseDto } from './dto/hydra-consent-info-response.dto';
 import { RejectHydraConsentDto } from './dto/reject-hydra-consent.dto';
+import { ConsentInfoQueryDto } from './dto/consent-info-query.dto';
 
 @Controller()
 export class AppController {
@@ -63,12 +64,10 @@ export class AppController {
   @Version('1')
   @Get('hydra-consent-info')
   async getHydraConsentInfo(
-    @Query('consent_challenge') consentChallenge: string,
+    @GetUser() user: AuthenticatedUser,
+    @Query() query: ConsentInfoQueryDto,
   ): Promise<HydraConsentInfoResponseDto> {
-    if (!consentChallenge) {
-      throw new BadRequestException('consent_challenge query param is required');
-    }
-    return this.appService.getHydraConsentInfo(consentChallenge);
+    return this.appService.getHydraConsentInfo(user, query.consent_challenge);
   }
 
   @ApiTags('auth')

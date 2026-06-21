@@ -118,8 +118,9 @@ export class AppService {
     }
   }
 
-  async getHydraConsentInfo(consentChallenge: string): Promise<HydraConsentInfoResponseDto> {
+  async getHydraConsentInfo(user: AuthenticatedUser, consentChallenge: string): Promise<HydraConsentInfoResponseDto> {
     try {
+      this.logger.log(`Fetching consent info for user ${user.userId} (challenge ${consentChallenge})`);
       const consentRequest = await this.hydra.getConsentRequest(consentChallenge);
       return {
         skip: consentRequest.skip,
@@ -142,6 +143,10 @@ export class AppService {
         error: 'access_denied',
         error_description: body.error_description ?? 'The user denied the request',
       });
+      // TODO: capture client_id if consent request is available (would require an
+      // extra getConsentRequest round-trip; defer until reject is refactored to
+      // fetch consent info first, e.g. to validate the challenge still belongs to
+      // this user before rejecting).
       await this.audit.record({
         actorId: user.userId,
         action: 'consent.user_reject',
