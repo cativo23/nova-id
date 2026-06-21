@@ -7,6 +7,7 @@ import type {
   OAuth2LoginRequest,
   OAuth2ConsentRequest,
   RejectOAuth2Request,
+  OAuth2Client,
 } from '@ory/hydra-client';
 import { HYDRA_OAUTH2_API } from './ory.constants';
 
@@ -61,5 +62,29 @@ export class HydraService {
       rejectOAuth2Request: body,
     });
     return data;
+  }
+
+  async listClients(): Promise<OAuth2Client[]> {
+    const { data } = await this.oauth2Api.listOAuth2Clients({});
+    return data;
+  }
+
+  async getClient(id: string): Promise<OAuth2Client> {
+    const { data } = await this.oauth2Api.getOAuth2Client({ id });
+    return data;
+  }
+
+  async createClient(body: OAuth2Client): Promise<OAuth2Client> {
+    const { data } = await this.oauth2Api.createOAuth2Client({ oAuth2Client: body });
+    return data;
+  }
+
+  async updateClient(id: string, body: OAuth2Client): Promise<OAuth2Client> {
+    const { data } = await this.oauth2Api.setOAuth2Client({ id, oAuth2Client: body });
+    return data;
+  }
+
+  async deleteClient(id: string): Promise<void> {
+    await this.oauth2Api.deleteOAuth2Client({ id });
   }
 }

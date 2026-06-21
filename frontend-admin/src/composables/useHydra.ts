@@ -1,11 +1,12 @@
 // Hydra API composable for OAuth2/OIDC client management
-// ZERO TRUST: Route through Oathkeeper - frontend cannot directly reach Hydra
-// NOTE: This is OUTSIDE the BFF surface (calls Hydra Admin via the gateway, not
-// the Nest BFF), so it intentionally keeps hand-rolled fetch — it is not part of
-// the generated @nova-id/api-client.
+// ZERO TRUST: Route through Oathkeeper + BFF - frontend cannot directly reach Hydra Admin
+// NOTE: These calls are routed through the NestJS BFF at /v1/admin/clients.
+// The BFF endpoints are gated by Keto Platform:nova#administer via PlatformAdministerGuard.
+// Hand-rolled fetch is kept here intentionally — this module is not part of the
+// generated @nova-id/api-client.
 import { logger, errMessage } from '../utils/logger'
 const oathkeeperUrl = import.meta.env.VITE_OATHKEEPER_URL || '/api'
-const hydraAdminUrl = `${oathkeeperUrl}/hydra-admin`
+const bffClientsUrl = `${oathkeeperUrl}/v1/admin/clients`
 
 /** Minimal OAuth2 client shape used by the UI. */
 export interface OAuthClient {
@@ -18,7 +19,7 @@ export interface OAuthClient {
 // List all OAuth clients
 export async function listClients(): Promise<OAuthClient[]> {
   try {
-    const response = await fetch(`${hydraAdminUrl}/clients`, {
+    const response = await fetch(`${bffClientsUrl}`, {
       method: 'GET',
       credentials: 'include',
       mode: 'cors',
@@ -42,7 +43,7 @@ export async function listClients(): Promise<OAuthClient[]> {
 // Get a single OAuth client
 export async function getClient(clientId: string): Promise<OAuthClient> {
   try {
-    const response = await fetch(`${hydraAdminUrl}/clients/${clientId}`, {
+    const response = await fetch(`${bffClientsUrl}/${clientId}`, {
       method: 'GET',
       credentials: 'include',
       mode: 'cors',
@@ -66,7 +67,7 @@ export async function getClient(clientId: string): Promise<OAuthClient> {
 // Create an OAuth client
 export async function createClient(clientData: Record<string, unknown>): Promise<OAuthClient> {
   try {
-    const response = await fetch(`${hydraAdminUrl}/clients`, {
+    const response = await fetch(`${bffClientsUrl}`, {
       method: 'POST',
       credentials: 'include',
       mode: 'cors',
@@ -92,7 +93,7 @@ export async function createClient(clientData: Record<string, unknown>): Promise
 // Update an OAuth client
 export async function updateClient(clientId: string, clientData: Record<string, unknown>): Promise<OAuthClient> {
   try {
-    const response = await fetch(`${hydraAdminUrl}/clients/${clientId}`, {
+    const response = await fetch(`${bffClientsUrl}/${clientId}`, {
       method: 'PUT',
       credentials: 'include',
       mode: 'cors',
@@ -118,7 +119,7 @@ export async function updateClient(clientId: string, clientData: Record<string, 
 // Delete an OAuth client
 export async function deleteClient(clientId: string): Promise<boolean> {
   try {
-    const response = await fetch(`${hydraAdminUrl}/clients/${clientId}`, {
+    const response = await fetch(`${bffClientsUrl}/${clientId}`, {
       method: 'DELETE',
       credentials: 'include',
       mode: 'cors',
