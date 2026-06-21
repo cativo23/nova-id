@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, ForbiddenException } from '@nestjs/common';
 import { HydraService } from './ory/hydra.service';
 import { KetoService } from './ory/keto.service';
 import { AuditService } from './audit/audit.service';
@@ -66,6 +66,17 @@ export class AppService {
       this.logger.log(`Consent for user ${user.userId} (challenge ${consentChallenge})`);
 
       const consentRequest = await this.hydra.getConsentRequest(consentChallenge);
+
+      // Ownership check: consent challenge must belong to the authenticated user.
+      if (consentRequest.subject) {
+        if (consentRequest.subject !== user.userId) {
+          this.logger.warn(`Consent IDOR blocked: challenge subject ${consentRequest.subject} !== ${user.userId}`);
+          throw new ForbiddenException('Consent challenge does not belong to current user');
+        }
+      } else {
+        this.logger.warn(`Consent challenge ${consentChallenge} has no subject yet — skipping ownership check`);
+      }
+
       const clientId = consentRequest.client?.client_id;
 
       // Per-app access gate (fail-closed): only members of App:<clientId> get a token.
@@ -122,6 +133,17 @@ export class AppService {
     try {
       this.logger.log(`Fetching consent info for user ${user.userId} (challenge ${consentChallenge})`);
       const consentRequest = await this.hydra.getConsentRequest(consentChallenge);
+
+      // Ownership check: consent challenge must belong to the authenticated user.
+      if (consentRequest.subject) {
+        if (consentRequest.subject !== user.userId) {
+          this.logger.warn(`Consent IDOR blocked: challenge subject ${consentRequest.subject} !== ${user.userId}`);
+          throw new ForbiddenException('Consent challenge does not belong to current user');
+        }
+      } else {
+        this.logger.warn(`Consent challenge ${consentChallenge} has no subject yet — skipping ownership check`);
+      }
+
       return {
         skip: consentRequest.skip,
         requested_scope: consentRequest.requested_scope ?? [],
@@ -139,18 +161,30 @@ export class AppService {
   async rejectHydraConsent(user: AuthenticatedUser, body: RejectHydraConsentDto): Promise<{ redirect_to: string }> {
     try {
       this.logger.log(`Rejecting consent for user ${user.userId} (challenge ${body.consent_challenge})`);
+
+      // Fetch consent request first: enables ownership check and client_id capture.
+      const consentRequest = await this.hydra.getConsentRequest(body.consent_challenge);
+
+      // Ownership check: consent challenge must belong to the authenticated user.
+      if (consentRequest.subject) {
+        if (consentRequest.subject !== user.userId) {
+          this.logger.warn(`Consent IDOR blocked: challenge subject ${consentRequest.subject} !== ${user.userId}`);
+          throw new ForbiddenException('Consent challenge does not belong to current user');
+        }
+      } else {
+        this.logger.warn(`Consent challenge ${body.consent_challenge} has no subject yet — skipping ownership check`);
+      }
+
+      const clientId = consentRequest.client?.client_id ?? null;
+
       const result = await this.hydra.rejectConsent(body.consent_challenge, {
         error: 'access_denied',
         error_description: body.error_description ?? 'The user denied the request',
       });
-      // TODO: capture client_id if consent request is available (would require an
-      // extra getConsentRequest round-trip; defer until reject is refactored to
-      // fetch consent info first, e.g. to validate the challenge still belongs to
-      // this user before rejecting).
       await this.audit.record({
         actorId: user.userId,
         action: 'consent.user_reject',
-        appId: null,
+        appId: clientId,
         targetType: 'app',
       });
       return { redirect_to: result.redirect_to };
