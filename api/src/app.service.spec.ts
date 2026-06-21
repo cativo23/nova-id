@@ -175,4 +175,144 @@ describe('AppService.acceptHydraConsent', () => {
     expect(body.grant_scope).toContain('email');
     expect(body.grant_scope).toContain('app:member');
   });
+
+  it('IDOR: throws ForbiddenException when challenge subject does not match user', async () => {
+    const hydra = makeHydra();
+    hydra.getConsentRequest.mockResolvedValue({
+      subject: 'other-user',
+      client: { client_id: 'nova-id-test-app' },
+      requested_access_token_audience: [],
+      requested_scope: ['openid'],
+    });
+    const keto = makeKeto();
+    keto.checkApp.mockResolvedValue(true);
+    const svc = new AppService(hydra as any, keto as any, makeAudit() as any);
+
+    await expect(
+      svc.acceptHydraConsent(user, { consent_challenge: 'cc', grant_scope: ['openid'] }),
+    ).rejects.toThrow('Consent challenge does not belong to current user');
+    expect(hydra.acceptConsent).not.toHaveBeenCalled();
+    expect(hydra.rejectConsent).not.toHaveBeenCalled();
+  });
+
+  it('passes ownership check when challenge subject matches user', async () => {
+    const hydra = makeHydra();
+    hydra.getConsentRequest.mockResolvedValue({
+      subject: 'u1',
+      client: { client_id: 'nova-id-test-app' },
+      requested_access_token_audience: [],
+      requested_scope: ['openid'],
+    });
+    const keto = makeKeto();
+    keto.checkApp.mockResolvedValue(true);
+    const svc = new AppService(hydra as any, keto as any, makeAudit() as any);
+
+    await expect(
+      svc.acceptHydraConsent(user, { consent_challenge: 'cc', grant_scope: ['openid'] }),
+    ).resolves.toBeDefined();
+  });
+});
+
+describe('AppService.getHydraConsentInfo', () => {
+  it('returns consent info for the authenticated user', async () => {
+    const hydra = makeHydra();
+    hydra.getConsentRequest.mockResolvedValue({
+      subject: 'u1',
+      skip: false,
+      requested_scope: ['openid'],
+      client: { client_id: 'app1', client_name: 'App One' },
+    });
+    const svc = new AppService(hydra as any, makeKeto() as any, makeAudit() as any);
+
+    const result = await svc.getHydraConsentInfo(user, 'chal');
+
+    expect(result.subject).toBe('u1');
+    expect(result.client?.client_id).toBe('app1');
+    expect(result.requested_scope).toContain('openid');
+  });
+
+  it('IDOR: throws ForbiddenException when challenge subject does not match user', async () => {
+    const hydra = makeHydra();
+    hydra.getConsentRequest.mockResolvedValue({
+      subject: 'attacker-user',
+      skip: false,
+      requested_scope: ['openid'],
+      client: { client_id: 'app1', client_name: 'App One' },
+    });
+    const svc = new AppService(hydra as any, makeKeto() as any, makeAudit() as any);
+
+    await expect(svc.getHydraConsentInfo(user, 'chal')).rejects.toThrow(
+      'Consent challenge does not belong to current user',
+    );
+  });
+
+  it('skips ownership check when subject is absent (challenge not yet bound)', async () => {
+    const hydra = makeHydra();
+    hydra.getConsentRequest.mockResolvedValue({
+      skip: false,
+      requested_scope: ['openid'],
+      client: { client_id: 'app1', client_name: 'App One' },
+    });
+    const svc = new AppService(hydra as any, makeKeto() as any, makeAudit() as any);
+
+    await expect(svc.getHydraConsentInfo(user, 'chal')).resolves.toBeDefined();
+  });
+});
+
+describe('AppService.rejectHydraConsent', () => {
+  it('rejects consent and records audit with appId captured from consent request', async () => {
+    const hydra = makeHydra();
+    hydra.getConsentRequest.mockResolvedValue({
+      subject: 'u1',
+      client: { client_id: 'my-app' },
+    });
+    const audit = makeAudit();
+    const svc = new AppService(hydra as any, makeKeto() as any, audit as any);
+
+    const result = await svc.rejectHydraConsent(user, { consent_challenge: 'chal' });
+
+    expect(hydra.getConsentRequest).toHaveBeenCalledWith('chal');
+    expect(hydra.rejectConsent).toHaveBeenCalledWith(
+      'chal',
+      expect.objectContaining({ error: 'access_denied' }),
+    );
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actorId: 'u1',
+        action: 'consent.user_reject',
+        appId: 'my-app',
+        targetType: 'app',
+      }),
+    );
+    expect(result.redirect_to).toBe('http://denied');
+  });
+
+  it('IDOR: throws ForbiddenException when challenge subject does not match user', async () => {
+    const hydra = makeHydra();
+    hydra.getConsentRequest.mockResolvedValue({
+      subject: 'someone-else',
+      client: { client_id: 'my-app' },
+    });
+    const svc = new AppService(hydra as any, makeKeto() as any, makeAudit() as any);
+
+    await expect(svc.rejectHydraConsent(user, { consent_challenge: 'chal' })).rejects.toThrow(
+      'Consent challenge does not belong to current user',
+    );
+    expect(hydra.rejectConsent).not.toHaveBeenCalled();
+  });
+
+  it('records appId=null when consent request has no client', async () => {
+    const hydra = makeHydra();
+    hydra.getConsentRequest.mockResolvedValue({
+      subject: 'u1',
+    });
+    const audit = makeAudit();
+    const svc = new AppService(hydra as any, makeKeto() as any, audit as any);
+
+    await svc.rejectHydraConsent(user, { consent_challenge: 'chal' });
+
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({ appId: null }),
+    );
+  });
 });
