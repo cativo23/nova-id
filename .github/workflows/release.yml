@@ -391,3 +391,24 @@ jobs:
         run: |
           docker push "${IMAGE_REF}:${VERSION}"
           docker push "${IMAGE_REF}:latest"
+
+  # ── Deploy ───────────────────────────────────────────────────────────────
+  # Runs ONLY after all 5 images are built, scanned, and pushed. This enforces
+  # the ordering: deploy-prod.sh can safely `docker pull` the tag because the
+  # images are guaranteed to exist in the registry. Calling deploy.yml as a
+  # reusable workflow (uses:) means a job-level `uses:` — no steps/run here.
+  deploy:
+    needs:
+      - build-api
+      - build-demo-api
+      - build-frontend-auth
+      - build-frontend-admin
+      - build-frontend-app
+    # Auto-deploy only on a real tag push. On workflow_dispatch builds (no tag
+    # ref) we build/push images but do NOT auto-deploy — use deploy.yml's own
+    # workflow_dispatch for that.
+    if: startsWith(github.ref, 'refs/tags/')
+    uses: ./.github/workflows/deploy.yml
+    with:
+      tag: ${{ github.ref_name }}
+    secrets: inherit

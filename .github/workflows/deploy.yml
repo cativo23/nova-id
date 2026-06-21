@@ -1,7 +1,15 @@
 # .github/workflows/deploy.yml
 #
-# Triggered by push of a v* tag (after release.yml completes) or
-# workflow_dispatch with a ref input for surgical rollback/redeploy.
+# Reusable deploy workflow. Two entry points:
+#   - workflow_call: invoked by release.yml's `deploy` job AFTER all 5 images
+#     are built, scanned, and pushed. Receives the immutable tag as `inputs.tag`.
+#     This is the ONLY automatic deploy path — it guarantees the images exist in
+#     the registry before deploy-prod.sh tries to pull them (no build/pull race).
+#   - workflow_dispatch: manual rollback/redeploy to a prior tag via `inputs.ref`.
+#
+# There is intentionally NO `push: tags` trigger here. If deploy ran on tag push
+# directly, it would race release.yml (which is still building/pushing the same
+# tag's images) and the pull would fail → smoke fail → spurious rollback.
 #
 # SSHs into polaris2 using a restricted deploy-only ed25519 keypair stored in
 # GitHub Actions secrets. Connection parameters (host, port, user) are also
@@ -16,15 +24,18 @@
 name: Deploy to Production
 
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_call:
+    inputs:
+      tag:
+        description: 'Immutable version tag to deploy (e.g. v1.2.0)'
+        required: true
+        type: string
   workflow_dispatch:
     inputs:
       ref:
-        description: 'Version tag to deploy (e.g. v1.2.0) — use for rollback'
+        description: 'Tag to deploy/rollback to (e.g. v1.2.0)'
         required: true
-        default: ''
+        type: string
 
 # Least privilege: this workflow uses only SSH; it never touches GITHUB_TOKEN.
 permissions:
@@ -37,23 +48,22 @@ concurrency:
 
 jobs:
   deploy:
-    name: Deploy ${{ github.event.inputs.ref || github.ref_name }} to polaris2
+    name: Deploy ${{ inputs.tag || inputs.ref }} to production
     runs-on: ubuntu-latest
     environment: production
 
     steps:
       - name: Determine version tag
         id: version
-        # Route workflow_dispatch input through an env var to avoid shell injection.
-        # Then validate the format — reject anything that isn't a semver tag.
+        # Resolve the version from whichever entry point invoked us:
+        #   workflow_call  → inputs.tag (set by release.yml)
+        #   workflow_dispatch → inputs.ref (manual rollback/redeploy)
+        # Route through an env var to avoid shell injection, then validate the
+        # format — reject anything that isn't a semver tag.
         env:
-          INPUT_REF: ${{ github.event.inputs.ref }}
+          INPUT_TAG: ${{ inputs.tag || inputs.ref }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TAG="${INPUT_REF}"
-          else
-            TAG="${GITHUB_REF_NAME}"
-          fi
+          TAG="${INPUT_TAG}"
           # Validate: must be vMAJOR.MINOR.PATCH[-prerelease] — no shell metacharacters.
           if [[ ! "${TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([-+][A-Za-z0-9._-]+)?$ ]]; then
             echo "::error::Invalid version tag: '${TAG}'. Expected format: v<major>.<minor>.<patch>"
