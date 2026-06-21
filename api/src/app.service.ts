@@ -4,6 +4,8 @@ import { KetoService } from './ory/keto.service';
 import { AuditService } from './audit/audit.service';
 import { AuthenticatedUser } from './common/types/authenticated-user';
 import { AcceptHydraConsentDto } from './dto/accept-hydra-consent.dto';
+import { HydraConsentInfoResponseDto } from './dto/hydra-consent-info-response.dto';
+import { RejectHydraConsentDto } from './dto/reject-hydra-consent.dto';
 
 @Injectable()
 export class AppService {
@@ -112,6 +114,37 @@ export class AppService {
       });
     } catch (error) {
       this.logger.error('Error accepting Hydra consent:', error.response?.data || error.message);
+      throw error;
+    }
+  }
+
+  async getHydraConsentInfo(consentChallenge: string): Promise<HydraConsentInfoResponseDto> {
+    try {
+      const consentRequest = await this.hydra.getConsentRequest(consentChallenge);
+      return {
+        skip: consentRequest.skip,
+        requested_scope: consentRequest.requested_scope ?? [],
+        client: consentRequest.client
+          ? { client_id: consentRequest.client.client_id, client_name: consentRequest.client.client_name }
+          : undefined,
+        subject: consentRequest.subject,
+      };
+    } catch (error) {
+      this.logger.error('Error fetching consent request:', error.response?.data || error.message);
+      throw error;
+    }
+  }
+
+  async rejectHydraConsent(user: AuthenticatedUser, body: RejectHydraConsentDto): Promise<{ redirect_to: string }> {
+    try {
+      this.logger.log(`Rejecting consent for user ${user.userId} (challenge ${body.consent_challenge})`);
+      const result = await this.hydra.rejectConsent(body.consent_challenge, {
+        error: 'access_denied',
+        error_description: body.error_description ?? 'The user denied the request',
+      });
+      return { redirect_to: result.redirect_to };
+    } catch (error) {
+      this.logger.error('Error rejecting consent:', error.response?.data || error.message);
       throw error;
     }
   }

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Version } from '@nestjs/common';
+import { Controller, Get, Post, Body, Version, Query, BadRequestException, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBody, ApiOkResponse } from '@nestjs/swagger';
 import { AppService } from './app.service';
 import { Public } from './decorators/public.decorator';
@@ -7,6 +7,8 @@ import { AuthenticatedUser } from './common/types/authenticated-user';
 import { AcceptHydraLoginDto } from './dto/accept-hydra-login.dto';
 import { AcceptHydraConsentDto } from './dto/accept-hydra-consent.dto';
 import { HydraRedirectResponseDto } from './dto/hydra-redirect-response.dto';
+import { HydraConsentInfoResponseDto } from './dto/hydra-consent-info-response.dto';
+import { RejectHydraConsentDto } from './dto/reject-hydra-consent.dto';
 
 @Controller()
 export class AppController {
@@ -53,5 +55,33 @@ export class AppController {
     @Body() body: AcceptHydraConsentDto,
   ): Promise<HydraRedirectResponseDto> {
     return this.appService.acceptHydraConsent(user, body);
+  }
+
+  @ApiTags('auth')
+  @ApiOperation({ operationId: 'getHydraConsentInfo', summary: 'Get Hydra consent request info (server-side proxy)' })
+  @ApiOkResponse({ type: HydraConsentInfoResponseDto })
+  @Version('1')
+  @Get('hydra-consent-info')
+  async getHydraConsentInfo(
+    @Query('consent_challenge') consentChallenge: string,
+  ): Promise<HydraConsentInfoResponseDto> {
+    if (!consentChallenge) {
+      throw new BadRequestException('consent_challenge query param is required');
+    }
+    return this.appService.getHydraConsentInfo(consentChallenge);
+  }
+
+  @ApiTags('auth')
+  @ApiOperation({ operationId: 'rejectHydraConsent', summary: 'Reject a Hydra consent challenge' })
+  @ApiBody({ type: RejectHydraConsentDto })
+  @ApiOkResponse({ type: HydraRedirectResponseDto })
+  @Version('1')
+  @HttpCode(HttpStatus.OK)
+  @Post('hydra-reject-consent')
+  async rejectHydraConsent(
+    @GetUser() user: AuthenticatedUser,
+    @Body() body: RejectHydraConsentDto,
+  ): Promise<HydraRedirectResponseDto> {
+    return this.appService.rejectHydraConsent(user, body);
   }
 }
