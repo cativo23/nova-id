@@ -150,51 +150,6 @@
     ]
   },
   {
-    "id": "hydra-admin",
-    "upstream": {
-      "preserve_host": false,
-      "strip_path": "/api/hydra-admin",
-      "url": "http://hydra:4445"
-    },
-    "match": {
-      "url": "<(http|https)://(api\\.ory\\.localhost|admin\\.ory\\.localhost|auth\\.ory\\.localhost|app\\.ory\\.localhost|localhost(:[0-9]+)?|oathkeeper(:[0-9]+)?)/api/hydra-admin/.*>",
-      "methods": [
-        "GET",
-        "POST",
-        "PUT",
-        "DELETE",
-        "PATCH",
-        "OPTIONS"
-      ]
-    },
-    "authenticators": [
-      {
-        "handler": "cookie_session"
-      }
-    ],
-    "authorizer": {
-      "handler": "remote_json",
-      "config": {
-        "remote": "http://keto:4466/relation-tuples/check",
-        "payload": "{\"namespace\":\"Platform\",\"object\":\"nova\",\"relation\":\"administer\",\"subject_id\":\"user:{{ print .Subject }}\"}",
-        "forward_response_headers_to_upstream": [
-          "Content-Type"
-        ]
-      }
-    },
-    "mutators": [
-      {
-        "handler": "header",
-        "config": {
-          "headers": {
-            "X-User-ID": "{{ print .Subject }}",
-            "X-User-Email": "{{ print .Extra.identity.traits.email }}"
-          }
-        }
-      }
-    ]
-  },
-  {
     "id": "frontend-auth",
     "upstream": {
       "preserve_host": false,

@@ -464,6 +464,192 @@
         ]
       }
     },
+    "/v1/admin/clients": {
+      "get": {
+        "operationId": "AdminClientsController_list",
+        "summary": "List all OAuth2 clients",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Array of OAuth2 clients"
+          },
+          "401": {
+            "description": "Missing or invalid Bearer id_token"
+          },
+          "403": {
+            "description": "Caller lacks Platform:nova#administer in Keto"
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "oathkeeper-id-token": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "AdminClientsController_create",
+        "summary": "Create a new OAuth2 client",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOauth2ClientDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "OAuth2 client created"
+          },
+          "401": {
+            "description": "Missing or invalid Bearer id_token"
+          },
+          "403": {
+            "description": "Caller lacks Platform:nova#administer in Keto"
+          },
+          "422": {
+            "description": "Validation failed"
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "oathkeeper-id-token": []
+          }
+        ]
+      }
+    },
+    "/v1/admin/clients/{id}": {
+      "get": {
+        "operationId": "AdminClientsController_get",
+        "summary": "Get a single OAuth2 client by id",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OAuth2 client"
+          },
+          "401": {
+            "description": "Missing or invalid Bearer id_token"
+          },
+          "403": {
+            "description": "Caller lacks Platform:nova#administer in Keto"
+          },
+          "404": {
+            "description": "Client not found"
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "oathkeeper-id-token": []
+          }
+        ]
+      },
+      "put": {
+        "operationId": "AdminClientsController_update",
+        "summary": "Replace an OAuth2 client (full update)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOauth2ClientDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OAuth2 client updated"
+          },
+          "401": {
+            "description": "Missing or invalid Bearer id_token"
+          },
+          "403": {
+            "description": "Caller lacks Platform:nova#administer in Keto"
+          },
+          "404": {
+            "description": "Client not found"
+          },
+          "422": {
+            "description": "Validation failed"
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "oathkeeper-id-token": []
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "AdminClientsController_remove",
+        "summary": "Delete an OAuth2 client",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Client deleted"
+          },
+          "401": {
+            "description": "Missing or invalid Bearer id_token"
+          },
+          "403": {
+            "description": "Caller lacks Platform:nova#administer in Keto"
+          },
+          "404": {
+            "description": "Client not found"
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "oathkeeper-id-token": []
+          }
+        ]
+      }
+    },
     "/v1/me/permissions": {
       "get": {
         "operationId": "MeController_permissions",
@@ -755,6 +941,112 @@
         "required": [
           "recovery_link"
         ]
+      },
+      "CreateOauth2ClientDto": {
+        "type": "object",
+        "properties": {
+          "client_name": {
+            "type": "string",
+            "description": "Human-readable name for the OAuth2 client"
+          },
+          "redirect_uris": {
+            "description": "Allowed redirect URIs for authorization code / implicit flows",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "grant_types": {
+            "type": "array",
+            "description": "Allowed OAuth2 grant types",
+            "items": {
+              "type": "string",
+              "enum": [
+                "authorization_code",
+                "client_credentials",
+                "refresh_token"
+              ]
+            }
+          },
+          "response_types": {
+            "type": "array",
+            "description": "Allowed response types",
+            "items": {
+              "type": "string",
+              "enum": [
+                "code"
+              ]
+            }
+          },
+          "scope": {
+            "type": "string",
+            "description": "Space-separated list of requested scopes"
+          },
+          "token_endpoint_auth_method": {
+            "type": "string",
+            "enum": [
+              "client_secret_basic",
+              "client_secret_post",
+              "none"
+            ],
+            "description": "Token endpoint authentication method"
+          }
+        },
+        "required": [
+          "client_name",
+          "redirect_uris"
+        ]
+      },
+      "UpdateOauth2ClientDto": {
+        "type": "object",
+        "properties": {
+          "client_name": {
+            "type": "string",
+            "description": "Human-readable name for the OAuth2 client"
+          },
+          "redirect_uris": {
+            "description": "Allowed redirect URIs for authorization code / implicit flows",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "grant_types": {
+            "type": "array",
+            "description": "Allowed OAuth2 grant types",
+            "items": {
+              "type": "string",
+              "enum": [
+                "authorization_code",
+                "client_credentials",
+                "refresh_token"
+              ]
+            }
+          },
+          "response_types": {
+            "type": "array",
+            "description": "Allowed response types",
+            "items": {
+              "type": "string",
+              "enum": [
+                "code"
+              ]
+            }
+          },
+          "scope": {
+            "type": "string",
+            "description": "Space-separated list of requested scopes"
+          },
+          "token_endpoint_auth_method": {
+            "type": "string",
+            "enum": [
+              "client_secret_basic",
+              "client_secret_post",
+              "none"
+            ],
+            "description": "Token endpoint authentication method"
+          }
+        }
       },
       "PermissionsResponseDto": {
         "type": "object",
