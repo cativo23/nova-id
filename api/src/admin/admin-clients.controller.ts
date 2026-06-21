@@ -56,7 +56,6 @@ export class AdminClientsController {
   }
 
   @Post()
-  @HttpCode(201)
   @ApiOperation({ summary: 'Create a new OAuth2 client' })
   @ApiResponse({ status: 201, description: 'OAuth2 client created' })
   @ApiResponse({ status: 401, description: 'Missing or invalid Bearer id_token' })

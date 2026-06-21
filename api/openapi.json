@@ -957,17 +957,25 @@
             }
           },
           "grant_types": {
-            "description": "Allowed OAuth2 grant types (e.g. authorization_code, client_credentials)",
             "type": "array",
+            "description": "Allowed OAuth2 grant types",
             "items": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "authorization_code",
+                "client_credentials",
+                "refresh_token"
+              ]
             }
           },
           "response_types": {
-            "description": "Allowed response types (e.g. code, token, id_token)",
             "type": "array",
+            "description": "Allowed response types",
             "items": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "code"
+              ]
             }
           },
           "scope": {
@@ -976,7 +984,12 @@
           },
           "token_endpoint_auth_method": {
             "type": "string",
-            "description": "Token endpoint authentication method (e.g. client_secret_basic, none)"
+            "enum": [
+              "client_secret_basic",
+              "client_secret_post",
+              "none"
+            ],
+            "description": "Token endpoint authentication method"
           }
         },
         "required": [
@@ -999,17 +1012,25 @@
             }
           },
           "grant_types": {
-            "description": "Allowed OAuth2 grant types (e.g. authorization_code, client_credentials)",
             "type": "array",
+            "description": "Allowed OAuth2 grant types",
             "items": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "authorization_code",
+                "client_credentials",
+                "refresh_token"
+              ]
             }
           },
           "response_types": {
-            "description": "Allowed response types (e.g. code, token, id_token)",
             "type": "array",
+            "description": "Allowed response types",
             "items": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "code"
+              ]
             }
           },
           "scope": {
@@ -1018,7 +1039,12 @@
           },
           "token_endpoint_auth_method": {
             "type": "string",
-            "description": "Token endpoint authentication method (e.g. client_secret_basic, none)"
+            "enum": [
+              "client_secret_basic",
+              "client_secret_post",
+              "none"
+            ],
+            "description": "Token endpoint authentication method"
           }
         }
       },
