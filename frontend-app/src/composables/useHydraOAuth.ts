@@ -17,6 +17,22 @@ function getHydraPublicUrl() {
   return 'http://localhost:4444'
 }
 
+/**
+ * Expected id_token issuer (the `iss` claim) — Hydra's configured issuer, which is
+ * NOT the same as the proxy base URL used to *reach* Hydra. In production the app
+ * calls Hydra via `${origin}/api/hydra-public`, but Hydra issues tokens with
+ * `iss: https://id.cativo.dev/`. Configure the real issuer via VITE_OAUTH_ISSUER.
+ * Locally (.ory.localhost) the proxy base IS the issuer (http://api.ory.localhost).
+ */
+function getExpectedIssuer() {
+  if (import.meta.env.VITE_OAUTH_ISSUER) return import.meta.env.VITE_OAUTH_ISSUER
+  if (typeof window !== 'undefined' && /\.ory\.localhost$/i.test(window.location.hostname)) {
+    return 'http://api.ory.localhost'
+  }
+  // Safety net only — production MUST set VITE_OAUTH_ISSUER (the proxy base is not the issuer).
+  return getHydraPublicUrl()
+}
+
 const OAUTH_STORAGE_PREFIX = 'nova_id_oauth_'
 
 /** Default clock skew in seconds for id_token exp/iat validation. */
@@ -112,7 +128,7 @@ export async function handleOAuthCallback(code: string, state: string): Promise<
   const storedNonce = sessionStorage.getItem(OAUTH_STORAGE_PREFIX + 'nonce')
   if (tokens.id_token) {
     const claims = decodeIdToken(tokens.id_token)
-    validateIdTokenClaims(claims, getHydraPublicUrl(), clientId)
+    validateIdTokenClaims(claims, getExpectedIssuer(), clientId)
     if (storedNonce && claims.nonce && claims.nonce !== storedNonce) {
       sessionStorage.removeItem(OAUTH_STORAGE_PREFIX + 'code_verifier')
       sessionStorage.removeItem(OAUTH_STORAGE_PREFIX + 'state')
