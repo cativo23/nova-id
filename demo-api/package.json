@@ -65,8 +65,7 @@
     "picomatch": ">=4.0.4",
     "axios": ">=1.16.0",
     "form-data": "^4.0.6",
-    "minimatch": "9.0.7",
-    "path-to-regexp": "0.1.13"
+    "minimatch": "9.0.7"
   },
   "jest": {
     "moduleFileExtensions": ["js", "json", "ts"],
