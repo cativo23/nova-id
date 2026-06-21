@@ -7,6 +7,8 @@ and its public half was hardcoded in `api/src/guards/authenticated.guard.ts`.
 **Any environment that ever used that keypair is compromised** — anyone with repo
 access could forge a signed id_token and impersonate `platform_admin`.
 
+> ⚠️ **NEVER reuse the key `da3b6279-9433-4a45-b660-b2fab0c3256e` (or its public half) in ANY environment — local, staging, or production. It is permanently public via git history and must be treated as compromised forever. Every environment generates its own fresh keypair with `scripts/generate-jwks.sh`.**
+
 ## Actions taken
 - Removed the hardcoded public key from the guard; it now verifies tokens against Oathkeeper's JWKS endpoint via `OAUTH_JWKS_URL` (e.g. `http://oathkeeper:4456/.well-known/jwks.json`) — no PEM is embedded or configured in the API.
 - Untracked the JWKS file from git and gitignored it.
