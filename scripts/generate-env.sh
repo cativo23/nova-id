@@ -42,6 +42,11 @@ ORY_PASSWORD=$(generate_secret)
 KRATOS_DB_PASSWORD=$(generate_secret)
 HYDRA_DB_PASSWORD=$(generate_secret)
 KETO_DB_PASSWORD=$(generate_secret)
+# Audit DB least-privilege roles (see docs/AUDIT_DB_LEAST_PRIVILEGE.md):
+#   app      — runtime BFF role, INSERT/SELECT on audit_logs only.
+#   migrator — DDL role used only by the api-migrate one-shot service.
+AUDIT_APP_PASSWORD=$(generate_secret)
+AUDIT_MIGRATOR_PASSWORD=$(generate_secret)
 
 # Kratos Secrets
 # cookie:  ≥16 chars — signs session cookies

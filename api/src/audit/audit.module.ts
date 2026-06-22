@@ -15,10 +15,16 @@ import { CreateAuditLogs1781750293893 } from './migrations/1781750293893-CreateA
  * Schema management: migrations only, in ALL environments.
  * - synchronize: false — never auto-mutate the schema. Use `npm run migration:generate`
  *   to produce a migration and `npm run migration:run` to apply it.
- * - migrationsRun: true — TypeORM runs pending migrations on every boot, so
- *   the table is created automatically in fresh dev/staging/prod environments
- *   without any manual step.
- * - The standalone DataSource for the CLI lives in audit.datasource.ts.
+ * - migrationsRun: false — the RUNTIME app connects as the least-privilege
+ *   `nova_audit_app` role, which holds only INSERT/SELECT on audit_logs and has
+ *   NO DDL. It must never attempt migrations on boot (it would fail). Migrations
+ *   are applied out-of-band by the privileged `nova_audit_migrator` role via the
+ *   one-shot `api-migrate` compose service (profiles: ["migrate"]). This enforces
+ *   append-only at the STORAGE layer: a fully-compromised BFF cannot
+ *   UPDATE/DELETE/TRUNCATE the ledger. See docs/AUDIT_DB_LEAST_PRIVILEGE.md.
+ * - The CLI DataSource for `npm run migration:*` (TS, dev) lives in
+ *   audit.datasource.ts; the compiled runtime one used by api-migrate (prod
+ *   image, no ts-node) lives in audit.datasource.runtime.ts.
  */
 @Module({
   imports: [
@@ -33,7 +39,7 @@ import { CreateAuditLogs1781750293893 } from './migrations/1781750293893-CreateA
       entities: [AuditLog],
       migrations: [CreateAuditLogs1781750293893],
       synchronize: false,
-      migrationsRun: true,
+      migrationsRun: false,
     }),
     TypeOrmModule.forFeature([AuditLog], 'audit'),
   ],
