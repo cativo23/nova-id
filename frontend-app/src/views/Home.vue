@@ -300,7 +300,6 @@
 import { ref, computed, onMounted, watch, inject, type Ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import NovaLogoIcon from '../components/NovaLogoIcon.vue'
-import { checkSession } from '../composables/useAuth'
 import { initiateOAuthFlow, getStoredAccessToken, clearStoredAccessToken } from '../composables/useHydraOAuth'
 import { getApiTestBaseUrl } from '../composables/useApiTest'
 import type { DemoUser, MeResponse, LogEntry } from '../types'

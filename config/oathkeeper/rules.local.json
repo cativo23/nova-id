@@ -390,7 +390,7 @@
     },
     "authenticators": [
       {
-        "handler": "oauth2_introspection"
+        "handler": "oauth2_introspection", "config": { "required_scope": ["app:member"] }
       }
     ],
     "authorizer": {
@@ -630,7 +630,7 @@
     },
     "authenticators": [
       {
-        "handler": "oauth2_introspection"
+        "handler": "oauth2_introspection", "config": { "required_scope": ["app:member"] }
       }
     ],
     "authorizer": {

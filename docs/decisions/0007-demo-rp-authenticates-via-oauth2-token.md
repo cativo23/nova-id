@@ -107,6 +107,9 @@ not used to authenticate demo RP API calls.
 - Refreshing the page clears sessionStorage → user must re-authenticate. Acceptable for a demo; a
   production RP would use refresh tokens via the BFF.
 
+**Scope gate clarification**
+The `/api-test/*` Oathkeeper rules (`api-test` in production and local, `api-test-app-gate` in local) pin `required_scope: [app:member]` per-rule on their `oauth2_introspection` authenticator; the demo token carries `app:member` force-added at consent. The global `oauth2_introspection` authenticator intentionally carries no `required_scope` — the `oauth2` scope it formerly required is not registered on any client and was incorrectly rejecting all tokens. The first-party rules (`protected-admin`, `me-permissions`, `api-roles-bootstrap`) rely on `cookie_session` as primary authenticator, so their `oauth2_introspection` fallback is scope-unrestricted; this is acceptable because Keto subject-level authz (`Platform:nova#administer`) is the real access gate for those routes.
+
 **E2E verification required (post-deploy)**
 1. **Allow flow**: complete login + consent → dashboard appears, `/api-test/me` returns user data.
 2. **Deny flow**: complete login → deny consent → Callback shows error, redirect to `/` shows
