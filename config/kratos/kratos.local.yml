@@ -165,7 +165,14 @@ cookies:
   # In --dev mode, Kratos should handle Secure flag automatically
 
 session:
-  lifespan: 720h
+  lifespan: 24h
+  # earliest_possible_extend: when there is less than this duration left on the
+  # session, a /sessions/whoami call will extend it to a full 24h from now —
+  # giving rolling-session behaviour without re-login for active users.
+  # Setting to 1h means the session slides forward only in the last hour before
+  # it would expire, keeping DB write frequency low.
+  # Ref: Ory Kratos config schema (session.earliest_possible_extend), v0.13+.
+  earliest_possible_extend: 1h
   cookie:
     domain: ory.localhost
     path: /
