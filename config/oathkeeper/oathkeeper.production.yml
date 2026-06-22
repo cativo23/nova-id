@@ -77,8 +77,6 @@ authenticators:
     enabled: true
     config:
       introspection_url: http://hydra:4445/oauth2/introspect
-      required_scope:
-        - oauth2
       token_from:
         header: Authorization
 

@@ -390,15 +390,6 @@
     },
     "authenticators": [
       {
-        "handler": "cookie_session",
-        "config": {
-          "check_session_url": "http://kratos:4433/sessions/whoami",
-          "preserve_path": true,
-          "extra_from": "@this",
-          "subject_from": "identity.id"
-        }
-      },
-      {
         "handler": "oauth2_introspection"
       }
     ],
@@ -638,15 +629,6 @@
       ]
     },
     "authenticators": [
-      {
-        "handler": "cookie_session",
-        "config": {
-          "check_session_url": "http://kratos:4433/sessions/whoami",
-          "preserve_path": true,
-          "extra_from": "@this",
-          "subject_from": "identity.id"
-        }
-      },
       {
         "handler": "oauth2_introspection"
       }
