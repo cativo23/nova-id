@@ -1,3 +1,5 @@
+> ⚠️ Historical. This phase/audit is complete as of v1.2.0 — see [PROJECT-STATUS.md](./PROJECT-STATUS.md) for current status.
+
 # Nova ID — Consolidated Audit Findings
 
 > Result of a 5-component investigation (Kratos, Hydra, Keto, Oathkeeper, Integration/Deploy)

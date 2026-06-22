@@ -1,3 +1,5 @@
+> ⚠️ Historical. This phase/audit is complete as of v1.2.0 — see [PROJECT-STATUS.md](./PROJECT-STATUS.md) for current status.
+
 # Bucket A — Finish the nova-id Code: Roadmap (A0 → A1 → A2)
 
 > Phased roadmap for "finish the IdP code" (no deploy). Companion to `docs/AUDIT_FINDINGS.md`
