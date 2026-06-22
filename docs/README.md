@@ -4,6 +4,12 @@ Identity and access management built on the [Ory Stack](https://www.ory.sh/) wit
 
 ---
 
+## Project status
+
+See **[PROJECT-STATUS.md](PROJECT-STATUS.md)** — current v1.2.0 production state, phase history, and open items.
+
+---
+
 ## Quick start
 
 1. **[Getting Started](GETTING_STARTED.md)** — What is Nova ID, installation, first login.
