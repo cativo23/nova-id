@@ -2,9 +2,9 @@
 // OAuth must start at the issuer (api.ory.localhost) so Hydra's CSRF cookie domain matches the
 // redirect-after-login URL; otherwise Hydra returns "No CSRF value available in the session cookie".
 //
-// Token-persistence and client-side claim decoding removed (A1.5, ADR-0002).
-// role/appRole are now read from /api-test/me under the Kratos cookie session the gateway honors.
-// Only the transient PKCE/state/nonce handshake entries remain in sessionStorage.
+// ADR-0007: The access token is stored in sessionStorage after the PKCE callback and used as the
+// sole credential for /api-test/* calls. The Kratos session cookie is NOT used to authenticate
+// demo RP API calls — the gateway api-test rule accepts oauth2_introspection only.
 
 import type { IdTokenClaims, TokenResponse } from '../types'
 
@@ -139,6 +139,11 @@ export async function handleOAuthCallback(code: string, state: string): Promise<
     }
   }
 
+  // Store the access token for use as Bearer credential on /api-test/* calls (ADR-0007).
+  if (tokens.access_token) {
+    sessionStorage.setItem('nova_id_oauth_access_token', tokens.access_token)
+  }
+
   sessionStorage.removeItem(OAUTH_STORAGE_PREFIX + 'code_verifier')
   sessionStorage.removeItem(OAUTH_STORAGE_PREFIX + 'state')
   sessionStorage.removeItem(OAUTH_STORAGE_PREFIX + 'nonce')
@@ -146,6 +151,16 @@ export async function handleOAuthCallback(code: string, state: string): Promise<
   sessionStorage.removeItem(OAUTH_STORAGE_PREFIX + 'redirect_uri')
 
   return tokens
+}
+
+/** Returns the stored OAuth2 access token, or null if not present. */
+export function getStoredAccessToken(): string | null {
+  return sessionStorage.getItem('nova_id_oauth_access_token')
+}
+
+/** Clears the stored OAuth2 access token (call on logout / deny). */
+export function clearStoredAccessToken(): void {
+  sessionStorage.removeItem('nova_id_oauth_access_token')
 }
 
 export function decodeIdToken(idToken: string): IdTokenClaims {

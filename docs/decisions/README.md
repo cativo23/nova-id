@@ -24,6 +24,7 @@ source-of-truth ruling) and would otherwise be re-litigated later from memory.
 | [0004](0004-per-app-access-enforcement-dual-mode.md) | Enforce per-app access in two coexisting modes, with Keto as the single source of truth | Accepted |
 | [0005](0005-generated-api-client-and-workspace.md) | Generate a typed, tags-split TanStack Query client and distribute it as a pnpm workspace package | Accepted |
 | [0006](0006-bff-is-a-token-handler-consolidation-api.md) | The server tier is a shared token-handler / IdP consolidation API, not a per-frontend BFF | Accepted |
+| [0007](0007-demo-rp-authenticates-via-oauth2-token.md) | The demo relying-party authenticates via its OAuth2 token (invokes ADR-0006's switch trigger) | Accepted |
 
 ## Related decision records (pre-ADR)
 

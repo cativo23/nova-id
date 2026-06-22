@@ -300,8 +300,7 @@
 import { ref, computed, onMounted, watch, inject, type Ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import NovaLogoIcon from '../components/NovaLogoIcon.vue'
-import { checkSession } from '../composables/useAuth'
-import { initiateOAuthFlow } from '../composables/useHydraOAuth'
+import { initiateOAuthFlow, getStoredAccessToken, clearStoredAccessToken } from '../composables/useHydraOAuth'
 import { getApiTestBaseUrl } from '../composables/useApiTest'
 import type { DemoUser, MeResponse, LogEntry } from '../types'
 
@@ -372,11 +371,18 @@ const endpoints: Endpoint[] = [
   { key: 'POST:/api-test/app-admin/configure', method: 'POST', path: '/api-test/app-admin/configure', level: 'app-admin', borderClass: 'border-orange-500/30 bg-orange-500/5', btnClass: 'bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 border border-orange-500/40' }
 ]
 
-async function sessionFromApiMe(): Promise<DemoSession | null> {
+async function sessionFromApiMe(token: string | null): Promise<DemoSession | null> {
+  if (!token) return null
   const url = `${getApiTestBaseUrl()}/me`
   try {
-    const res = await fetch(url, { credentials: 'include' })
-    if (!res.ok) return null
+    const res = await fetch(url, {
+      headers: { 'Authorization': 'Bearer ' + token }
+    })
+    if (!res.ok) {
+      // Token is invalid/expired — clear it so the user is not stuck (ADR-0007).
+      clearStoredAccessToken()
+      return null
+    }
     const me = await res.json() as MeResponse
     const u: DemoUser = me.user ?? (me as unknown as DemoUser)
     if (!u?.id) return null
@@ -400,16 +406,30 @@ async function sessionFromApiMe(): Promise<DemoSession | null> {
 
 async function loadRecentLogs() {
   if (!isAdmin.value) return
+  const token = getStoredAccessToken()
+  if (!token) return
   recentLogsLoading.value = true
   try {
     const baseUrl = getApiTestBaseUrl()
     const opts: RequestInit = {
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json', 'X-Frontend-Source': 'frontend-app' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Frontend-Source': 'frontend-app',
+        'Authorization': 'Bearer ' + token,
+      },
     }
     const res = await fetch(`${baseUrl}/logs?limit=3`, opts)
-    if (res.ok) recentLogs.value = await res.json() as LogEntry[]
-    else recentLogs.value = []
+    if (res.ok) {
+      recentLogs.value = await res.json() as LogEntry[]
+    } else {
+      recentLogs.value = []
+      // 401 = dead/expired token → de-authenticate (ADR-0007). 403 is a legitimate
+      // authz denial, not an auth failure, so the token stays valid.
+      if (res.status === 401) {
+        clearStoredAccessToken()
+        session.value = null
+      }
+    }
   } catch {
     recentLogs.value = []
   } finally {
@@ -419,26 +439,23 @@ async function loadRecentLogs() {
 
 onMounted(async () => {
   try {
-    // Always use the cookie session through the gateway (ADR-0002).
-    // App.vue's refreshAuth() is running concurrently; we read /api-test/me ourselves
-    // so Home has the full user shape (id, email, appRole) for the dashboard.
-    const meSession = await sessionFromApiMe()
+    // Gate authentication on the OAuth2 access token (ADR-0007).
+    // No token → unauthenticated, regardless of any active Kratos session.
+    const storedToken = getStoredAccessToken()
+    if (!storedToken) {
+      session.value = null
+      sessionLoading.value = false
+      return
+    }
+    // Fetch the user profile using the Bearer token.
+    const meSession = await sessionFromApiMe(storedToken)
     if (meSession) {
       session.value = meSession
       if (isAdmin.value) loadRecentLogs()
       return
     }
-    const sessionData = await checkSession()
-    session.value = sessionData?.identity
-      ? {
-          identity: {
-            id: sessionData.identity.id,
-            traits: (sessionData.identity.traits ?? {}) as DemoSession['identity']['traits'],
-            metadata_public: (sessionData.identity.metadata_public ?? null) as DemoSession['identity']['metadata_public']
-          }
-        }
-      : null
-    if (isAdmin.value) loadRecentLogs()
+    // Token present but /me returned null (invalid/expired) — already cleared by sessionFromApiMe.
+    session.value = null
   } catch {
     session.value = null
   } finally {
@@ -487,17 +504,24 @@ async function runTest(ep: Endpoint) {
   try {
     // Test API lives at /api-test/* (use getApiTestBaseUrl, not Oathkeeper /api)
     const url = ep.path.startsWith('/api-test') ? `${getApiTestBaseUrl()}${ep.path.replace(/^\/api-test/, '')}` : ep.path
-    const isSimpleGet = ep.method === 'GET' && (ep.path === '/api-test/health' || ep.path === '/api-test/public')
-    // Always use the Kratos cookie session; the gateway's api-test rule accepts cookie_session (ADR-0002).
+    const isPublicEndpoint = ep.method === 'GET' && (ep.path === '/api-test/health' || ep.path === '/api-test/public')
+    // Public endpoints need no auth. Protected endpoints use Bearer token (ADR-0007).
+    const token = isPublicEndpoint ? null : getStoredAccessToken()
+    if (!isPublicEndpoint && !token) {
+      apiError.value = 'Not authenticated. Please sign in first.'
+      return
+    }
     const headers: Record<string, string> = {}
     const options: RequestInit = {
       method: ep.method,
-      credentials: 'include',
       headers
     }
-    if (!isSimpleGet) {
+    if (!isPublicEndpoint) {
+      // token is guaranteed non-null here by the guard above.
+      const safeToken = token as string
       headers['Content-Type'] = 'application/json'
       headers['X-Frontend-Source'] = 'frontend-app'
+      headers['Authorization'] = 'Bearer ' + safeToken
     }
     if (ep.method === 'POST' || ep.method === 'PUT') {
       options.body = JSON.stringify({ timestamp: new Date().toISOString(), source: 'frontend-app' })

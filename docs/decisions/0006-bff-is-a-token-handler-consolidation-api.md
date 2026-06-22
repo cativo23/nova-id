@@ -6,6 +6,8 @@
 - **Context phase:** Post-A2 (after hardening PRs #33–#36), reviewing the shape of the `api/` tier
 - **Relates to:** [ADR-0001](0001-idp-vs-demo-app-boundary.md), [ADR-0003](0003-three-layer-authorization-model.md), [ADR-0004](0004-per-app-access-enforcement-dual-mode.md), [ADR-0005](0005-generated-api-client-and-workspace.md)
 
+> **Related:** [ADR-0007](0007-demo-rp-authenticates-via-oauth2-token.md) invokes this ADR's documented switch trigger for `frontend-app` (the demo RP); the token-handler pattern below remains in force for the first-party SPAs (`frontend-auth` / `frontend-admin` ↔ the `api/` IdP consolidation API).
+
 ## Context
 
 The `api/` NestJS tier sits between the three Vue SPAs (`frontend-auth`, `frontend-admin`,

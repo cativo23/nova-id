@@ -58,7 +58,7 @@
 <script setup lang="ts">
 import { ref, onMounted, inject } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { handleOAuthCallback } from '../composables/useHydraOAuth'
+import { handleOAuthCallback, clearStoredAccessToken } from '../composables/useHydraOAuth'
 
 const router = useRouter()
 const route = useRoute()
@@ -91,6 +91,7 @@ onMounted(async () => {
       router.replace({ path: '/', query: {} })
       return
     }
+    clearStoredAccessToken()
     error.value = msg
     return
   }
@@ -110,6 +111,7 @@ onMounted(async () => {
       router.replace({ path: '/', query: {} })
       return
     }
+    clearStoredAccessToken()
     error.value = errMsg
   }
 })
