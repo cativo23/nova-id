@@ -140,7 +140,9 @@ export async function handleOAuthCallback(code: string, state: string): Promise<
   }
 
   // Store the access token for use as Bearer credential on /api-test/* calls (ADR-0007).
-  sessionStorage.setItem('nova_id_oauth_access_token', tokens.access_token)
+  if (tokens.access_token) {
+    sessionStorage.setItem('nova_id_oauth_access_token', tokens.access_token)
+  }
 
   sessionStorage.removeItem(OAUTH_STORAGE_PREFIX + 'code_verifier')
   sessionStorage.removeItem(OAUTH_STORAGE_PREFIX + 'state')
