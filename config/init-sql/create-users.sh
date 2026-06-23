@@ -25,6 +25,15 @@ BEGIN
     IF NOT EXISTS (SELECT FROM pg_user WHERE usename = 'demo_user') THEN
         CREATE USER demo_user WITH PASSWORD '${DEMO_DB_PASSWORD}';
     END IF;
+    -- Audit DB least-privilege roles (see docs/AUDIT_DB_LEAST_PRIVILEGE.md):
+    --   nova_audit_migrator — DDL/owner, used only by the api-migrate service.
+    --   nova_audit_app      — runtime BFF role: INSERT/SELECT on audit_logs only.
+    IF NOT EXISTS (SELECT FROM pg_user WHERE usename = 'nova_audit_migrator') THEN
+        CREATE USER nova_audit_migrator WITH PASSWORD '${AUDIT_MIGRATOR_PASSWORD}';
+    END IF;
+    IF NOT EXISTS (SELECT FROM pg_user WHERE usename = 'nova_audit_app') THEN
+        CREATE USER nova_audit_app WITH PASSWORD '${AUDIT_APP_PASSWORD}';
+    END IF;
 END
 \$\$;
 
@@ -72,4 +81,22 @@ ALTER DEFAULT PRIVILEGES FOR ROLE demo_user IN SCHEMA public
     GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO demo_user;
 ALTER DEFAULT PRIVILEGES FOR ROLE demo_user IN SCHEMA public
     GRANT USAGE, SELECT ON SEQUENCES TO demo_user;
+EOF
+
+# Audit DB least-privilege grants (nova_audit). On a fresh bootstrap the
+# audit_logs table does not exist yet — it is created later by the api-migrate
+# service running as nova_audit_migrator. So we grant at the SCHEMA level and use
+# ALTER DEFAULT PRIVILEGES so that any table the migrator creates automatically
+# grants INSERT/SELECT (and NOTHING else) to the runtime app role. The app can
+# never UPDATE/DELETE/TRUNCATE the ledger — append-only at the storage layer.
+# NOTE: production roles/grants are bootstrapped MANUALLY (this script is
+# bootstrap-only and never runs in deploy) — see docs/AUDIT_DB_LEAST_PRIVILEGE.md.
+psql -h postgres -U postgres -d nova_audit <<EOF
+REVOKE CONNECT ON DATABASE nova_audit FROM PUBLIC;
+GRANT CONNECT ON DATABASE nova_audit TO nova_audit_app, nova_audit_migrator;
+REVOKE ALL ON SCHEMA public FROM PUBLIC;
+GRANT USAGE ON SCHEMA public TO nova_audit_app;
+GRANT USAGE, CREATE ON SCHEMA public TO nova_audit_migrator;
+ALTER DEFAULT PRIVILEGES FOR ROLE nova_audit_migrator IN SCHEMA public
+    GRANT INSERT, SELECT ON TABLES TO nova_audit_app;
 EOF

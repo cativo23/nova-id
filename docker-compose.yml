@@ -30,6 +30,8 @@ services:
       HYDRA_DB_PASSWORD: ${HYDRA_DB_PASSWORD}
       KETO_DB_PASSWORD: ${KETO_DB_PASSWORD}
       DEMO_DB_PASSWORD: ${DEMO_DB_PASSWORD}
+      AUDIT_APP_PASSWORD: ${AUDIT_APP_PASSWORD}
+      AUDIT_MIGRATOR_PASSWORD: ${AUDIT_MIGRATOR_PASSWORD}
     command: >
       sh -c "
         until pg_isready -h postgres -U postgres; do sleep 1; done &&
@@ -269,11 +271,13 @@ services:
       - KRATOS_ADMIN_URL=http://kratos:4434
       - KETO_READ_URL=http://keto:4466
       # Audit trail Postgres connection (nova_audit DB on the ory-internal network).
+      # Least-privilege runtime role: INSERT/SELECT only, no DDL (parity with prod).
+      # Migrations run via the api-migrate service below, not on app boot.
       - AUDIT_DB_HOST=postgres
       - AUDIT_DB_PORT=5432
       - AUDIT_DB_NAME=nova_audit
-      - AUDIT_DB_USER=postgres
-      - AUDIT_DB_PASSWORD=${POSTGRES_PASSWORD}
+      - AUDIT_DB_USER=nova_audit_app
+      - AUDIT_DB_PASSWORD=${AUDIT_APP_PASSWORD}
     networks:
       - apps
       - ory-internal
@@ -281,6 +285,37 @@ services:
       - oathkeeper
       - postgres
     restart: unless-stopped
+
+  # ── Audit DB migrator (one-shot, profile-gated) ────────────────────────────
+  # Dev parity for the prod api-migrate service. Since migrationsRun is now off,
+  # the table is not auto-created on app boot. On first setup of a fresh stack
+  # (or after adding an audit migration), run once:
+  #   docker compose --profile migrate run --rm api-migrate
+  # Uses the privileged migrator role; the dev image has ts-node so it runs the
+  # TS migration:run directly. The runtime app (nova_audit_app) has no DDL.
+  api-migrate:
+    build:
+      context: ./api
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./api:/app
+      - /app/node_modules
+    command: sh -c "npm install && npm run migration:run"
+    profiles: ["migrate"]
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=development
+      - AUDIT_DB_HOST=postgres
+      - AUDIT_DB_PORT=5432
+      - AUDIT_DB_NAME=nova_audit
+      - AUDIT_DB_USER=nova_audit_migrator
+      - AUDIT_DB_PASSWORD=${AUDIT_MIGRATOR_PASSWORD}
+    networks:
+      - ory-internal
+    depends_on:
+      - postgres
+    restart: "no"
 
   # ── Demo Relying-Party Backend ─────────────────────────────────────────────
   # Standalone NestJS service that owns demo_app Postgres and serves the

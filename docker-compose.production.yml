@@ -314,8 +314,11 @@ services:
       - AUDIT_DB_HOST=postgres
       - AUDIT_DB_PORT=5432
       - AUDIT_DB_NAME=nova_audit
-      - AUDIT_DB_USER=postgres
-      - AUDIT_DB_PASSWORD=${POSTGRES_PASSWORD}
+      # Least-privilege runtime role: INSERT/SELECT on audit_logs only, no DDL,
+      # not table owner. A compromised BFF cannot UPDATE/DELETE/TRUNCATE the
+      # ledger. Migrations run separately via the api-migrate service below.
+      - AUDIT_DB_USER=nova_audit_app
+      - AUDIT_DB_PASSWORD=${AUDIT_APP_PASSWORD}
     networks:
       - apps
       - ory-internal
@@ -325,6 +328,36 @@ services:
       postgres:
         condition: service_healthy
     restart: unless-stopped
+
+  # ── Audit DB migrator (one-shot, profile-gated) ───────────────────────────────
+  # Applies audit migrations as the privileged nova_audit_migrator role. NOT
+  # started by `docker compose up` (profiles: ["migrate"]) — deploy-prod.sh's
+  # `up -d` ignores it. The runtime app (nova_audit_app) has no DDL, so on the
+  # rare occasion a release adds an audit migration, run this MANUALLY on the
+  # host BEFORE deploying that release:
+  #   IMAGE_TAG=vX.Y.Z docker compose --env-file .env.production \
+  #     -f docker-compose.production.yml --profile migrate run --rm api-migrate
+  # See docs/AUDIT_DB_LEAST_PRIVILEGE.md.
+  api-migrate:
+    image: cativo23/nova-id-api:${IMAGE_TAG:?IMAGE_TAG must be set}
+    command:
+      ["node", "node_modules/typeorm/cli.js", "migration:run", "-d", "dist/audit/audit.datasource.runtime.js"]
+    profiles: ["migrate"]
+    env_file:
+      - .env.production
+    environment:
+      - NODE_ENV=production
+      - AUDIT_DB_HOST=postgres
+      - AUDIT_DB_PORT=5432
+      - AUDIT_DB_NAME=nova_audit
+      - AUDIT_DB_USER=nova_audit_migrator
+      - AUDIT_DB_PASSWORD=${AUDIT_MIGRATOR_PASSWORD}
+    networks:
+      - ory-internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
 
   # ── Demo Relying-Party Backend ────────────────────────────────────────────────
   # Standalone NestJS service that owns demo_app Postgres and serves the
