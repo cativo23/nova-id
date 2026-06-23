@@ -1,4 +1,5 @@
 import { Injectable, Logger, ForbiddenException } from '@nestjs/common';
+import { toHttpExceptionFromOry } from './common/ory-error';
 import { HydraService } from './ory/hydra.service';
 import { KetoService } from './ory/keto.service';
 import { AuditService } from './audit/audit.service';
@@ -56,7 +57,7 @@ export class AppService {
       });
     } catch (error) {
       this.logger.error('Error accepting Hydra login:', error.response?.data || error.message);
-      throw error;
+      throw toHttpExceptionFromOry(error);
     }
   }
 
@@ -125,7 +126,7 @@ export class AppService {
       });
     } catch (error) {
       this.logger.error('Error accepting Hydra consent:', error.response?.data || error.message);
-      throw error;
+      throw toHttpExceptionFromOry(error);
     }
   }
 
@@ -154,7 +155,7 @@ export class AppService {
       };
     } catch (error) {
       this.logger.error('Error fetching consent request:', error.response?.data || error.message);
-      throw error;
+      throw toHttpExceptionFromOry(error);
     }
   }
 
@@ -190,7 +191,7 @@ export class AppService {
       return { redirect_to: result.redirect_to };
     } catch (error) {
       this.logger.error('Error rejecting consent:', error.response?.data || error.message);
-      throw error;
+      throw toHttpExceptionFromOry(error);
     }
   }
 }
