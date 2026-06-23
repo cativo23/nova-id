@@ -235,7 +235,7 @@ import { useRouter, useRoute } from 'vue-router'
 import type { LocationQuery, LocationQueryValue } from 'vue-router'
 import type { UpdateLoginFlowBody } from '@ory/client'
 import NovaLogoIcon from '../components/NovaLogoIcon.vue'
-import { createLoginFlow, getLoginFlow, updateLoginFlow } from '../composables/useAuth'
+import { checkSession, createLoginFlow, getLoginFlow, updateLoginFlow } from '../composables/useAuth'
 import type { FlowLike, HttpErrorLike, ContinueWithLike } from '../types/flow'
 import type { UiNodeLike } from '../utils/uiNodes'
 import { logger, errMessage } from '../utils/logger'
@@ -282,6 +282,16 @@ onMounted(async () => {
       // OAuth/Hydra flow: after Kratos login, land on hydra-callback to accept Hydra login and complete OAuth
       const base = import.meta.env.VITE_AUTH_URL || window.location.origin
       const returnUrl = `${base}/auth/hydra-callback?login_challenge=${encodeURIComponent(loginChallenge)}`
+      // If a Kratos session already exists, creating a new login flow would make
+      // Kratos reject with 400 "you are already logged in" and dump the user on
+      // the generic error page. Skip Kratos login entirely and go straight to
+      // hydra-callback, which accepts the Hydra login via the BFF using the
+      // existing session cookie (honoring Hydra's `skip`).
+      const existingSession = await checkSession().catch(() => null)
+      if (existingSession) {
+        window.location.href = returnUrl
+        return
+      }
       intendedReturnUrl.value = returnUrl
       flow.value = await createLoginFlow(returnUrl)
     } else {
