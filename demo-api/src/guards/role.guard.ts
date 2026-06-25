@@ -4,9 +4,9 @@ import {
   ExecutionContext,
   ForbiddenException,
   Logger,
-} from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
-import { ROLE_KEY } from '../decorators/require-role.decorator';
+} from "@nestjs/common";
+import { Reflector } from "@nestjs/core";
+import { ROLE_KEY } from "../decorators/require-role.decorator";
 
 /**
  * RoleGuard — Platform role authorization for demo-api.
@@ -35,10 +35,10 @@ export class RoleGuard implements CanActivate {
     const user = request.user;
 
     if (!user || !user.userId) {
-      throw new ForbiddenException('User ID not found in request context');
+      throw new ForbiddenException("User ID not found in request context");
     }
 
-    const userRole = user.role || 'platform_user';
+    const userRole = user.role || "platform_user";
 
     if (userRole !== requiredRole) {
       this.logger.warn(

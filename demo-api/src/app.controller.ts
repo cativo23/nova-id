@@ -1,5 +1,5 @@
-import { Controller, Get } from '@nestjs/common';
-import { Public } from './decorators/public.decorator';
+import { Controller, Get } from "@nestjs/common";
+import { Public } from "./decorators/public.decorator";
 
 /**
  * AppController — public endpoints for demo-api.
@@ -10,22 +10,22 @@ import { Public } from './decorators/public.decorator';
  */
 @Controller()
 export class AppController {
-  @Get('health')
+  @Get("health")
   @Public()
   getHealth() {
     return {
-      status: 'ok',
-      service: 'demo-api',
+      status: "ok",
+      service: "demo-api",
       timestamp: new Date().toISOString(),
     };
   }
 
-  @Get('public')
+  @Get("public")
   @Public()
   getPublicData() {
     return {
-      message: 'Public endpoint — no authentication required',
-      service: 'demo-api',
+      message: "Public endpoint — no authentication required",
+      service: "demo-api",
       timestamp: new Date().toISOString(),
     };
   }

@@ -3,13 +3,13 @@ import {
   NestInterceptor,
   ExecutionContext,
   CallHandler,
-} from '@nestjs/common';
-import { Observable } from 'rxjs';
-import { tap } from 'rxjs/operators';
-import { Logger } from '@nestjs/common';
-import { LOG_ACCESS_KEY } from './log-access.decorator';
-import { Reflector } from '@nestjs/core';
-import { LogsService } from './logs/logs.service';
+} from "@nestjs/common";
+import { Observable } from "rxjs";
+import { tap } from "rxjs/operators";
+import { Logger } from "@nestjs/common";
+import { LOG_ACCESS_KEY } from "./log-access.decorator";
+import { Reflector } from "@nestjs/core";
+import { LogsService } from "./logs/logs.service";
 
 @Injectable()
 export class LoggingInterceptor implements NestInterceptor {
@@ -23,10 +23,10 @@ export class LoggingInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const request = context.switchToHttp().getRequest();
     const { method, url, headers } = request;
-    const shouldLog = this.reflector.getAllAndOverride<boolean>(LOG_ACCESS_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+    const shouldLog = this.reflector.getAllAndOverride<boolean>(
+      LOG_ACCESS_KEY,
+      [context.getHandler(), context.getClass()],
+    );
 
     if (!shouldLog) {
       return next.handle();
@@ -36,10 +36,10 @@ export class LoggingInterceptor implements NestInterceptor {
     const frontendSource = this.extractFrontendSource(headers, request);
     // Never fall back to X-User-* headers — they are spoofable (M-2).
     // When request.user is absent (unauthenticated / Public decorator), use 'anonymous'.
-    const userId = request.user?.userId ?? 'anonymous';
-    const userEmail = request.user?.email ?? 'anonymous';
-    const userRole = request.user?.role ?? 'anonymous';
-    const authMethod = request.user?.authMethod || 'session';
+    const userId = request.user?.userId ?? "anonymous";
+    const userEmail = request.user?.email ?? "anonymous";
+    const userRole = request.user?.role ?? "anonymous";
+    const authMethod = request.user?.authMethod || "session";
     const clientId = request.user?.clientId || null;
 
     return next.handle().pipe(
@@ -102,8 +102,8 @@ export class LoggingInterceptor implements NestInterceptor {
 
   private extractFrontendSource(headers: any, request: any): string {
     // Try X-Frontend-Source header first
-    if (headers['x-frontend-source']) {
-      return headers['x-frontend-source'];
+    if (headers["x-frontend-source"]) {
+      return headers["x-frontend-source"];
     }
 
     // For OAuth2 tokens, check if client ID is available
@@ -112,17 +112,17 @@ export class LoggingInterceptor implements NestInterceptor {
     }
 
     // Extract from Referer header
-    const referer = headers['referer'] || headers['referrer'] || '';
-    if (referer.includes('/auth/')) {
-      return 'frontend-auth';
+    const referer = headers["referer"] || headers["referrer"] || "";
+    if (referer.includes("/auth/")) {
+      return "frontend-auth";
     }
-    if (referer.includes('/admin/')) {
-      return 'frontend-admin';
+    if (referer.includes("/admin/")) {
+      return "frontend-admin";
     }
-    if (referer.includes('/app/')) {
-      return 'frontend-app';
+    if (referer.includes("/app/")) {
+      return "frontend-app";
     }
 
-    return 'unknown';
+    return "unknown";
   }
 }

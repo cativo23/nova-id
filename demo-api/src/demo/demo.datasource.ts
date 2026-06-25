@@ -1,7 +1,7 @@
-import 'reflect-metadata';
-import { DataSource } from 'typeorm';
-import { UserRole } from './roles/entities/user-role.entity';
-import { DemoMembershipAudit } from './audit/demo-membership-audit.entity';
+import "reflect-metadata";
+import { DataSource } from "typeorm";
+import { UserRole } from "./roles/entities/user-role.entity";
+import { DemoMembershipAudit } from "./audit/demo-membership-audit.entity";
 
 /**
  * Standalone DataSource used exclusively by the TypeORM CLI
@@ -16,14 +16,14 @@ import { DemoMembershipAudit } from './audit/demo-membership-audit.entity';
  * Required export name: "default" — TypeORM CLI requires a default export.
  */
 const DemoDataSource = new DataSource({
-  type: 'postgres',
+  type: "postgres",
   host: process.env.DEMO_DB_HOST,
-  port: parseInt(process.env.DEMO_DB_PORT ?? '5432', 10),
+  port: parseInt(process.env.DEMO_DB_PORT ?? "5432", 10),
   username: process.env.DEMO_DB_USER,
   password: process.env.DEMO_DB_PASSWORD,
   database: process.env.DEMO_DB_NAME,
   entities: [UserRole, DemoMembershipAudit],
-  migrations: ['src/demo/migrations/*.ts'],
+  migrations: ["src/demo/migrations/*.ts"],
   /**
    * synchronize MUST be false — this DataSource is for migrations only.
    * Auto-sync would race with migration state tracking.

@@ -1,6 +1,6 @@
-import { Controller, Get, Query, Param, UseGuards } from '@nestjs/common';
-import { LogsService } from './logs.service';
-import { AppAdminGuard } from '../guards/app-admin.guard';
+import { Controller, Get, Query, Param, UseGuards } from "@nestjs/common";
+import { LogsService } from "./logs.service";
+import { AppAdminGuard } from "../guards/app-admin.guard";
 
 /**
  * Access gate: AppAdminGuard (class-level) enforces that the caller
@@ -10,18 +10,18 @@ import { AppAdminGuard } from '../guards/app-admin.guard';
  * The global AuthenticatedGuard (registered as APP_GUARD in AppModule)
  * already ensures every caller is authenticated before AppAdminGuard runs.
  */
-@Controller('logs')
+@Controller("logs")
 @UseGuards(AppAdminGuard)
 export class LogsController {
   constructor(private readonly logsService: LogsService) {}
 
   @Get()
   async getLogs(
-    @Query('limit') limit?: string,
-    @Query('frontend') frontend?: string,
-    @Query('method') method?: string,
-    @Query('status') status?: string,
-    @Query('path') path?: string,
+    @Query("limit") limit?: string,
+    @Query("frontend") frontend?: string,
+    @Query("method") method?: string,
+    @Query("status") status?: string,
+    @Query("path") path?: string,
   ) {
     const limitNum = limit ? parseInt(limit, 10) : 100;
     const hasFilters = method || status || path || frontend;
@@ -36,24 +36,24 @@ export class LogsController {
     return this.logsService.getAccessLogs(limitNum);
   }
 
-  @Get('stats')
+  @Get("stats")
   async getStats() {
     return this.logsService.getAccessStats();
   }
 
-  @Get('frontend/:frontend')
+  @Get("frontend/:frontend")
   async getLogsByFrontend(
-    @Param('frontend') frontend: string,
-    @Query('limit') limit?: string,
+    @Param("frontend") frontend: string,
+    @Query("limit") limit?: string,
   ) {
     const limitNum = limit ? parseInt(limit, 10) : 100;
     return this.logsService.getAccessLogsByFrontend(frontend, limitNum);
   }
 
-  @Get('user/:userId')
+  @Get("user/:userId")
   async getLogsByUser(
-    @Param('userId') userId: string,
-    @Query('limit') limit?: string,
+    @Param("userId") userId: string,
+    @Query("limit") limit?: string,
   ) {
     const limitNum = limit ? parseInt(limit, 10) : 100;
     return this.logsService.getAccessLogsByUser(userId, limitNum);
