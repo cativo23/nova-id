@@ -59,7 +59,10 @@ export function pruneSchemas(doc: OpenAPIObject): OpenAPIObject {
 
 /**
  * Return a new doc containing only paths whose operations carry at least one
- * of the given tags. Automatically calls pruneSchemas on the result.
+ * of the given tags. Non-allowed tags are stripped from each kept operation's
+ * tags array so they don't leak into the published client spec (e.g. swagger
+ * ^11 auto-infers a controller-name tag when no class-level @ApiTags is set).
+ * Automatically calls pruneSchemas on the result.
  */
 export function filterByTags(
   doc: OpenAPIObject,
@@ -74,7 +77,14 @@ export function filterByTags(
       const op = (item as Record<string, any>)[method];
       if (!op) continue;
       const opTags: string[] = op.tags ?? [];
-      if (opTags.some((t) => allowedTags.has(t))) keptItem[method] = op;
+      if (opTags.some((t) => allowedTags.has(t))) {
+        // Strip tags that aren't in allowedTags so auto-inferred controller
+        // tags (e.g. "App" from AppController) don't appear in the output.
+        keptItem[method] = {
+          ...op,
+          tags: opTags.filter((t) => allowedTags.has(t)),
+        };
+      }
     }
     if (Object.keys(keptItem).length > 0)
       kept[route] = keptItem as (typeof paths)[string];

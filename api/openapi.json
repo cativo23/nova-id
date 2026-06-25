@@ -4,7 +4,6 @@
     "/v1/hydra-accept-login": {
       "post": {
         "operationId": "acceptHydraLogin",
-        "summary": "Accept a Hydra login challenge for the signed-in user",
         "parameters": [],
         "requestBody": {
           "required": true,
@@ -28,6 +27,7 @@
             }
           }
         },
+        "summary": "Accept a Hydra login challenge for the signed-in user",
         "tags": [
           "auth"
         ]
@@ -36,7 +36,6 @@
     "/v1/hydra-accept-consent": {
       "post": {
         "operationId": "acceptHydraConsent",
-        "summary": "Accept a Hydra consent challenge for the signed-in user",
         "parameters": [],
         "requestBody": {
           "required": true,
@@ -60,6 +59,7 @@
             }
           }
         },
+        "summary": "Accept a Hydra consent challenge for the signed-in user",
         "tags": [
           "auth"
         ]
@@ -68,7 +68,6 @@
     "/v1/hydra-consent-info": {
       "get": {
         "operationId": "getHydraConsentInfo",
-        "summary": "Get Hydra consent request info (server-side proxy)",
         "parameters": [
           {
             "name": "consent_challenge",
@@ -92,6 +91,7 @@
             }
           }
         },
+        "summary": "Get Hydra consent request info (server-side proxy)",
         "tags": [
           "auth"
         ]
@@ -100,7 +100,6 @@
     "/v1/hydra-reject-consent": {
       "post": {
         "operationId": "rejectHydraConsent",
-        "summary": "Reject a Hydra consent challenge",
         "parameters": [],
         "requestBody": {
           "required": true,
@@ -124,6 +123,7 @@
             }
           }
         },
+        "summary": "Reject a Hydra consent challenge",
         "tags": [
           "auth"
         ]
@@ -132,7 +132,6 @@
     "/v1/admin/users": {
       "get": {
         "operationId": "AdminUsersController_list",
-        "summary": "List all platform users (cursor-paginated)",
         "parameters": [
           {
             "name": "pageSize",
@@ -173,18 +172,18 @@
             "description": "Caller lacks Platform:nova#manage_users in Keto"
           }
         },
-        "tags": [
-          "admin"
-        ],
         "security": [
           {
             "oathkeeper-id-token": []
           }
+        ],
+        "summary": "List all platform users (cursor-paginated)",
+        "tags": [
+          "admin"
         ]
       },
       "post": {
         "operationId": "AdminUsersController_create",
-        "summary": "Create a new platform user identity",
         "parameters": [],
         "requestBody": {
           "required": true,
@@ -220,20 +219,20 @@
             "description": "Validation failed"
           }
         },
-        "tags": [
-          "admin"
-        ],
         "security": [
           {
             "oathkeeper-id-token": []
           }
+        ],
+        "summary": "Create a new platform user identity",
+        "tags": [
+          "admin"
         ]
       }
     },
     "/v1/admin/users/{id}": {
       "get": {
         "operationId": "AdminUsersController_get",
-        "summary": "Get a single user by Kratos identity id",
         "parameters": [
           {
             "name": "id",
@@ -265,18 +264,18 @@
             "description": "Identity not found"
           }
         },
-        "tags": [
-          "admin"
-        ],
         "security": [
           {
             "oathkeeper-id-token": []
           }
+        ],
+        "summary": "Get a single user by Kratos identity id",
+        "tags": [
+          "admin"
         ]
       },
       "delete": {
         "operationId": "AdminUsersController_remove",
-        "summary": "Delete a user identity permanently",
         "parameters": [
           {
             "name": "id",
@@ -301,18 +300,18 @@
             "description": "Identity not found"
           }
         },
-        "tags": [
-          "admin"
-        ],
         "security": [
           {
             "oathkeeper-id-token": []
           }
+        ],
+        "summary": "Delete a user identity permanently",
+        "tags": [
+          "admin"
         ]
       },
       "patch": {
         "operationId": "AdminUsersController_update",
-        "summary": "Partially update user traits / role",
         "parameters": [
           {
             "name": "id",
@@ -354,20 +353,20 @@
             "description": "Identity not found"
           }
         },
-        "tags": [
-          "admin"
-        ],
         "security": [
           {
             "oathkeeper-id-token": []
           }
+        ],
+        "summary": "Partially update user traits / role",
+        "tags": [
+          "admin"
         ]
       }
     },
     "/v1/admin/users/{id}/state": {
       "patch": {
         "operationId": "AdminUsersController_setState",
-        "summary": "Activate or deactivate a user identity",
         "parameters": [
           {
             "name": "id",
@@ -409,20 +408,20 @@
             "description": "Identity not found"
           }
         },
-        "tags": [
-          "admin"
-        ],
         "security": [
           {
             "oathkeeper-id-token": []
           }
+        ],
+        "summary": "Activate or deactivate a user identity",
+        "tags": [
+          "admin"
         ]
       }
     },
     "/v1/admin/users/{id}/recovery-link": {
       "post": {
         "operationId": "AdminUsersController_recoveryLink",
-        "summary": "Generate a recovery link for a user",
         "parameters": [
           {
             "name": "id",
@@ -454,20 +453,20 @@
             "description": "Identity not found"
           }
         },
-        "tags": [
-          "admin"
-        ],
         "security": [
           {
             "oathkeeper-id-token": []
           }
+        ],
+        "summary": "Generate a recovery link for a user",
+        "tags": [
+          "admin"
         ]
       }
     },
     "/v1/admin/clients": {
       "get": {
         "operationId": "AdminClientsController_list",
-        "summary": "List all OAuth2 clients",
         "parameters": [],
         "responses": {
           "200": {
@@ -480,18 +479,18 @@
             "description": "Caller lacks Platform:nova#administer in Keto"
           }
         },
-        "tags": [
-          "admin"
-        ],
         "security": [
           {
             "oathkeeper-id-token": []
           }
+        ],
+        "summary": "List all OAuth2 clients",
+        "tags": [
+          "admin"
         ]
       },
       "post": {
         "operationId": "AdminClientsController_create",
-        "summary": "Create a new OAuth2 client",
         "parameters": [],
         "requestBody": {
           "required": true,
@@ -517,20 +516,20 @@
             "description": "Validation failed"
           }
         },
-        "tags": [
-          "admin"
-        ],
         "security": [
           {
             "oathkeeper-id-token": []
           }
+        ],
+        "summary": "Create a new OAuth2 client",
+        "tags": [
+          "admin"
         ]
       }
     },
     "/v1/admin/clients/{id}": {
       "get": {
         "operationId": "AdminClientsController_get",
-        "summary": "Get a single OAuth2 client by id",
         "parameters": [
           {
             "name": "id",
@@ -555,18 +554,18 @@
             "description": "Client not found"
           }
         },
-        "tags": [
-          "admin"
-        ],
         "security": [
           {
             "oathkeeper-id-token": []
           }
+        ],
+        "summary": "Get a single OAuth2 client by id",
+        "tags": [
+          "admin"
         ]
       },
       "put": {
         "operationId": "AdminClientsController_update",
-        "summary": "Replace an OAuth2 client (full update)",
         "parameters": [
           {
             "name": "id",
@@ -604,18 +603,18 @@
             "description": "Validation failed"
           }
         },
-        "tags": [
-          "admin"
-        ],
         "security": [
           {
             "oathkeeper-id-token": []
           }
+        ],
+        "summary": "Replace an OAuth2 client (full update)",
+        "tags": [
+          "admin"
         ]
       },
       "delete": {
         "operationId": "AdminClientsController_remove",
-        "summary": "Delete an OAuth2 client",
         "parameters": [
           {
             "name": "id",
@@ -640,20 +639,20 @@
             "description": "Client not found"
           }
         },
-        "tags": [
-          "admin"
-        ],
         "security": [
           {
             "oathkeeper-id-token": []
           }
+        ],
+        "summary": "Delete an OAuth2 client",
+        "tags": [
+          "admin"
         ]
       }
     },
     "/v1/me/permissions": {
       "get": {
         "operationId": "MeController_permissions",
-        "summary": "Resolve the caller's Platform-level Keto permissions",
         "parameters": [],
         "responses": {
           "200": {
@@ -670,13 +669,14 @@
             "description": "Missing or invalid Bearer id_token"
           }
         },
-        "tags": [
-          "me"
-        ],
         "security": [
           {
             "oathkeeper-id-token": []
           }
+        ],
+        "summary": "Resolve the caller's Platform-level Keto permissions",
+        "tags": [
+          "me"
         ]
       }
     }
