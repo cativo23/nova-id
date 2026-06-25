@@ -1,19 +1,27 @@
 import {
-  Controller, Get, Post, Put, Delete, Body, Param, UseGuards, UseInterceptors,
-} from '@nestjs/common';
-import { LoggingInterceptor } from './logging.interceptor';
-import { LogAccess } from './log-access.decorator';
-import { DemoService } from './demo.service';
-import { RolesService } from './roles/roles.service';
-import { GetUser } from '../decorators/get-user.decorator';
-import { AuthenticatedUser } from '../common/types/authenticated-user';
-import { RequireRole } from '../decorators/require-role.decorator';
-import { RoleGuard } from '../guards/role.guard';
-import { AppAdminGuard } from './guards/app-admin.guard';
-import { AppUserGuard } from './guards/app-user.guard';
-import { DemoCreateDataDto } from './dto/demo-create-data.dto';
-import { DemoConfigureDto } from './dto/demo-configure.dto';
-import { DemoUpdateDataDto } from './dto/demo-update-data.dto';
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  UseGuards,
+  UseInterceptors,
+} from "@nestjs/common";
+import { LoggingInterceptor } from "./logging.interceptor";
+import { LogAccess } from "./log-access.decorator";
+import { DemoService } from "./demo.service";
+import { RolesService } from "./roles/roles.service";
+import { GetUser } from "../decorators/get-user.decorator";
+import { AuthenticatedUser } from "../common/types/authenticated-user";
+import { RequireRole } from "../decorators/require-role.decorator";
+import { RoleGuard } from "../guards/role.guard";
+import { AppAdminGuard } from "./guards/app-admin.guard";
+import { AppUserGuard } from "./guards/app-user.guard";
+import { DemoCreateDataDto } from "./dto/demo-create-data.dto";
+import { DemoConfigureDto } from "./dto/demo-configure.dto";
+import { DemoUpdateDataDto } from "./dto/demo-update-data.dto";
 
 @Controller()
 @LogAccess()
@@ -24,7 +32,7 @@ export class DemoController {
     private readonly rolesService: RolesService,
   ) {}
 
-  @Get('me')
+  @Get("me")
   @UseGuards(AppUserGuard)
   async getMe(@GetUser() user: AuthenticatedUser) {
     const appRole = await this.rolesService.getAppRole(user.userId);
@@ -34,13 +42,13 @@ export class DemoController {
         email: user.email,
         full_name: user.full_name,
         name: user.full_name,
-        role: user.role ?? 'platform_user',
-        appRole: appRole ?? 'app_user',
+        role: user.role ?? "platform_user",
+        appRole: appRole ?? "app_user",
       },
     };
   }
 
-  @Get('nova-id-session')
+  @Get("nova-id-session")
   @UseGuards(AppUserGuard)
   async getNovaIdSession(@GetUser() user: AuthenticatedUser) {
     const appRole = await this.rolesService.getAppRole(user.userId);
@@ -50,77 +58,93 @@ export class DemoController {
         traits: {
           email: user.email,
           full_name: user.full_name,
-          role: user.role ?? 'platform_user',
-          appRole: appRole ?? 'app_user',
+          role: user.role ?? "platform_user",
+          appRole: appRole ?? "app_user",
         },
       },
     };
   }
 
-  @Get('protected')
+  @Get("protected")
   @UseGuards(AppUserGuard)
   getProtectedData(@GetUser() user: AuthenticatedUser) {
     return this.demoService.getProtectedData(user);
   }
 
-  @Get('user-demo')
+  @Get("user-demo")
   @UseGuards(AppUserGuard)
   getUserDemoData(@GetUser() user: AuthenticatedUser) {
     return this.demoService.getUserDemoData(user);
   }
 
-  @Post('data')
+  @Post("data")
   @UseGuards(AppUserGuard)
-  createData(@GetUser() user: AuthenticatedUser, @Body() dto: DemoCreateDataDto) {
+  createData(
+    @GetUser() user: AuthenticatedUser,
+    @Body() dto: DemoCreateDataDto,
+  ) {
     return this.demoService.createData(user, dto);
   }
 
-  @Post('create')
+  @Post("create")
   @UseGuards(AppUserGuard)
-  createDataLegacy(@GetUser() user: AuthenticatedUser, @Body() dto: DemoCreateDataDto) {
+  createDataLegacy(
+    @GetUser() user: AuthenticatedUser,
+    @Body() dto: DemoCreateDataDto,
+  ) {
     return this.demoService.createData(user, dto);
   }
 
-  @Get('app-user-data')
+  @Get("app-user-data")
   @UseGuards(AppUserGuard)
   async getAppUserData(@GetUser() user: AuthenticatedUser) {
     return this.demoService.getAppUserData(user);
   }
 
-  @Post('app-user-data')
+  @Post("app-user-data")
   @UseGuards(AppUserGuard)
-  async createAppUserData(@GetUser() user: AuthenticatedUser, @Body() dto: DemoCreateDataDto) {
+  async createAppUserData(
+    @GetUser() user: AuthenticatedUser,
+    @Body() dto: DemoCreateDataDto,
+  ) {
     return this.demoService.createData(user, dto);
   }
 
-  @Get('admin-demo')
+  @Get("admin-demo")
   @UseGuards(RoleGuard)
-  @RequireRole('platform_admin')
+  @RequireRole("platform_admin")
   getAdminDemoData(@GetUser() user: AuthenticatedUser) {
     return this.demoService.getAdminDemoData(user);
   }
 
-  @Get('app-admin-only')
+  @Get("app-admin-only")
   @UseGuards(AppAdminGuard)
   getAppAdminOnlyData(@GetUser() user: AuthenticatedUser) {
     return this.demoService.getAppAdminOnlyData(user);
   }
 
-  @Post('app-admin/configure')
+  @Post("app-admin/configure")
   @UseGuards(AppAdminGuard)
-  configureAppAdmin(@GetUser() user: AuthenticatedUser, @Body() dto: DemoConfigureDto) {
+  configureAppAdmin(
+    @GetUser() user: AuthenticatedUser,
+    @Body() dto: DemoConfigureDto,
+  ) {
     return this.demoService.configureAppAdmin(user, dto);
   }
 
-  @Put('data/:id')
+  @Put("data/:id")
   @UseGuards(AppUserGuard)
-  updateData(@GetUser() user: AuthenticatedUser, @Param('id') id: string, @Body() dto: DemoUpdateDataDto) {
+  updateData(
+    @GetUser() user: AuthenticatedUser,
+    @Param("id") id: string,
+    @Body() dto: DemoUpdateDataDto,
+  ) {
     return this.demoService.updateData(user, id, dto);
   }
 
-  @Delete('data/:id')
+  @Delete("data/:id")
   @UseGuards(AppUserGuard)
-  deleteData(@GetUser() user: AuthenticatedUser, @Param('id') id: string) {
+  deleteData(@GetUser() user: AuthenticatedUser, @Param("id") id: string) {
     return this.demoService.deleteData(user, id);
   }
 }

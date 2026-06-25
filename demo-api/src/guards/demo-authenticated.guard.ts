@@ -4,12 +4,12 @@ import {
   ExecutionContext,
   UnauthorizedException,
   Logger,
-} from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { Reflector } from '@nestjs/core';
-import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
-import * as jwt from 'jsonwebtoken';
-import { JwksClient } from 'jwks-rsa';
+} from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { Reflector } from "@nestjs/core";
+import { IS_PUBLIC_KEY } from "../decorators/public.decorator";
+import * as jwt from "jsonwebtoken";
+import { JwksClient } from "jwks-rsa";
 
 /**
  * DemoAuthenticatedGuard — ZERO TRUST with Oathkeeper (Ory IAP pattern).
@@ -38,8 +38,8 @@ export class DemoAuthenticatedGuard implements CanActivate {
     private reflector: Reflector,
     private config: ConfigService,
   ) {
-    const jwksUri = this.config.get<string>('JWKS_URL');
-    const issuer = this.config.get<string>('OAUTH_ISSUER');
+    const jwksUri = this.config.get<string>("JWKS_URL");
+    const issuer = this.config.get<string>("OAUTH_ISSUER");
     if (!jwksUri) {
       throw new Error(
         "JWKS_URL is required. Set it to Oathkeeper's JWKS endpoint, e.g. http://oathkeeper:4456/.well-known/jwks.json.",
@@ -47,7 +47,7 @@ export class DemoAuthenticatedGuard implements CanActivate {
     }
     if (!issuer) {
       throw new Error(
-        'OAUTH_ISSUER is required. Set it to the Oathkeeper id_token issuer_url (https://id.cativo.dev/).',
+        "OAUTH_ISSUER is required. Set it to the Oathkeeper id_token issuer_url (https://id.cativo.dev/).",
       );
     }
     this.jwksUri = jwksUri;
@@ -74,12 +74,12 @@ export class DemoAuthenticatedGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
     const headers = request.headers ?? {};
     const authHeader: string | undefined =
-      headers['authorization'] || headers['Authorization'];
+      headers["authorization"] || headers["Authorization"];
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      this.logger.warn('Missing Bearer token — request not authenticated');
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      this.logger.warn("Missing Bearer token — request not authenticated");
       throw new UnauthorizedException(
-        'Unauthorized. Provide a valid token from Oathkeeper.',
+        "Unauthorized. Provide a valid token from Oathkeeper.",
       );
     }
 
@@ -88,25 +88,25 @@ export class DemoAuthenticatedGuard implements CanActivate {
       const kid = this.decodeKid(token);
       const signingKey = await this.getSigningKey(kid);
       const decoded = jwt.verify(token, signingKey, {
-        algorithms: ['RS256'],
+        algorithms: ["RS256"],
         issuer: this.issuer,
       }) as jwt.JwtPayload;
 
       if (!decoded.sub) {
-        throw new UnauthorizedException('Token missing subject claim');
+        throw new UnauthorizedException("Token missing subject claim");
       }
       const clean = (val: unknown) =>
-        val && val !== '<no value>' ? (val as string) : undefined;
+        val && val !== "<no value>" ? (val as string) : undefined;
       request.user = {
         userId: decoded.sub,
         email: clean(decoded.email),
         full_name: clean(decoded.name ?? decoded.full_name),
-        role: clean(decoded.role) || 'platform_user',
-        authMethod: 'jwt',
+        role: clean(decoded.role) || "platform_user",
+        authMethod: "jwt",
         jwtClaims: decoded,
       };
       this.logger.debug(
-        `Authenticated via Oathkeeper id_token: ${decoded.sub} (${decoded.email || 'no email'})`,
+        `Authenticated via Oathkeeper id_token: ${decoded.sub} (${decoded.email || "no email"})`,
       );
       return true;
     } catch (error: any) {
@@ -115,7 +115,7 @@ export class DemoAuthenticatedGuard implements CanActivate {
         throw error;
       }
       this.logger.error(`JWT validation failed: ${error?.message ?? error}`);
-      throw new UnauthorizedException('Invalid token');
+      throw new UnauthorizedException("Invalid token");
     }
   }
 

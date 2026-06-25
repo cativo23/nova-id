@@ -1,4 +1,4 @@
-import { JwtPayload } from 'jsonwebtoken';
+import { JwtPayload } from "jsonwebtoken";
 
 /**
  * Shape of `request.user` as set by DemoAuthenticatedGuard after RS256
@@ -15,7 +15,7 @@ export interface AuthenticatedUser {
   /** Platform role from JWT `role` claim; defaults to `'platform_user'`. */
   role: string;
   /** Always `'jwt'` for requests validated by DemoAuthenticatedGuard. */
-  authMethod: 'jwt';
+  authMethod: "jwt";
   /** Raw verified JWT payload. */
   jwtClaims: JwtPayload;
 }

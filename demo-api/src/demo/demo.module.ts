@@ -1,13 +1,13 @@
-import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { RolesModule } from './roles/roles.module';
-import { LogsModule } from './logs/logs.module';
-import { DemoController } from './demo.controller';
-import { DemoService } from './demo.service';
-import { UserRole } from './roles/entities/user-role.entity';
-import { DemoMembershipAudit } from './audit/demo-membership-audit.entity';
-import { LoggingInterceptor } from './logging.interceptor';
-import { InitDemoSchema1750100000000 } from './migrations/1750100000000-InitDemoSchema';
+import { Module } from "@nestjs/common";
+import { TypeOrmModule } from "@nestjs/typeorm";
+import { RolesModule } from "./roles/roles.module";
+import { LogsModule } from "./logs/logs.module";
+import { DemoController } from "./demo.controller";
+import { DemoService } from "./demo.service";
+import { UserRole } from "./roles/entities/user-role.entity";
+import { DemoMembershipAudit } from "./audit/demo-membership-audit.entity";
+import { LoggingInterceptor } from "./logging.interceptor";
+import { InitDemoSchema1750100000000 } from "./migrations/1750100000000-InitDemoSchema";
 
 /**
  * DemoModule — named 'demo' Postgres connection backed by the demo_app DB.
@@ -24,10 +24,10 @@ import { InitDemoSchema1750100000000 } from './migrations/1750100000000-InitDemo
 @Module({
   imports: [
     TypeOrmModule.forRoot({
-      name: 'demo',
-      type: 'postgres',
+      name: "demo",
+      type: "postgres",
       host: process.env.DEMO_DB_HOST,
-      port: parseInt(process.env.DEMO_DB_PORT ?? '5432', 10),
+      port: parseInt(process.env.DEMO_DB_PORT ?? "5432", 10),
       username: process.env.DEMO_DB_USER,
       password: process.env.DEMO_DB_PASSWORD,
       database: process.env.DEMO_DB_NAME,

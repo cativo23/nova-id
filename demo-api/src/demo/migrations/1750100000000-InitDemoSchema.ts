@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import { MigrationInterface, QueryRunner } from "typeorm";
 
 /**
  * InitDemoSchema — initial schema for the demo_app Postgres database.
@@ -13,7 +13,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * gen_random_uuid() is Postgres 13+ core; no uuid-ossp extension required.
  */
 export class InitDemoSchema1750100000000 implements MigrationInterface {
-  name = 'InitDemoSchema1750100000000';
+  name = "InitDemoSchema1750100000000";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // user_roles — mirrors the UserRole entity (formerly SQLite)
@@ -52,8 +52,12 @@ export class InitDemoSchema1750100000000 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`DROP INDEX IF EXISTS "public"."IDX_demo_audit_action"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "public"."IDX_demo_audit_actorId"`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "public"."IDX_demo_audit_action"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "public"."IDX_demo_audit_actorId"`,
+    );
     await queryRunner.query(`DROP TABLE IF EXISTS "demo_membership_audit"`);
     await queryRunner.query(`DROP TABLE IF EXISTS "user_roles"`);
   }
