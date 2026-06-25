@@ -61,7 +61,18 @@
           <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
-          <p class="text-sm text-red-300">{{ error }}</p>
+          <div class="min-w-0 flex-1">
+            <p class="text-sm text-red-300">{{ error }}</p>
+            <router-link
+              to="/login"
+              class="inline-flex items-center gap-1.5 mt-3 text-sm font-medium text-cyber-accent hover:text-cyber-accent/90"
+            >
+              Start over
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+              </svg>
+            </router-link>
+          </div>
         </div>
         </div>
       </div>
