@@ -78,7 +78,21 @@ server {
     }
 
     # SPA history-mode fallback — must be last.
+    # index.html: no-cache so browsers always re-fetch after a deploy and pick up
+    # new hashed asset filenames. Hashed assets under /assets/ keep their long cache
+    # (served by the rule above). The try_files fallback also serves index.html for
+    # client-side routes, so the no-cache headers apply to those responses too.
+    location = /index.html {
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+        add_header Pragma "no-cache";
+        add_header Expires "0";
+        try_files $uri /index.html;
+    }
+
     location / {
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+        add_header Pragma "no-cache";
+        add_header Expires "0";
         try_files $uri $uri/ /index.html;
     }
 }
