@@ -1,7 +1,7 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { UserRole } from './entities/user-role.entity';
+import { Injectable, NotFoundException, Logger } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { UserRole } from "./entities/user-role.entity";
 
 @Injectable()
 export class RolesService {
@@ -11,9 +11,9 @@ export class RolesService {
     // 'demo' connection name required — UserRole is registered on the named
     // 'demo' Postgres connection. Omitting it resolves to the unnamed default
     // (which doesn't exist) and crashes Nest DI at boot.
-    @InjectRepository(UserRole, 'demo')
+    @InjectRepository(UserRole, "demo")
     private readonly userRoleRepository: Repository<UserRole>,
-  ) { }
+  ) {}
 
   /**
    * Ensures a user exists in the app database with default app_user role.
@@ -28,7 +28,7 @@ export class RolesService {
       this.logger.log(`Creating new app user: ${userId} with role app_user`);
       userRole = this.userRoleRepository.create({
         userId,
-        appRole: 'app_user',
+        appRole: "app_user",
       });
       userRole = await this.userRoleRepository.save(userRole);
     }
@@ -36,7 +36,10 @@ export class RolesService {
     return userRole;
   }
 
-  async getAppRole(userId: string, ensureExists: boolean = true): Promise<'app_admin' | 'app_user'> {
+  async getAppRole(
+    userId: string,
+    ensureExists: boolean = true,
+  ): Promise<"app_admin" | "app_user"> {
     let userRole = await this.userRoleRepository.findOne({
       where: { userId },
     });
@@ -46,10 +49,13 @@ export class RolesService {
       userRole = await this.ensureUserExists(userId);
     }
 
-    return userRole?.appRole || 'app_user'; // Default to app_user
+    return userRole?.appRole || "app_user"; // Default to app_user
   }
 
-  async setAppRole(userId: string, appRole: 'app_admin' | 'app_user'): Promise<UserRole> {
+  async setAppRole(
+    userId: string,
+    appRole: "app_admin" | "app_user",
+  ): Promise<UserRole> {
     let userRole = await this.userRoleRepository.findOne({
       where: { userId },
     });
@@ -65,7 +71,7 @@ export class RolesService {
 
   async getAllUserRoles(): Promise<UserRole[]> {
     return await this.userRoleRepository.find({
-      order: { createdAt: 'DESC' },
+      order: { createdAt: "DESC" },
     });
   }
 

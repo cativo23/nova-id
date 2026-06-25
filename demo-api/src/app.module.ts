@@ -1,10 +1,10 @@
-import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
-import { APP_GUARD } from '@nestjs/core';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
-import { DemoModule } from './demo/demo.module';
-import { DemoAuthenticatedGuard } from './guards/demo-authenticated.guard';
-import { AppController } from './app.controller';
+import { Module } from "@nestjs/common";
+import { ConfigModule } from "@nestjs/config";
+import { APP_GUARD } from "@nestjs/core";
+import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
+import { DemoModule } from "./demo/demo.module";
+import { DemoAuthenticatedGuard } from "./guards/demo-authenticated.guard";
+import { AppController } from "./app.controller";
 
 /**
  * AppModule for demo-api — the standalone demo relying-party backend.

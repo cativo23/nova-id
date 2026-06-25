@@ -114,8 +114,8 @@
 import { ref, onMounted, provide } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import NovaLogoIcon from './components/NovaLogoIcon.vue'
-import { checkSession, logout } from './composables/useAuth'
-import { initiateOAuthFlow } from './composables/useHydraOAuth'
+import { logout } from './composables/useAuth'
+import { initiateOAuthFlow, getStoredAccessToken, clearStoredAccessToken } from './composables/useHydraOAuth'
 import { getApiTestBaseUrl } from './composables/useApiTest'
 import type { DemoUser, MeResponse } from './types'
 
@@ -138,30 +138,33 @@ const refreshAuth = async () => {
   isAuthenticated.value = false
   userEmail.value = ''
   userFromMe.value = null
+  isAppAdmin.value = false
+
+  // The nav reflects THIS app's OAuth session, not the IdP (Kratos) cookie.
+  // Post-ADR-0007 the demo RP authenticates via its OAuth2 access token and
+  // /api-test/* is gated by oauth2_introspection — so a Kratos session alone
+  // does NOT mean the user is signed in here. Gate on the stored token (same
+  // source Home uses) to keep the nav consistent with the dashboard.
+  const token = getStoredAccessToken()
+  if (!token) return
+
   try {
-    // The gateway honors the Kratos cookie session; /api-test/me returns the
-    // resolved user incl. appRole from the demo SQLite store (ADR-0002).
-    const res = await fetch(`${getApiTestBaseUrl()}/me`, { credentials: 'include' })
-    if (res.ok) {
-      const me = await res.json() as MeResponse
-      const user: DemoUser = me.user ?? (me as unknown as DemoUser)
-      isAuthenticated.value = true
-      userFromMe.value = user || null
-      userEmail.value = user?.email || ''
-      isAppAdmin.value = user?.appRole === 'app_admin'
+    const res = await fetch(`${getApiTestBaseUrl()}/me`, {
+      headers: { Authorization: 'Bearer ' + token },
+    })
+    if (!res.ok) {
+      // Token invalid/expired — clear it so the user is not stuck (ADR-0007).
+      clearStoredAccessToken()
       return
     }
-  } catch {}
-  // Fall back to a bare session check (covers logged-in-but-not-yet-provisioned).
-  try {
-    const session = await checkSession()
-    isAuthenticated.value = !!session
-    userEmail.value = session?.identity?.traits?.email || ''
-    isAppAdmin.value = false
+    const me = await res.json() as MeResponse
+    const user: DemoUser = me.user ?? (me as unknown as DemoUser)
+    isAuthenticated.value = true
+    userFromMe.value = user || null
+    userEmail.value = user?.email || ''
+    isAppAdmin.value = user?.appRole === 'app_admin'
   } catch {
     isAuthenticated.value = false
-    userEmail.value = ''
-    isAppAdmin.value = false
   }
 }
 
@@ -187,6 +190,9 @@ function startOAuth() {
 }
 
 const handleLogout = async () => {
+  // Clear the app's OAuth session first so the nav/dashboard flip to logged-out
+  // immediately, even if the IdP logout redirect is slow or fails (ADR-0007).
+  clearStoredAccessToken()
   try {
     const returnTo = window.location.origin + '/'
     const data = await logout(returnTo)

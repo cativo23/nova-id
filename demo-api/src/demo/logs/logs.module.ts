@@ -1,7 +1,7 @@
-import { Module } from '@nestjs/common';
-import { LogsService } from './logs.service';
-import { LogsController } from './logs.controller';
-import { RolesModule } from '../roles/roles.module';
+import { Module } from "@nestjs/common";
+import { LogsService } from "./logs.service";
+import { LogsController } from "./logs.controller";
+import { RolesModule } from "../roles/roles.module";
 
 /**
  * LogsModule — access logs storage and retrieval.

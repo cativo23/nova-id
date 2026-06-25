@@ -1,7 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { DemoMembershipAudit } from './demo-membership-audit.entity';
+import { Injectable, Logger } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { DemoMembershipAudit } from "./demo-membership-audit.entity";
 
 export interface DemoAuditRecord {
   actorId: string;
@@ -24,7 +24,7 @@ export class DemoAuditService {
   private readonly logger = new Logger(DemoAuditService.name);
 
   constructor(
-    @InjectRepository(DemoMembershipAudit, 'demo')
+    @InjectRepository(DemoMembershipAudit, "demo")
     private readonly repo: Repository<DemoMembershipAudit>,
   ) {}
 

@@ -24,6 +24,22 @@ const router = createRouter({
   routes
 })
 
+// Upper bound on each network-bound auth check in the guard. Without it, a hung
+// request (server unreachable / stalled connection) would leave navigation
+// pending forever, freezing the app on a blank route. On timeout we fail closed
+// (redirect to '/') — see #24.
+const GUARD_CHECK_TIMEOUT_MS = 8000
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
+    promise.then(
+      (value) => { clearTimeout(timer); resolve(value) },
+      (err) => { clearTimeout(timer); reject(err) },
+    )
+  })
+}
+
 // Navigation guard: authentication and admin access permission for admin routes
 router.beforeEach(async (to, _from, next) => {
   if (to.path === '/') {
@@ -34,7 +50,7 @@ router.beforeEach(async (to, _from, next) => {
   if (to.meta.requiresAuth) {
     try {
       const { checkSession } = await import('./composables/useAuth')
-      const session = await checkSession()
+      const session = await withTimeout(checkSession(), GUARD_CHECK_TIMEOUT_MS, 'Session check')
 
       if (!session) {
         next({ path: '/' })
@@ -43,7 +59,11 @@ router.beforeEach(async (to, _from, next) => {
 
       if (to.meta.requiresAdminAccess) {
         const { canAccessAdmin } = await import('./composables/usePermissions')
-        const hasAccess = await canAccessAdmin(session.identity?.id)
+        const hasAccess = await withTimeout(
+          canAccessAdmin(session.identity?.id),
+          GUARD_CHECK_TIMEOUT_MS,
+          'Admin access check',
+        )
         if (!hasAccess) {
           next({ path: '/' })
           return
