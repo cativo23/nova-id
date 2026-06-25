@@ -24,7 +24,21 @@ async function generate() {
     )
     .build();
 
-  const full = SwaggerModule.createDocument(app, config);
+  const full = SwaggerModule.createDocument(app, config, {
+    // Prevent swagger ^11 from auto-inferring a tag from the controller class
+    // name (e.g. AppController → "App") when no class-level @ApiTags is set.
+    // Without this, AppController's untagged-at-class-level endpoints gain an
+    // "App" tag that leaks into the published openapi.json and causes orval's
+    // tags-split mode to emit an extra generated/app/ file, breaking imports.
+    autoTagControllers: false,
+    // Suppress the _v1 suffix that swagger ^11 appends to auto-generated
+    // operationIds for URI-versioned controllers. Endpoints with an explicit
+    // @ApiOperation({ operationId: '...' }) are unaffected. Admin and me
+    // controllers rely on the auto-generated Id; stripping the version keeps
+    // the function names stable in the generated API client.
+    operationIdFactory: (controllerKey: string, methodKey: string) =>
+      controllerKey ? `${controllerKey}_${methodKey}` : methodKey,
+  });
   const filtered = filterByTags(full, ALLOWED_TAGS);
 
   const outPath = join(__dirname, '..', 'openapi.json');

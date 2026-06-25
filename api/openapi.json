@@ -29,7 +29,6 @@
         },
         "summary": "Accept a Hydra login challenge for the signed-in user",
         "tags": [
-          "App",
           "auth"
         ]
       }
@@ -62,7 +61,6 @@
         },
         "summary": "Accept a Hydra consent challenge for the signed-in user",
         "tags": [
-          "App",
           "auth"
         ]
       }
@@ -95,7 +93,6 @@
         },
         "summary": "Get Hydra consent request info (server-side proxy)",
         "tags": [
-          "App",
           "auth"
         ]
       }
@@ -128,14 +125,13 @@
         },
         "summary": "Reject a Hydra consent challenge",
         "tags": [
-          "App",
           "auth"
         ]
       }
     },
     "/v1/admin/users": {
       "get": {
-        "operationId": "AdminUsersController_list_v1",
+        "operationId": "AdminUsersController_list",
         "parameters": [
           {
             "name": "pageSize",
@@ -187,7 +183,7 @@
         ]
       },
       "post": {
-        "operationId": "AdminUsersController_create_v1",
+        "operationId": "AdminUsersController_create",
         "parameters": [],
         "requestBody": {
           "required": true,
@@ -236,7 +232,7 @@
     },
     "/v1/admin/users/{id}": {
       "get": {
-        "operationId": "AdminUsersController_get_v1",
+        "operationId": "AdminUsersController_get",
         "parameters": [
           {
             "name": "id",
@@ -279,7 +275,7 @@
         ]
       },
       "delete": {
-        "operationId": "AdminUsersController_remove_v1",
+        "operationId": "AdminUsersController_remove",
         "parameters": [
           {
             "name": "id",
@@ -315,7 +311,7 @@
         ]
       },
       "patch": {
-        "operationId": "AdminUsersController_update_v1",
+        "operationId": "AdminUsersController_update",
         "parameters": [
           {
             "name": "id",
@@ -370,7 +366,7 @@
     },
     "/v1/admin/users/{id}/state": {
       "patch": {
-        "operationId": "AdminUsersController_setState_v1",
+        "operationId": "AdminUsersController_setState",
         "parameters": [
           {
             "name": "id",
@@ -425,7 +421,7 @@
     },
     "/v1/admin/users/{id}/recovery-link": {
       "post": {
-        "operationId": "AdminUsersController_recoveryLink_v1",
+        "operationId": "AdminUsersController_recoveryLink",
         "parameters": [
           {
             "name": "id",
@@ -470,7 +466,7 @@
     },
     "/v1/admin/clients": {
       "get": {
-        "operationId": "AdminClientsController_list_v1",
+        "operationId": "AdminClientsController_list",
         "parameters": [],
         "responses": {
           "200": {
@@ -494,7 +490,7 @@
         ]
       },
       "post": {
-        "operationId": "AdminClientsController_create_v1",
+        "operationId": "AdminClientsController_create",
         "parameters": [],
         "requestBody": {
           "required": true,
@@ -533,7 +529,7 @@
     },
     "/v1/admin/clients/{id}": {
       "get": {
-        "operationId": "AdminClientsController_get_v1",
+        "operationId": "AdminClientsController_get",
         "parameters": [
           {
             "name": "id",
@@ -569,7 +565,7 @@
         ]
       },
       "put": {
-        "operationId": "AdminClientsController_update_v1",
+        "operationId": "AdminClientsController_update",
         "parameters": [
           {
             "name": "id",
@@ -618,7 +614,7 @@
         ]
       },
       "delete": {
-        "operationId": "AdminClientsController_remove_v1",
+        "operationId": "AdminClientsController_remove",
         "parameters": [
           {
             "name": "id",
@@ -656,7 +652,7 @@
     },
     "/v1/me/permissions": {
       "get": {
-        "operationId": "MeController_permissions_v1",
+        "operationId": "MeController_permissions",
         "parameters": [],
         "responses": {
           "200": {
