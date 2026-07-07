@@ -119,6 +119,15 @@ export class KratosAdminService {
     }
   }
 
+  // WARNING — lost-update race: this is a read-then-full-PUT (getIdentity,
+  // then updateIdentity with the whole identity body). Kratos's admin
+  // updateIdentity endpoint has no optimistic-concurrency parameter (no
+  // ETag/If-Match, no version field on UpdateIdentityBody) to guard the gap
+  // between the two calls, so two concurrent admin edits to the same
+  // identity can race: the second write's PUT silently overwrites whatever
+  // fields the first write changed that it didn't itself resend. Given the
+  // low concurrent-admin-edit likelihood and Kratos's current API surface,
+  // this is accepted as a known limitation rather than worked around.
   async updateIdentity(id: string, input: UpdateIdentityInput): Promise<Identity> {
     // getIdentity already maps 404 → NotFoundException
     const current = await this.getIdentity(id);
@@ -150,6 +159,8 @@ export class KratosAdminService {
     }
   }
 
+  // WARNING — same read-then-full-PUT lost-update window as updateIdentity
+  // above: no version guard exists on Kratos's admin updateIdentity endpoint.
   async setIdentityState(id: string, state: 'active' | 'inactive'): Promise<Identity> {
     // getIdentity already maps 404 → NotFoundException
     const current = await this.getIdentity(id);
