@@ -61,15 +61,20 @@ export class LogsService {
    * Async file write with size-cap rotation.
    *
    * Before appending, stat the file; if it exceeds MAX_LOG_BYTES rotate it
-   * (rename access.log → access.log.1, start fresh).  This keeps the file
-   * permanently bounded without requiring an external log-rotation daemon.
+   * (rename access.log → access.log.<timestamp>, start fresh). This keeps
+   * the active file permanently bounded without requiring an external
+   * log-rotation daemon.
+   *
+   * A fixed `.1` suffix would overwrite on POSIX rename — a second rotation
+   * would silently clobber the first rotated file, losing history (#104).
+   * A timestamped suffix never collides across rotations.
    */
   private async writeLogLine(line: string): Promise<void> {
     // Check current file size; rotate if over the cap.
     try {
       const stat = await fsPromises.stat(this.accessLogFile);
       if (stat.size >= MAX_LOG_BYTES) {
-        const rotatedPath = `${this.accessLogFile}.1`;
+        const rotatedPath = `${this.accessLogFile}.${Date.now()}`;
         await fsPromises.rename(this.accessLogFile, rotatedPath);
       }
     } catch {
