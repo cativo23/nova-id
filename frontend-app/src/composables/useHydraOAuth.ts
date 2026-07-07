@@ -129,7 +129,12 @@ export async function handleOAuthCallback(code: string, state: string): Promise<
   if (tokens.id_token) {
     const claims = decodeIdToken(tokens.id_token)
     validateIdTokenClaims(claims, getExpectedIssuer(), clientId)
-    if (storedNonce && claims.nonce && claims.nonce !== storedNonce) {
+    // We always send a nonce in initiateOAuthFlow, so an id_token that omits it
+    // (claims.nonce falsy) is itself suspicious and must be rejected, not
+    // silently accepted — the previous `storedNonce && claims.nonce && ...`
+    // check short-circuited to false (skipping the throw) whenever claims.nonce
+    // was undefined, which would let a nonce-stripped/replayed token through.
+    if (storedNonce && (!claims.nonce || claims.nonce !== storedNonce)) {
       sessionStorage.removeItem(OAUTH_STORAGE_PREFIX + 'code_verifier')
       sessionStorage.removeItem(OAUTH_STORAGE_PREFIX + 'state')
       sessionStorage.removeItem(OAUTH_STORAGE_PREFIX + 'nonce')
