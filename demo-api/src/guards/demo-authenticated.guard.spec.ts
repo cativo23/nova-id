@@ -1,6 +1,11 @@
 import { UnauthorizedException } from "@nestjs/common";
 import { DemoAuthenticatedGuard } from "./demo-authenticated.guard";
 
+// TS-native CommonJS import syntax: keeps a live, mutable binding to the
+// actual module.exports object (unlike `import * as jwtLib`, whose namespace
+// object is read-only), which `jest.spyOn(jwtLib, "verify")` below relies on.
+import jwtLib = require("jsonwebtoken");
+
 /**
  * DemoAuthenticatedGuard unit tests.
  *
@@ -90,7 +95,6 @@ describe("DemoAuthenticatedGuard", () => {
   });
 
   it("sets request.user from verified JWT claims", async () => {
-    const jwtLib = require("jsonwebtoken");
     const payload = {
       sub: "user-abc",
       email: "alice@nova.test",
@@ -102,7 +106,7 @@ describe("DemoAuthenticatedGuard", () => {
     };
 
     const token = jwtLib.sign(payload, "test-secret", {
-      header: { kid: "test-kid" },
+      keyid: "test-kid",
     });
 
     const guard = makeGuard();
@@ -127,7 +131,6 @@ describe("DemoAuthenticatedGuard", () => {
   });
 
   it("rejects a token missing the sub claim", async () => {
-    const jwtLib = require("jsonwebtoken");
     const payload = {
       email: "nosubject@nova.test",
       iss: "https://id.cativo.dev/",
@@ -135,7 +138,7 @@ describe("DemoAuthenticatedGuard", () => {
       exp: Math.floor(Date.now() / 1000) + 3600,
     };
     const token = jwtLib.sign(payload, "test-secret", {
-      header: { kid: "test-kid" },
+      keyid: "test-kid",
     });
 
     const guard = makeGuard();
