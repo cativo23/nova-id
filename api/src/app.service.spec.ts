@@ -63,6 +63,29 @@ describe('AppService.acceptHydraLogin', () => {
     expect(body.context).toEqual({ email: 'a@b.c', name: 'A B', role: 'platform_admin' });
     expect(JSON.stringify(body)).not.toContain('appRole');
   });
+
+  it('records a login.accept audit entry after a successful accept', async () => {
+    const hydra = makeHydra();
+    hydra.getLoginRequest.mockResolvedValue({ skip: false });
+    const audit = makeAudit();
+    const svc = new AppService(hydra as any, makeKeto() as any, audit as any);
+
+    await svc.acceptHydraLogin(user, 'chal');
+
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({ actorId: 'u1', action: 'login.accept' }),
+    );
+  });
+
+  it('IDOR-blocked login never records a login.accept audit entry', async () => {
+    const hydra = makeHydra();
+    hydra.getLoginRequest.mockResolvedValue({ skip: true, subject: 'other-user' });
+    const audit = makeAudit();
+    const svc = new AppService(hydra as any, makeKeto() as any, audit as any);
+
+    await expect(svc.acceptHydraLogin(user, 'chal')).rejects.toThrow();
+    expect(audit.record).not.toHaveBeenCalled();
+  });
 });
 
 describe('AppService.acceptHydraConsent', () => {
@@ -135,6 +158,31 @@ describe('AppService.acceptHydraConsent', () => {
     expect(body.session.access_token.app_access).toBe(true);
     // NEVER appRole
     expect(JSON.stringify(body)).not.toContain('appRole');
+  });
+
+  it('consent.grant: emits audit record on the successful grant path (previously only denials were logged)', async () => {
+    const hydra = makeHydra();
+    hydra.getConsentRequest.mockResolvedValue({
+      client: { client_id: 'nova-id-test-app' },
+      requested_access_token_audience: ['aud1'],
+      requested_scope: ['openid', 'profile'],
+    });
+    const keto = makeKeto();
+    keto.checkApp.mockResolvedValue(true);
+    const audit = makeAudit();
+    const svc = new AppService(hydra as any, keto as any, audit as any);
+
+    await svc.acceptHydraConsent(user, { consent_challenge: 'cc', grant_scope: ['openid', 'profile'] });
+
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actorId: 'u1',
+        action: 'consent.grant',
+        appId: 'nova-id-test-app',
+        targetType: 'app',
+        metadata: expect.objectContaining({ scopes: expect.arrayContaining(['openid', 'profile', 'app:member']) }),
+      }),
+    );
   });
 
   it('scope intersection: forged extra scope in body is dropped when not in requested_scope', async () => {

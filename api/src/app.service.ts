@@ -46,15 +46,23 @@ export class AppService {
           );
           throw new ForbiddenException('Login challenge subject does not belong to current user');
         }
-        return await this.hydra.acceptLogin(loginChallenge, {
+        const result = await this.hydra.acceptLogin(loginChallenge, {
           subject: loginRequest.subject ?? user.userId,
         });
+        await this.audit.record({
+          actorId: user.userId,
+          action: 'login.accept',
+          appId: loginRequest.client?.client_id ?? null,
+          targetType: 'app',
+          metadata: { skip: true },
+        });
+        return result;
       }
 
       // Login has NO session field in Ory's contract. Carry claims forward via
       // `context`, which Hydra echoes into the consent request's `context`.
       // Never mint appRole (ADR-0002).
-      return await this.hydra.acceptLogin(loginChallenge, {
+      const result = await this.hydra.acceptLogin(loginChallenge, {
         subject: user.userId,
         remember: true,
         remember_for: 3600,
@@ -64,6 +72,14 @@ export class AppService {
           role: user.role,
         },
       });
+      await this.audit.record({
+        actorId: user.userId,
+        action: 'login.accept',
+        appId: loginRequest.client?.client_id ?? null,
+        targetType: 'app',
+        metadata: { skip: false },
+      });
+      return result;
     } catch (error) {
       this.logger.error('Error accepting Hydra login:', error.response?.data || error.message);
       throw toHttpExceptionFromOry(error);
@@ -123,7 +139,7 @@ export class AppService {
       // /api-test path sees `role` (fixes the logs 403). Never mint appRole.
       const claims = { email: user.email, name: user.full_name, role: user.role, app_access: true };
 
-      return await this.hydra.acceptConsent(consentChallenge, {
+      const result = await this.hydra.acceptConsent(consentChallenge, {
         grant_scope: grantScope,
         grant_access_token_audience: grantAudience,
         remember: true,
@@ -133,6 +149,20 @@ export class AppService {
           access_token: claims,
         },
       });
+
+      // Successful grants were previously never audited — only denials were,
+      // leaving the audit trail one-sided (see #91). Record after the grant
+      // has actually gone through, mirroring rejectHydraConsent's
+      // record-after-the-fact ordering.
+      await this.audit.record({
+        actorId: user.userId,
+        action: 'consent.grant',
+        appId: clientId ?? null,
+        targetType: 'app',
+        metadata: { scopes: grantScope },
+      });
+
+      return result;
     } catch (error) {
       this.logger.error('Error accepting Hydra consent:', error.response?.data || error.message);
       throw toHttpExceptionFromOry(error);
