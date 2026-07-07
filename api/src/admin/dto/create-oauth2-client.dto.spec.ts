@@ -27,4 +27,24 @@ describe('CreateOauth2ClientDto', () => {
     const redirectErrors = errors.find((e) => e.property === 'redirect_uris');
     expect(redirectErrors).toBeUndefined();
   });
+
+  it('rejects a plaintext http:// redirect_uri on a non-loopback host (RFC 8252/9700)', async () => {
+    const errors = await validateDto({
+      client_name: 'Test App',
+      redirect_uris: ['http://evil.example.com/callback'],
+    });
+
+    const redirectErrors = errors.find((e) => e.property === 'redirect_uris');
+    expect(redirectErrors).toBeDefined();
+  });
+
+  it('accepts an http:// redirect_uri on localhost (native-app loopback exception)', async () => {
+    const errors = await validateDto({
+      client_name: 'Test App',
+      redirect_uris: ['http://localhost:4000/callback'],
+    });
+
+    const redirectErrors = errors.find((e) => e.property === 'redirect_uris');
+    expect(redirectErrors).toBeUndefined();
+  });
 });
