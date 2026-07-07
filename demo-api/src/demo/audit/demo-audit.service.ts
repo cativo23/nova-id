@@ -41,10 +41,16 @@ export class DemoAuditService {
         }),
       );
     } catch (err) {
-      // Audit writes must never crash business flows — log and continue.
+      // Log for diagnostics, then rethrow (#105). RolesController awaits
+      // record() with no try/catch of its own — silently swallowing the
+      // error here let a failed demo_membership_audit insert return 200
+      // with the role mutation applied and no audit trail. Rethrowing lets
+      // it propagate to Nest's exception filter (500) so the caller sees
+      // the failure instead of a false-success response.
       this.logger.error(
         `[demo-audit] Failed to write audit record: ${(err as Error).message}`,
       );
+      throw err;
     }
   }
 }
