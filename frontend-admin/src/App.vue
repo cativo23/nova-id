@@ -56,7 +56,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, provide } from 'vue'
+import { computed, onMounted, provide } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import AppSidebar from './components/AppSidebar.vue'
 import AppHeader from './components/AppHeader.vue'
@@ -67,7 +67,6 @@ import { clearPermissionsCache } from './composables/usePermissions'
 
 const router = useRouter()
 const route = useRoute()
-const isAuthenticated = ref(false)
 
 const showNav = computed(() => route.path !== '/')
 
@@ -76,12 +75,13 @@ function reload () {
   window.location.reload()
 }
 
+// Router guard (see main.ts) is the single source of truth for auth state;
+// this only re-warms checkSession's cache so guards see fresh data.
 const refreshAuth = async () => {
   try {
-    const session = await checkSession()
-    isAuthenticated.value = !!session
+    await checkSession()
   } catch (error) {
-    isAuthenticated.value = false
+    // Ignore — the router guard handles redirecting unauthenticated users.
   }
 }
 
