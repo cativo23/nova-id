@@ -39,6 +39,17 @@ describe('AppService.acceptHydraLogin', () => {
     expect(body.session).toBeUndefined();
   });
 
+  it('skip=true + mismatched subject: throws ForbiddenException, never accepts the remembered subject', async () => {
+    const hydra = makeHydra();
+    hydra.getLoginRequest.mockResolvedValue({ skip: true, subject: 'other-user' });
+    const svc = new AppService(hydra as any, makeKeto() as any, makeAudit() as any);
+
+    await expect(svc.acceptHydraLogin(user, 'chal')).rejects.toThrow(
+      'Login challenge subject does not belong to current user',
+    );
+    expect(hydra.acceptLogin).not.toHaveBeenCalled();
+  });
+
   it('skip=false: puts claims on context, never on session', async () => {
     const hydra = makeHydra();
     hydra.getLoginRequest.mockResolvedValue({ skip: false });

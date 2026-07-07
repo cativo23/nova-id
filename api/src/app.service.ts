@@ -36,7 +36,16 @@ export class AppService {
       const loginRequest = await this.hydra.getLoginRequest(loginChallenge);
 
       // Honor skip: Hydra already has a valid session for this subject.
+      // Never trust the remembered subject over the JWT-authenticated user —
+      // on a shared browser this would let a second identity silently ride
+      // the first identity's remembered Hydra session (session fixation).
       if (loginRequest.skip) {
+        if (loginRequest.subject && loginRequest.subject !== user.userId) {
+          this.logger.warn(
+            `Login skip IDOR blocked: challenge subject ${loginRequest.subject} !== ${user.userId}`,
+          );
+          throw new ForbiddenException('Login challenge subject does not belong to current user');
+        }
         return await this.hydra.acceptLogin(loginChallenge, {
           subject: loginRequest.subject ?? user.userId,
         });
