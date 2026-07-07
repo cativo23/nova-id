@@ -3,6 +3,7 @@ import { toHttpExceptionFromOry } from './common/ory-error';
 import { HydraService } from './ory/hydra.service';
 import { KetoService } from './ory/keto.service';
 import { AuditService } from './audit/audit.service';
+import { LoginBindingService } from './login-binding/login-binding.service';
 import { AuthenticatedUser } from './common/types/authenticated-user';
 import { AcceptHydraConsentDto } from './dto/accept-hydra-consent.dto';
 import { HydraConsentInfoResponseDto } from './dto/hydra-consent-info-response.dto';
@@ -16,6 +17,7 @@ export class AppService {
     private readonly hydra: HydraService,
     private readonly keto: KetoService,
     private readonly audit: AuditService,
+    private readonly loginBinding: LoginBindingService,
   ) {}
 
   getPublicData() {
@@ -59,6 +61,23 @@ export class AppService {
         return result;
       }
 
+      // VULN-0002 ownership gate (fail-closed). The non-skip path used to accept
+      // ANY login_challenge for the JWT-authenticated caller, letting a second
+      // authenticated user consume a victim's in-flight challenge (login DoS).
+      // Require a server-recorded binding claimed by THIS identity (registered by
+      // the SPA the moment the authenticated browser first saw the challenge —
+      // see LoginBindingService). No binding, an expired one, or one owned by
+      // someone else → reject before touching Hydra, so the challenge is never
+      // consumed. The skip path above is intentionally exempt: it has no earlier
+      // authenticated touchpoint and is already guarded by its subject-match check.
+      const owned = await this.loginBinding.isBoundTo(user.userId, loginChallenge);
+      if (!owned) {
+        this.logger.warn(
+          `Login binding check failed: challenge not bound to ${user.userId}`,
+        );
+        throw new ForbiddenException('Login challenge is not bound to the current user');
+      }
+
       // Login has NO session field in Ory's contract. Carry claims forward via
       // `context`, which Hydra echoes into the consent request's `context`.
       // Never mint appRole (ADR-0002).
@@ -86,6 +105,17 @@ export class AppService {
     }
   }
 
+  /**
+   * VULN-0002: claim a login_challenge for the authenticated caller before the
+   * accept step. The SPA calls this as soon as it receives the challenge (right
+   * after Kratos auth). Throws ForbiddenException if the challenge was already
+   * claimed by a different identity. Idempotent for the same identity.
+   */
+  async registerHydraLoginBinding(user: AuthenticatedUser, loginChallenge: string): Promise<void> {
+    this.logger.log(`Registering login binding for user ${user.userId}`);
+    await this.loginBinding.register(user.userId, loginChallenge);
+  }
+
   async acceptHydraConsent(user: AuthenticatedUser, body: AcceptHydraConsentDto) {
     try {
       const consentChallenge = body.consent_challenge;
@@ -93,14 +123,14 @@ export class AppService {
 
       const consentRequest = await this.hydra.getConsentRequest(consentChallenge);
 
-      // Ownership check: consent challenge must belong to the authenticated user.
-      if (consentRequest.subject) {
-        if (consentRequest.subject !== user.userId) {
-          this.logger.warn(`Consent IDOR blocked: challenge subject ${consentRequest.subject} !== ${user.userId}`);
-          throw new ForbiddenException('Consent challenge does not belong to current user');
-        }
-      } else {
-        this.logger.warn(`Consent challenge ${consentChallenge} has no subject yet — skipping ownership check`);
+      // Ownership check (fail-closed): the consent challenge must belong to the
+      // authenticated user. A null/undefined subject means the challenge is not
+      // bound to any user — no one may act on it, so reject rather than skip.
+      if (!consentRequest.subject || consentRequest.subject !== user.userId) {
+        this.logger.warn(
+          `Consent IDOR blocked: challenge subject ${consentRequest.subject ?? '(unbound)'} !== ${user.userId}`,
+        );
+        throw new ForbiddenException('Consent challenge does not belong to current user');
       }
 
       const clientId = consentRequest.client?.client_id;
@@ -178,14 +208,14 @@ export class AppService {
       this.logger.log(`Fetching consent info for user ${user.userId} (challenge ${consentChallenge})`);
       const consentRequest = await this.hydra.getConsentRequest(consentChallenge);
 
-      // Ownership check: consent challenge must belong to the authenticated user.
-      if (consentRequest.subject) {
-        if (consentRequest.subject !== user.userId) {
-          this.logger.warn(`Consent IDOR blocked: challenge subject ${consentRequest.subject} !== ${user.userId}`);
-          throw new ForbiddenException('Consent challenge does not belong to current user');
-        }
-      } else {
-        this.logger.warn(`Consent challenge ${consentChallenge} has no subject yet — skipping ownership check`);
+      // Ownership check (fail-closed): the consent challenge must belong to the
+      // authenticated user. A null/undefined subject means the challenge is not
+      // bound to any user — no one may act on it, so reject rather than skip.
+      if (!consentRequest.subject || consentRequest.subject !== user.userId) {
+        this.logger.warn(
+          `Consent IDOR blocked: challenge subject ${consentRequest.subject ?? '(unbound)'} !== ${user.userId}`,
+        );
+        throw new ForbiddenException('Consent challenge does not belong to current user');
       }
 
       return {
@@ -209,14 +239,14 @@ export class AppService {
       // Fetch consent request first: enables ownership check and client_id capture.
       const consentRequest = await this.hydra.getConsentRequest(body.consent_challenge);
 
-      // Ownership check: consent challenge must belong to the authenticated user.
-      if (consentRequest.subject) {
-        if (consentRequest.subject !== user.userId) {
-          this.logger.warn(`Consent IDOR blocked: challenge subject ${consentRequest.subject} !== ${user.userId}`);
-          throw new ForbiddenException('Consent challenge does not belong to current user');
-        }
-      } else {
-        this.logger.warn(`Consent challenge ${body.consent_challenge} has no subject yet — skipping ownership check`);
+      // Ownership check (fail-closed): the consent challenge must belong to the
+      // authenticated user. A null/undefined subject means the challenge is not
+      // bound to any user — no one may act on it, so reject rather than skip.
+      if (!consentRequest.subject || consentRequest.subject !== user.userId) {
+        this.logger.warn(
+          `Consent IDOR blocked: challenge subject ${consentRequest.subject ?? '(unbound)'} !== ${user.userId}`,
+        );
+        throw new ForbiddenException('Consent challenge does not belong to current user');
       }
 
       const clientId = consentRequest.client?.client_id ?? null;

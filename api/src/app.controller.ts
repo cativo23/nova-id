@@ -46,6 +46,22 @@ export class AppController {
   }
 
   @ApiTags('auth')
+  @ApiOperation({
+    operationId: 'registerHydraLoginBinding',
+    summary: 'Bind a Hydra login challenge to the signed-in user (VULN-0002) before accepting it',
+  })
+  @ApiBody({ type: AcceptHydraLoginDto })
+  @Version('1')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Post('hydra-login-init')
+  async registerHydraLoginBinding(
+    @GetUser() user: AuthenticatedUser,
+    @Body() body: AcceptHydraLoginDto,
+  ): Promise<void> {
+    await this.appService.registerHydraLoginBinding(user, body.login_challenge);
+  }
+
+  @ApiTags('auth')
   @ApiOperation({ operationId: 'acceptHydraConsent', summary: 'Accept a Hydra consent challenge for the signed-in user' })
   @ApiBody({ type: AcceptHydraConsentDto })
   @ApiOkResponse({ type: HydraRedirectResponseDto })

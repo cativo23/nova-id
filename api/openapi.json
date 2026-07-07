@@ -33,6 +33,31 @@
         ]
       }
     },
+    "/v1/hydra-login-init": {
+      "post": {
+        "operationId": "registerHydraLoginBinding",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptHydraLoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Bind a Hydra login challenge to the signed-in user (VULN-0002) before accepting it",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/v1/hydra-accept-consent": {
       "post": {
         "operationId": "acceptHydraConsent",
@@ -683,7 +708,7 @@
   },
   "info": {
     "title": "Nova ID API",
-    "description": "Self-hosted central IdP BFF — Ory consolidation layer",
+    "description": "Self-hosted central IdP BFF \u2014 Ory consolidation layer",
     "version": "1.0",
     "contact": {}
   },
@@ -884,7 +909,7 @@
               "platform_user"
             ],
             "default": "platform_user",
-            "description": "Sets the JWT `role` claim (via Oathkeeper id_token mutator reading metadata_public.role). Does NOT grant Platform admin (manage_users/administer) — that lives in Keto (A1-plan-2)."
+            "description": "Sets the JWT `role` claim (via Oathkeeper id_token mutator reading metadata_public.role). Does NOT grant Platform admin (manage_users/administer) \u2014 that lives in Keto (A1-plan-2)."
           }
         },
         "required": [
@@ -910,7 +935,7 @@
               "platform_admin",
               "platform_user"
             ],
-            "description": "Sets the JWT `role` claim (via Oathkeeper id_token mutator reading metadata_public.role). Does NOT grant Platform admin (manage_users/administer) — that lives in Keto (A1-plan-2)."
+            "description": "Sets the JWT `role` claim (via Oathkeeper id_token mutator reading metadata_public.role). Does NOT grant Platform admin (manage_users/administer) \u2014 that lives in Keto (A1-plan-2)."
           }
         }
       },

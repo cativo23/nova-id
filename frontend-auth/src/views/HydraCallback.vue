@@ -38,7 +38,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { acceptHydraLogin } from '@nova-id/api-client'
+import { acceptHydraLogin, registerHydraLoginBinding } from '@nova-id/api-client'
 
 const route = useRoute()
 const error = ref<string | null>(null)
@@ -53,6 +53,12 @@ onMounted(async () => {
   }
 
   try {
+    // VULN-0002: claim this login_challenge for the authenticated session BEFORE
+    // accepting it, so a second signed-in user cannot consume our in-flight
+    // challenge (login DoS). The backend records the binding here and enforces it
+    // in acceptHydraLogin. Typed client method (POST /v1/hydra-login-init).
+    await registerHydraLoginBinding({ login_challenge: loginChallenge })
+
     // The generated client posts to /hydra-accept-login through the shared axios
     // mutator (baseURL '/api', withCredentials). The fn now takes the typed
     // AcceptHydraLoginDto directly and resolves to { redirect_to }.

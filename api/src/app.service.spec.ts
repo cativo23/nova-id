@@ -15,6 +15,15 @@ function makeKeto() {
 function makeAudit() {
   return { record: jest.fn().mockResolvedValue(undefined) };
 }
+function makeBinding() {
+  // Default: the challenge IS bound to the calling user, so pre-existing
+  // non-skip tests (which don't care about the binding) keep passing. Tests
+  // that exercise the binding gate override isBoundTo explicitly.
+  return {
+    register: jest.fn().mockResolvedValue(undefined),
+    isBoundTo: jest.fn().mockResolvedValue(true),
+  };
+}
 const user = {
   userId: 'u1',
   email: 'a@b.c',
@@ -28,7 +37,7 @@ describe('AppService.acceptHydraLogin', () => {
   it('honors skip=true: accepts with subject only, no context claims', async () => {
     const hydra = makeHydra();
     hydra.getLoginRequest.mockResolvedValue({ skip: true, subject: 'u1' });
-    const svc = new AppService(hydra as any, makeKeto() as any, makeAudit() as any);
+    const svc = new AppService(hydra as any, makeKeto() as any, makeAudit() as any, makeBinding() as any);
 
     await svc.acceptHydraLogin(user, 'chal');
 
@@ -42,7 +51,7 @@ describe('AppService.acceptHydraLogin', () => {
   it('skip=true + mismatched subject: throws ForbiddenException, never accepts the remembered subject', async () => {
     const hydra = makeHydra();
     hydra.getLoginRequest.mockResolvedValue({ skip: true, subject: 'other-user' });
-    const svc = new AppService(hydra as any, makeKeto() as any, makeAudit() as any);
+    const svc = new AppService(hydra as any, makeKeto() as any, makeAudit() as any, makeBinding() as any);
 
     await expect(svc.acceptHydraLogin(user, 'chal')).rejects.toThrow(
       'Login challenge subject does not belong to current user',
@@ -53,7 +62,7 @@ describe('AppService.acceptHydraLogin', () => {
   it('skip=false: puts claims on context, never on session', async () => {
     const hydra = makeHydra();
     hydra.getLoginRequest.mockResolvedValue({ skip: false });
-    const svc = new AppService(hydra as any, makeKeto() as any, makeAudit() as any);
+    const svc = new AppService(hydra as any, makeKeto() as any, makeAudit() as any, makeBinding() as any);
 
     await svc.acceptHydraLogin(user, 'chal');
 
@@ -68,7 +77,7 @@ describe('AppService.acceptHydraLogin', () => {
     const hydra = makeHydra();
     hydra.getLoginRequest.mockResolvedValue({ skip: false });
     const audit = makeAudit();
-    const svc = new AppService(hydra as any, makeKeto() as any, audit as any);
+    const svc = new AppService(hydra as any, makeKeto() as any, audit as any, makeBinding() as any);
 
     await svc.acceptHydraLogin(user, 'chal');
 
@@ -81,24 +90,100 @@ describe('AppService.acceptHydraLogin', () => {
     const hydra = makeHydra();
     hydra.getLoginRequest.mockResolvedValue({ skip: true, subject: 'other-user' });
     const audit = makeAudit();
-    const svc = new AppService(hydra as any, makeKeto() as any, audit as any);
+    const svc = new AppService(hydra as any, makeKeto() as any, audit as any, makeBinding() as any);
 
     await expect(svc.acceptHydraLogin(user, 'chal')).rejects.toThrow();
     expect(audit.record).not.toHaveBeenCalled();
   });
+
+  it('skip=false with NO binding for the caller: throws ForbiddenException and never accepts', async () => {
+    const hydra = makeHydra();
+    hydra.getLoginRequest.mockResolvedValue({ skip: false });
+    const binding = makeBinding();
+    binding.isBoundTo.mockResolvedValue(false);
+    const svc = new AppService(hydra as any, makeKeto() as any, makeAudit() as any, binding as any);
+
+    await expect(svc.acceptHydraLogin(user, 'chal')).rejects.toThrow(
+      'Login challenge is not bound to the current user',
+    );
+    expect(binding.isBoundTo).toHaveBeenCalledWith('u1', 'chal');
+    expect(hydra.acceptLogin).not.toHaveBeenCalled();
+  });
+
+  it('skip=false with a binding owned by the caller: verifies the binding then accepts', async () => {
+    const hydra = makeHydra();
+    hydra.getLoginRequest.mockResolvedValue({ skip: false });
+    const binding = makeBinding();
+    binding.isBoundTo.mockResolvedValue(true);
+    const svc = new AppService(hydra as any, makeKeto() as any, makeAudit() as any, binding as any);
+
+    await svc.acceptHydraLogin(user, 'chal');
+
+    expect(binding.isBoundTo).toHaveBeenCalledWith('u1', 'chal');
+    expect(hydra.acceptLogin).toHaveBeenCalledTimes(1);
+    expect(hydra.acceptLogin.mock.calls[0][1].subject).toBe('u1');
+  });
+
+  it('skip=false binding-blocked login never records a login.accept audit entry', async () => {
+    const hydra = makeHydra();
+    hydra.getLoginRequest.mockResolvedValue({ skip: false });
+    const binding = makeBinding();
+    binding.isBoundTo.mockResolvedValue(false);
+    const audit = makeAudit();
+    const svc = new AppService(hydra as any, makeKeto() as any, audit as any, binding as any);
+
+    await expect(svc.acceptHydraLogin(user, 'chal')).rejects.toThrow();
+    expect(audit.record).not.toHaveBeenCalled();
+  });
+
+  it('skip=true does NOT require a binding (skip path is guarded by subject-match only)', async () => {
+    const hydra = makeHydra();
+    hydra.getLoginRequest.mockResolvedValue({ skip: true, subject: 'u1' });
+    const binding = makeBinding();
+    // Even if no binding was ever registered, a valid skip must still succeed.
+    binding.isBoundTo.mockResolvedValue(false);
+    const svc = new AppService(hydra as any, makeKeto() as any, makeAudit() as any, binding as any);
+
+    await svc.acceptHydraLogin(user, 'chal');
+
+    expect(binding.isBoundTo).not.toHaveBeenCalled();
+    expect(hydra.acceptLogin).toHaveBeenCalledTimes(1);
+  });
 });
+
+describe('AppService.registerHydraLoginBinding', () => {
+  it('delegates to the binding store with the authenticated userId and challenge', async () => {
+    const binding = makeBinding();
+    const svc = new AppService(makeHydra() as any, makeKeto() as any, makeAudit() as any, binding as any);
+
+    await svc.registerHydraLoginBinding(user, 'chal');
+
+    expect(binding.register).toHaveBeenCalledWith('u1', 'chal');
+  });
+
+  it('propagates a ForbiddenException when the challenge is already bound to someone else', async () => {
+    const binding = makeBinding();
+    binding.register.mockRejectedValue(new ForbiddenExceptionStub('already bound'));
+    const svc = new AppService(makeHydra() as any, makeKeto() as any, makeAudit() as any, binding as any);
+
+    await expect(svc.registerHydraLoginBinding(user, 'chal')).rejects.toThrow('already bound');
+  });
+});
+
+class ForbiddenExceptionStub extends Error {}
 
 describe('AppService.acceptHydraConsent', () => {
   it('rejects non-members with access_denied and never accepts', async () => {
     const hydra = makeHydra();
     hydra.getConsentRequest.mockResolvedValue({
+      subject: 'u1',
       client: { client_id: 'nova-id-test-app' },
       requested_access_token_audience: ['aud1'],
       requested_scope: ['openid'],
     });
     const keto = makeKeto();
     keto.checkApp.mockResolvedValue(false);
-    const svc = new AppService(hydra as any, keto as any, makeAudit() as any);
+    const svc = new AppService(hydra as any, keto as any, makeAudit() as any, makeBinding() as any);
 
     const out = await svc.acceptHydraConsent(user, { consent_challenge: 'cc', grant_scope: ['openid'] });
 
@@ -111,6 +196,7 @@ describe('AppService.acceptHydraConsent', () => {
   it('consent.deny: does NOT record the deny audit entry if rejectConsent itself fails (never log a deny that never happened)', async () => {
     const hydra = makeHydra();
     hydra.getConsentRequest.mockResolvedValue({
+      subject: 'u1',
       client: { client_id: 'nova-id-test-app' },
       requested_access_token_audience: ['aud1'],
       requested_scope: ['openid'],
@@ -119,7 +205,7 @@ describe('AppService.acceptHydraConsent', () => {
     const keto = makeKeto();
     keto.checkApp.mockResolvedValue(false);
     const audit = makeAudit();
-    const svc = new AppService(hydra as any, keto as any, audit as any);
+    const svc = new AppService(hydra as any, keto as any, audit as any, makeBinding() as any);
 
     await expect(
       svc.acceptHydraConsent(user, { consent_challenge: 'cc', grant_scope: ['openid'] }),
@@ -130,6 +216,7 @@ describe('AppService.acceptHydraConsent', () => {
   it('consent.deny: emits audit record with action=consent.deny, actorId, appId, targetType=app', async () => {
     const hydra = makeHydra();
     hydra.getConsentRequest.mockResolvedValue({
+      subject: 'u1',
       client: { client_id: 'nova-id-test-app' },
       requested_access_token_audience: ['aud1'],
       requested_scope: ['openid'],
@@ -137,7 +224,7 @@ describe('AppService.acceptHydraConsent', () => {
     const keto = makeKeto();
     keto.checkApp.mockResolvedValue(false);
     const audit = makeAudit();
-    const svc = new AppService(hydra as any, keto as any, audit as any);
+    const svc = new AppService(hydra as any, keto as any, audit as any, makeBinding() as any);
 
     await svc.acceptHydraConsent(user, { consent_challenge: 'cc', grant_scope: ['openid'] });
 
@@ -155,13 +242,14 @@ describe('AppService.acceptHydraConsent', () => {
   it('members: accepts with trusted audience, role on id_token AND access_token, app:member scope, no appRole', async () => {
     const hydra = makeHydra();
     hydra.getConsentRequest.mockResolvedValue({
+      subject: 'u1',
       client: { client_id: 'nova-id-test-app' },
       requested_access_token_audience: ['aud1', 'aud2'],
       requested_scope: ['openid', 'profile'],
     });
     const keto = makeKeto();
     keto.checkApp.mockResolvedValue(true);
-    const svc = new AppService(hydra as any, keto as any, makeAudit() as any);
+    const svc = new AppService(hydra as any, keto as any, makeAudit() as any, makeBinding() as any);
 
     await svc.acceptHydraConsent(user, { consent_challenge: 'cc', grant_scope: ['openid', 'profile'] });
 
@@ -182,6 +270,7 @@ describe('AppService.acceptHydraConsent', () => {
   it('consent.grant: emits audit record on the successful grant path (previously only denials were logged)', async () => {
     const hydra = makeHydra();
     hydra.getConsentRequest.mockResolvedValue({
+      subject: 'u1',
       client: { client_id: 'nova-id-test-app' },
       requested_access_token_audience: ['aud1'],
       requested_scope: ['openid', 'profile'],
@@ -189,7 +278,7 @@ describe('AppService.acceptHydraConsent', () => {
     const keto = makeKeto();
     keto.checkApp.mockResolvedValue(true);
     const audit = makeAudit();
-    const svc = new AppService(hydra as any, keto as any, audit as any);
+    const svc = new AppService(hydra as any, keto as any, audit as any, makeBinding() as any);
 
     await svc.acceptHydraConsent(user, { consent_challenge: 'cc', grant_scope: ['openid', 'profile'] });
 
@@ -207,6 +296,7 @@ describe('AppService.acceptHydraConsent', () => {
   it('scope intersection: forged extra scope in body is dropped when not in requested_scope', async () => {
     const hydra = makeHydra();
     hydra.getConsentRequest.mockResolvedValue({
+      subject: 'u1',
       client: { client_id: 'nova-id-test-app' },
       requested_access_token_audience: [],
       // Client only requested openid — NOT "admin:write"
@@ -214,7 +304,7 @@ describe('AppService.acceptHydraConsent', () => {
     });
     const keto = makeKeto();
     keto.checkApp.mockResolvedValue(true);
-    const svc = new AppService(hydra as any, keto as any, makeAudit() as any);
+    const svc = new AppService(hydra as any, keto as any, makeAudit() as any, makeBinding() as any);
 
     // Tampered body includes a scope the client never requested
     await svc.acceptHydraConsent(user, {
@@ -234,13 +324,14 @@ describe('AppService.acceptHydraConsent', () => {
   it('scope intersection: legitimately-requested scopes all pass through', async () => {
     const hydra = makeHydra();
     hydra.getConsentRequest.mockResolvedValue({
+      subject: 'u1',
       client: { client_id: 'nova-id-test-app' },
       requested_access_token_audience: [],
       requested_scope: ['openid', 'profile', 'email'],
     });
     const keto = makeKeto();
     keto.checkApp.mockResolvedValue(true);
-    const svc = new AppService(hydra as any, keto as any, makeAudit() as any);
+    const svc = new AppService(hydra as any, keto as any, makeAudit() as any, makeBinding() as any);
 
     await svc.acceptHydraConsent(user, {
       consent_challenge: 'cc',
@@ -264,7 +355,7 @@ describe('AppService.acceptHydraConsent', () => {
     });
     const keto = makeKeto();
     keto.checkApp.mockResolvedValue(true);
-    const svc = new AppService(hydra as any, keto as any, makeAudit() as any);
+    const svc = new AppService(hydra as any, keto as any, makeAudit() as any, makeBinding() as any);
 
     await expect(
       svc.acceptHydraConsent(user, { consent_challenge: 'cc', grant_scope: ['openid'] }),
@@ -283,11 +374,29 @@ describe('AppService.acceptHydraConsent', () => {
     });
     const keto = makeKeto();
     keto.checkApp.mockResolvedValue(true);
-    const svc = new AppService(hydra as any, keto as any, makeAudit() as any);
+    const svc = new AppService(hydra as any, keto as any, makeAudit() as any, makeBinding() as any);
 
     await expect(
       svc.acceptHydraConsent(user, { consent_challenge: 'cc', grant_scope: ['openid'] }),
     ).resolves.toBeDefined();
+  });
+
+  it('null-subject: rejects with ForbiddenException and never accepts nor rejects the consent', async () => {
+    const hydra = makeHydra();
+    hydra.getConsentRequest.mockResolvedValue({
+      client: { client_id: 'nova-id-test-app' },
+      requested_access_token_audience: [],
+      requested_scope: ['openid'],
+    });
+    const keto = makeKeto();
+    keto.checkApp.mockResolvedValue(true);
+    const svc = new AppService(hydra as any, keto as any, makeAudit() as any, makeBinding() as any);
+
+    await expect(
+      svc.acceptHydraConsent(user, { consent_challenge: 'cc', grant_scope: ['openid'] }),
+    ).rejects.toThrow('Consent challenge does not belong to current user');
+    expect(hydra.acceptConsent).not.toHaveBeenCalled();
+    expect(hydra.rejectConsent).not.toHaveBeenCalled();
   });
 });
 
@@ -300,7 +409,7 @@ describe('AppService.getHydraConsentInfo', () => {
       requested_scope: ['openid'],
       client: { client_id: 'app1', client_name: 'App One' },
     });
-    const svc = new AppService(hydra as any, makeKeto() as any, makeAudit() as any);
+    const svc = new AppService(hydra as any, makeKeto() as any, makeAudit() as any, makeBinding() as any);
 
     const result = await svc.getHydraConsentInfo(user, 'chal');
 
@@ -317,23 +426,25 @@ describe('AppService.getHydraConsentInfo', () => {
       requested_scope: ['openid'],
       client: { client_id: 'app1', client_name: 'App One' },
     });
-    const svc = new AppService(hydra as any, makeKeto() as any, makeAudit() as any);
+    const svc = new AppService(hydra as any, makeKeto() as any, makeAudit() as any, makeBinding() as any);
 
     await expect(svc.getHydraConsentInfo(user, 'chal')).rejects.toThrow(
       'Consent challenge does not belong to current user',
     );
   });
 
-  it('skips ownership check when subject is absent (challenge not yet bound)', async () => {
+  it('null-subject: rejects with ForbiddenException instead of skipping the ownership check', async () => {
     const hydra = makeHydra();
     hydra.getConsentRequest.mockResolvedValue({
       skip: false,
       requested_scope: ['openid'],
       client: { client_id: 'app1', client_name: 'App One' },
     });
-    const svc = new AppService(hydra as any, makeKeto() as any, makeAudit() as any);
+    const svc = new AppService(hydra as any, makeKeto() as any, makeAudit() as any, makeBinding() as any);
 
-    await expect(svc.getHydraConsentInfo(user, 'chal')).resolves.toBeDefined();
+    await expect(svc.getHydraConsentInfo(user, 'chal')).rejects.toThrow(
+      'Consent challenge does not belong to current user',
+    );
   });
 });
 
@@ -345,7 +456,7 @@ describe('AppService.rejectHydraConsent', () => {
       client: { client_id: 'my-app' },
     });
     const audit = makeAudit();
-    const svc = new AppService(hydra as any, makeKeto() as any, audit as any);
+    const svc = new AppService(hydra as any, makeKeto() as any, audit as any, makeBinding() as any);
 
     const result = await svc.rejectHydraConsent(user, { consent_challenge: 'chal' });
 
@@ -371,7 +482,20 @@ describe('AppService.rejectHydraConsent', () => {
       subject: 'someone-else',
       client: { client_id: 'my-app' },
     });
-    const svc = new AppService(hydra as any, makeKeto() as any, makeAudit() as any);
+    const svc = new AppService(hydra as any, makeKeto() as any, makeAudit() as any, makeBinding() as any);
+
+    await expect(svc.rejectHydraConsent(user, { consent_challenge: 'chal' })).rejects.toThrow(
+      'Consent challenge does not belong to current user',
+    );
+    expect(hydra.rejectConsent).not.toHaveBeenCalled();
+  });
+
+  it('null-subject: rejects with ForbiddenException and never rejects the consent', async () => {
+    const hydra = makeHydra();
+    hydra.getConsentRequest.mockResolvedValue({
+      client: { client_id: 'my-app' },
+    });
+    const svc = new AppService(hydra as any, makeKeto() as any, makeAudit() as any, makeBinding() as any);
 
     await expect(svc.rejectHydraConsent(user, { consent_challenge: 'chal' })).rejects.toThrow(
       'Consent challenge does not belong to current user',
@@ -385,7 +509,7 @@ describe('AppService.rejectHydraConsent', () => {
       subject: 'u1',
     });
     const audit = makeAudit();
-    const svc = new AppService(hydra as any, makeKeto() as any, audit as any);
+    const svc = new AppService(hydra as any, makeKeto() as any, audit as any, makeBinding() as any);
 
     await svc.rejectHydraConsent(user, { consent_challenge: 'chal' });
 
