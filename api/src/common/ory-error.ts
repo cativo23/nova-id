@@ -2,8 +2,11 @@ import {
   HttpException,
   GoneException,
   BadGatewayException,
+  Logger,
 } from '@nestjs/common';
 import type { AxiosError } from 'axios';
+
+const logger = new Logger('OryError');
 
 /**
  * Maps an error raised by an Ory admin API call (Hydra/Kratos/Keto) into a
@@ -50,13 +53,17 @@ export function toHttpExceptionFromOry(error: unknown): HttpException {
     });
   }
 
-  // Any other upstream Ory failure: surface Ory's own description (when present)
-  // as a 502 so the cause is visible, never a bare 500.
+  // Any other upstream Ory failure: log the real cause server-side (never a
+  // bare, silent 500), but do NOT forward Ory's raw message to the browser —
+  // it can contain internal state (paths, config, stack-adjacent detail)
+  // that the SPA has no business seeing. A generic, still-actionable message
+  // goes to the client instead.
+  if (oryMessage) {
+    logger.error(`Ory upstream error (status ${status ?? 'unknown'}): ${oryMessage}`);
+  }
   return new BadGatewayException({
     statusCode: 502,
     code: 'ory_upstream_error',
-    message: oryMessage
-      ? `Identity provider error: ${oryMessage}`
-      : 'The identity provider returned an unexpected error. Please try again.',
+    message: 'The identity provider returned an unexpected error. Please try again.',
   });
 }

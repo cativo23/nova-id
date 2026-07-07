@@ -34,14 +34,15 @@ describe('toHttpExceptionFromOry', () => {
     expect(body.code).toBe('oauth_challenge_invalid');
   });
 
-  it('maps any other Ory error to 502 Bad Gateway, surfacing the description', () => {
+  it('maps any other Ory error to 502 Bad Gateway WITHOUT leaking the upstream message to the client', () => {
     const ex = toHttpExceptionFromOry(
-      axiosErr(500, { error_description: 'boom upstream' }),
+      axiosErr(500, { error_description: 'boom upstream: /internal/db/path leaked' }),
     );
     expect(ex).toBeInstanceOf(BadGatewayException);
     expect(ex.getStatus()).toBe(502);
     const body = ex.getResponse() as { message: string };
-    expect(body.message).toContain('boom upstream');
+    expect(body.message).not.toContain('boom upstream');
+    expect(body.message).toMatch(/identity provider/i);
   });
 
   it('passes existing HttpExceptions through unchanged (e.g. the IDOR ForbiddenException)', () => {
