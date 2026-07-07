@@ -168,6 +168,38 @@ export function clearStoredAccessToken(): void {
   sessionStorage.removeItem('nova_id_oauth_access_token')
 }
 
+/**
+ * ACCEPTED RISK — no JWS signature verification (documented, not fixed, by design):
+ *
+ * This decodes the id_token's payload WITHOUT cryptographically verifying its
+ * signature against Hydra's JWKS. That is intentional for this demo RP, not an
+ * oversight:
+ *
+ *   - The id_token here is only ever read moments after being returned directly
+ *     from Hydra's /oauth2/token response over the authenticated PKCE exchange
+ *     (see handleOAuthCallback above) — it is never accepted from an untrusted
+ *     transport (e.g. a URL fragment or postMessage) where a forged token could
+ *     be substituted in transit.
+ *   - The credential this app actually relies on for every subsequent API call
+ *     is the OAuth2 access_token, which the gateway (Oathkeeper) verifies via
+ *     server-side token introspection against Hydra on every request (ADR-0007).
+ *     The id_token's claims are informational only (display name/email, replay
+ *     and audience sanity checks) and are never used as an authorization
+ *     decision on their own.
+ *   - Given that, adding a JWS verification path (fetching Hydra's JWKS,
+ *     importing keys, verifying via `jose` or Web Crypto) would add real
+ *     complexity and a new dependency for a demo app without closing a gap that
+ *     matters here — the introspected access_token is the actual trust boundary.
+ *
+ * Because the claims are still trusted for the replay/sanity checks above, claim
+ * validation MUST stay strict: validateIdTokenClaims() below enforces exp/iat
+ * (with clock skew), an exact iss match, and aud containing our client_id, and
+ * handleOAuthCallback additionally enforces nonce equality (#99) and OAuth
+ * `state` (CSRF). If this code is ever reused somewhere the id_token itself
+ * becomes a real authorization credential (e.g. passed to a backend as a bearer
+ * credential, or accepted from a source you don't control), add proper JWS
+ * verification against the issuer's JWKS before trusting these claims.
+ */
 export function decodeIdToken(idToken: string): IdTokenClaims {
   const parts = idToken.split('.')
   if (parts.length !== 3) throw new Error('Invalid ID token format')
