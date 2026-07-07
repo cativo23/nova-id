@@ -5,6 +5,7 @@ import {
   InternalServerErrorException,
   Logger,
   NotFoundException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import type { IdentityApi, Identity } from '@ory/client';
 import { KRATOS_IDENTITY_API } from './ory.constants';
@@ -30,6 +31,18 @@ export interface ListIdentitiesResult {
   identities: Identity[];
   /** Opaque Kratos cursor; null when no further pages exist. */
   nextPageToken: string | null;
+}
+
+/**
+ * Extract a client-safe validation message from a Kratos error response.
+ * Kratos's own error/UI messages are already written to be shown to end
+ * users (no stack traces or internal paths), so it is safe to forward them
+ * as-is — unlike a bare stack trace or DB error, which must never reach the
+ * client.
+ */
+function kratosErrorMessage(err: unknown): string | undefined {
+  const data = (err as any)?.response?.data;
+  return data?.error?.message ?? data?.error?.reason ?? data?.message;
 }
 
 @Injectable()
@@ -81,8 +94,25 @@ export class KratosAdminService {
       return data;
     } catch (err) {
       const status = httpStatus(err);
-      if (status === 409 || status === 400) {
+      if (status === 409) {
         throw new ConflictException('Email already registered');
+      }
+      if (status === 400) {
+        // Kratos returns 400 for BOTH a duplicate identifier AND unrelated
+        // schema/password-policy violations. Blindly mapping every 400 to
+        // "Email already registered" hid the real reason (e.g. a weak
+        // password) behind a misleading message. Inspect the upstream
+        // message: only a genuine duplicate-identifier signal maps to
+        // Conflict; anything else surfaces as 422 with Kratos's own
+        // (already user-safe) validation text.
+        const reason = kratosErrorMessage(err);
+        if (
+          reason &&
+          /duplicate|already (exists|registered|taken|in use)|exists already|identifier.*(exists|taken)/i.test(reason)
+        ) {
+          throw new ConflictException('Email already registered');
+        }
+        throw new UnprocessableEntityException(reason ?? 'The provided identity data is invalid.');
       }
       this.logger.error(`Kratos createIdentity failed: ${(err as Error).message}`);
       throw new InternalServerErrorException('Kratos createIdentity failed');
