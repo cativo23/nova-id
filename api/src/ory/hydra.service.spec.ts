@@ -1,4 +1,9 @@
+import { NotFoundException, ConflictException, InternalServerErrorException } from '@nestjs/common';
 import { HydraService } from './hydra.service';
+
+function axiosErr(status: number) {
+  return { response: { status }, message: 'boom' } as unknown;
+}
 
 describe('HydraService', () => {
   it('acceptLogin delegates to OAuth2Api.acceptOAuth2LoginRequest with the challenge + body', async () => {
@@ -95,6 +100,50 @@ describe('listClients pagination', () => {
     await svc.listClients({ pageToken: 'cursor-abc' });
 
     expect(api.listOAuth2Clients).toHaveBeenCalledWith(expect.objectContaining({ pageToken: 'cursor-abc' }));
+  });
+});
+
+describe('HydraService client CRUD error classification', () => {
+  it('getClient: 404 → NotFoundException', async () => {
+    const api = { getOAuth2Client: jest.fn().mockRejectedValue(axiosErr(404)) };
+    const svc = new HydraService(api as any);
+
+    await expect(svc.getClient('missing')).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('createClient: 409 → ConflictException', async () => {
+    const api = { createOAuth2Client: jest.fn().mockRejectedValue(axiosErr(409)) };
+    const svc = new HydraService(api as any);
+
+    await expect(svc.createClient({} as any)).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('createClient: 400 → ConflictException', async () => {
+    const api = { createOAuth2Client: jest.fn().mockRejectedValue(axiosErr(400)) };
+    const svc = new HydraService(api as any);
+
+    await expect(svc.createClient({} as any)).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('updateClient: 404 while fetching current client → NotFoundException', async () => {
+    const api = { getOAuth2Client: jest.fn().mockRejectedValue(axiosErr(404)) };
+    const svc = new HydraService(api as any);
+
+    await expect(svc.updateClient('missing', {})).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('deleteClient: 404 → NotFoundException', async () => {
+    const api = { deleteOAuth2Client: jest.fn().mockRejectedValue(axiosErr(404)) };
+    const svc = new HydraService(api as any);
+
+    await expect(svc.deleteClient('missing')).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('any other status → InternalServerErrorException, never a bare 500 leak', async () => {
+    const api = { getOAuth2Client: jest.fn().mockRejectedValue(axiosErr(503)) };
+    const svc = new HydraService(api as any);
+
+    await expect(svc.getClient('x')).rejects.toBeInstanceOf(InternalServerErrorException);
   });
 });
 

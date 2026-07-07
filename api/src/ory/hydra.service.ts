@@ -1,4 +1,11 @@
-import { Inject, Injectable } from '@nestjs/common';
+import {
+  ConflictException,
+  Inject,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import type {
   OAuth2Api,
   AcceptOAuth2LoginRequest,
@@ -11,6 +18,7 @@ import type {
 } from '@ory/hydra-client';
 import { HYDRA_OAUTH2_API } from './ory.constants';
 import { parseNextPageToken } from '../common/pagination';
+import { httpStatus } from '../common/http-status';
 
 export interface ListClientsResult {
   clients: OAuth2Client[];
@@ -29,6 +37,8 @@ export type AcceptOAuth2LoginRequestWithSession = AcceptOAuth2LoginRequest & {
 
 @Injectable()
 export class HydraService {
+  private readonly logger = new Logger(HydraService.name);
+
   constructor(@Inject(HYDRA_OAUTH2_API) private readonly oauth2Api: OAuth2Api) {}
 
   async acceptLogin(
@@ -85,14 +95,36 @@ export class HydraService {
     return { clients, nextPageToken };
   }
 
+  // Unlike KratosAdminService, these client CRUD calls previously let raw
+  // AxiosErrors propagate — Nest's default filter turns any uncaught error
+  // into a bare `500 Internal server error`, so a 404 (unknown client id) or
+  // 409 (duplicate client_id) never reached the caller, breaking the
+  // @ApiResponse(404) contract on the admin controller. Classify the same
+  // way KratosAdminService does.
   async getClient(id: string): Promise<OAuth2Client> {
-    const { data } = await this.oauth2Api.getOAuth2Client({ id });
-    return data;
+    try {
+      const { data } = await this.oauth2Api.getOAuth2Client({ id });
+      return data;
+    } catch (err) {
+      const status = httpStatus(err);
+      if (status === 404) throw new NotFoundException(`OAuth2 client ${id} not found`);
+      this.logger.error(`Hydra getClient failed for ${id}: ${(err as Error).message}`);
+      throw new InternalServerErrorException('Hydra getClient failed');
+    }
   }
 
   async createClient(body: OAuth2Client): Promise<OAuth2Client> {
-    const { data } = await this.oauth2Api.createOAuth2Client({ oAuth2Client: body });
-    return data;
+    try {
+      const { data } = await this.oauth2Api.createOAuth2Client({ oAuth2Client: body });
+      return data;
+    } catch (err) {
+      const status = httpStatus(err);
+      if (status === 409 || status === 400) {
+        throw new ConflictException('An OAuth2 client with this id already exists');
+      }
+      this.logger.error(`Hydra createClient failed: ${(err as Error).message}`);
+      throw new InternalServerErrorException('Hydra createClient failed');
+    }
   }
 
   // Hydra's setOAuth2Client is a full-replace PUT: any field omitted from the
@@ -101,14 +133,32 @@ export class HydraService {
   // merge the patch onto it before writing, or every field the caller didn't
   // mention (redirect_uris, grant_types, scope, ...) silently disappears.
   async updateClient(id: string, patch: Partial<OAuth2Client>): Promise<OAuth2Client> {
+    // getClient already maps 404 → NotFoundException
     const current = await this.getClient(id);
     const merged = deepMergeClient(current, patch);
-    const { data } = await this.oauth2Api.setOAuth2Client({ id, oAuth2Client: merged });
-    return data;
+    try {
+      const { data } = await this.oauth2Api.setOAuth2Client({ id, oAuth2Client: merged });
+      return data;
+    } catch (err) {
+      const status = httpStatus(err);
+      if (status === 404) throw new NotFoundException(`OAuth2 client ${id} not found`);
+      if (status === 409 || status === 400) {
+        throw new ConflictException('OAuth2 client update conflicts with an existing client');
+      }
+      this.logger.error(`Hydra updateClient failed for ${id}: ${(err as Error).message}`);
+      throw new InternalServerErrorException('Hydra updateClient failed');
+    }
   }
 
   async deleteClient(id: string): Promise<void> {
-    await this.oauth2Api.deleteOAuth2Client({ id });
+    try {
+      await this.oauth2Api.deleteOAuth2Client({ id });
+    } catch (err) {
+      const status = httpStatus(err);
+      if (status === 404) throw new NotFoundException(`OAuth2 client ${id} not found`);
+      this.logger.error(`Hydra deleteClient failed for ${id}: ${(err as Error).message}`);
+      throw new InternalServerErrorException('Hydra deleteClient failed');
+    }
   }
 }
 

@@ -67,6 +67,7 @@ export class AdminClientsController {
   @ApiResponse({ status: 201, description: 'OAuth2 client created' })
   @ApiResponse({ status: 401, description: 'Missing or invalid Bearer id_token' })
   @ApiResponse({ status: 403, description: 'Caller lacks Platform:nova#administer in Keto' })
+  @ApiResponse({ status: 409, description: 'A client with this id already exists' })
   @ApiResponse({ status: 422, description: 'Validation failed' })
   async create(
     @GetUser() actor: AuthenticatedUser,

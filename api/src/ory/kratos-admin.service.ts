@@ -9,6 +9,7 @@ import {
 import type { IdentityApi, Identity } from '@ory/client';
 import { KRATOS_IDENTITY_API } from './ory.constants';
 import { parseNextPageToken } from '../common/pagination';
+import { httpStatus } from '../common/http-status';
 
 export type PlatformRole = 'platform_admin' | 'platform_user';
 
@@ -29,11 +30,6 @@ export interface ListIdentitiesResult {
   identities: Identity[];
   /** Opaque Kratos cursor; null when no further pages exist. */
   nextPageToken: string | null;
-}
-
-/** Translate an Axios-style error status to its HTTP status code, or undefined. */
-function httpStatus(err: unknown): number | undefined {
-  return (err as any)?.response?.status as number | undefined;
 }
 
 @Injectable()
