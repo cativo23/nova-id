@@ -225,6 +225,7 @@ import type { FlowLike, HttpErrorLike, ContinueWithLike } from '../types/flow'
 import type { UiNodeLike } from '../utils/uiNodes'
 import { logger, errMessage } from '../utils/logger'
 import { safeRedirect } from '../utils/safeRedirect'
+import { DEFAULT_RETURN_URL } from '../utils/defaultReturnUrl'
 import {
   getNodeValue,
   getNodeName,
@@ -453,12 +454,11 @@ const handleSubmit = async (event: Event) => {
     }
 
     const redirectAfter = () => {
-      const destination = safeRedirect(returnTo.value ? decodeURIComponent(returnTo.value) : null, '/dashboard')
-      if (destination.startsWith('/')) {
-        router.push(destination)
-      } else {
-        window.location.href = destination
-      }
+      // '/dashboard' is not a SPA route here — it's the external app surface, so
+      // the fallback must be the absolute DEFAULT_RETURN_URL and navigation must
+      // be a full browser redirect, never router.push (which would 404 in-SPA).
+      const destination = safeRedirect(returnTo.value ? decodeURIComponent(returnTo.value) : null, DEFAULT_RETURN_URL)
+      window.location.href = destination
     }
 
     // Check if registration completed successfully

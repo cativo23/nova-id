@@ -209,6 +209,7 @@ import type { FlowLike, HttpErrorLike } from '../types/flow'
 import type { UiNodeLike } from '../utils/uiNodes'
 import { logger, errMessage } from '../utils/logger'
 import { safeRedirect } from '../utils/safeRedirect'
+import { DEFAULT_RETURN_URL } from '../utils/defaultReturnUrl'
 import {
   getNodeValue,
   getNodeName,
@@ -491,14 +492,14 @@ const handleSubmit = async (event: Event) => {
       const hasSuccess = data?.ui?.messages?.some(msg => msg.type === 'success')
       
       if (hasSuccess || data?.state === 'success') {
-        // Password reset successful - redirect to return_to if provided (e.g. from recovery), else dashboard
+        // Password reset successful - redirect to return_to if provided (e.g. from
+        // recovery), else the external app surface. '/dashboard' is not a SPA route
+        // here, so the fallback must be absolute and navigation a full browser
+        // redirect, never router.push (which would 404 in-SPA).
         const returnTo = firstQuery(route.query.return_to) || firstQuery(route.query.returnTo)
-        const destination = safeRedirect(returnTo ? decodeURIComponent(returnTo) : null, '/dashboard?password_reset=true')
-        if (destination.startsWith('/')) {
-          router.push(destination)
-        } else {
-          window.location.href = destination
-        }
+        const fallback = `${DEFAULT_RETURN_URL}${DEFAULT_RETURN_URL.includes('?') ? '&' : '?'}password_reset=true`
+        const destination = safeRedirect(returnTo ? decodeURIComponent(returnTo) : null, fallback)
+        window.location.href = destination
       } else {
         // Update flow with new state
         flow.value = data

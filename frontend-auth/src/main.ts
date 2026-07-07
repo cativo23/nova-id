@@ -27,7 +27,10 @@ const routes: RouteRecordRaw[] = [
   { path: '/verification', name: 'Verification', component: Verification },
   { path: '/settings', name: 'Settings', component: Settings },
   { path: '/consent', name: 'Consent', component: Consent },
-  { path: '/error', name: 'Error', component: Error }
+  { path: '/error', name: 'Error', component: Error },
+  // Safety net: any unmatched path (e.g. a stray '/dashboard' redirect) lands on
+  // Error instead of Vue Router silently rendering a blank page.
+  { path: '/:pathMatch(.*)*', name: 'NotFound', component: Error }
 ]
 
 const router = createRouter({

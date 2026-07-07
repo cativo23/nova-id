@@ -16,6 +16,7 @@ import type {
   UpdateSettingsFlowBody,
   UpdateVerificationFlowBody,
 } from '@ory/client'
+import { DEFAULT_RETURN_URL } from '../utils/defaultReturnUrl'
 
 // ZERO TRUST: All requests must go through Oathkeeper
 // Frontends cannot directly access Kratos - must use Oathkeeper gateway
@@ -55,7 +56,10 @@ export async function getLoginFlow(flowId: string): Promise<LoginFlow> {
 }
 
 export async function createLoginFlow(returnTo: string | null = null): Promise<LoginFlow> {
-  const returnUrl = returnTo || (window.location.origin + '/dashboard')
+  // '/dashboard' is not a route in this SPA — it's the external app surface.
+  // Falling back to this SPA's own origin + '/dashboard' would bounce Kratos'
+  // post-flow browser redirect straight into a 404/blank page.
+  const returnUrl = returnTo || DEFAULT_RETURN_URL
   const { data } = await ory.createBrowserLoginFlow({
     returnTo: returnUrl,
   })

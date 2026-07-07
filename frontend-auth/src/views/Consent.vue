@@ -82,9 +82,10 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { acceptHydraConsent } from '@nova-id/api-client'
 import { logger, errMessage } from '../utils/logger'
+import { DEFAULT_RETURN_URL } from '../utils/defaultReturnUrl'
 
 interface ConsentInfo {
   skip?: boolean
@@ -94,7 +95,6 @@ interface ConsentInfo {
 }
 
 const route = useRoute()
-const router = useRouter()
 
 const consentChallenge = ref<string | null>(null)
 const consentInfo = ref<ConsentInfo | null>(null)
@@ -199,12 +199,10 @@ const rejectConsent = async () => {
 
     const result = await response.json()
 
-    // Redirect to the redirect_uri
-    if (result.redirect_to) {
-      window.location.href = result.redirect_to
-    } else {
-      router.push('/dashboard')
-    }
+    // Redirect to the redirect_uri. '/dashboard' is not a SPA route here — it's
+    // the external app surface — so the no-redirect_to fallback must be an
+    // absolute URL via a full browser navigation, never router.push.
+    window.location.href = result.redirect_to || DEFAULT_RETURN_URL
   } catch (err) {
     error.value = (err as Error).message || 'Failed to reject consent'
     logger.error('Error rejecting consent:', errMessage(err))
