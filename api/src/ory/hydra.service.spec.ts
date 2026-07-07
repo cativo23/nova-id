@@ -64,6 +64,40 @@ describe('getConsentRequest', () => {
   });
 });
 
+describe('listClients pagination', () => {
+  it('forwards pageSize/pageToken and returns null nextPageToken when there is no Link header', async () => {
+    const clients = [{ client_id: 'c1' }];
+    const api = { listOAuth2Clients: jest.fn().mockResolvedValue({ data: clients, headers: {} }) };
+    const svc = new HydraService(api as any);
+
+    const result = await svc.listClients({ pageSize: 50 });
+
+    expect(api.listOAuth2Clients).toHaveBeenCalledWith(expect.objectContaining({ pageSize: 50 }));
+    expect(result).toEqual({ clients, nextPageToken: null });
+  });
+
+  it('parses page_token from the Link header rel="next" entry', async () => {
+    const linkHeader = '<http://hydra/admin/clients?page_token=tok123>; rel="next"';
+    const api = {
+      listOAuth2Clients: jest.fn().mockResolvedValue({ data: [], headers: { link: linkHeader } }),
+    };
+    const svc = new HydraService(api as any);
+
+    const result = await svc.listClients({ pageSize: 100 });
+
+    expect(result.nextPageToken).toBe('tok123');
+  });
+
+  it('passes pageToken through to the SDK call', async () => {
+    const api = { listOAuth2Clients: jest.fn().mockResolvedValue({ data: [], headers: {} }) };
+    const svc = new HydraService(api as any);
+
+    await svc.listClients({ pageToken: 'cursor-abc' });
+
+    expect(api.listOAuth2Clients).toHaveBeenCalledWith(expect.objectContaining({ pageToken: 'cursor-abc' }));
+  });
+});
+
 describe('updateClient', () => {
   it('fetches the current client and merges the partial body so omitted fields survive Hydra\'s full-replace PUT', async () => {
     const current = {

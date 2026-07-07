@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import type { IdentityApi, Identity } from '@ory/client';
 import { KRATOS_IDENTITY_API } from './ory.constants';
+import { parseNextPageToken } from '../common/pagination';
 
 export type PlatformRole = 'platform_admin' | 'platform_user';
 
@@ -28,27 +29,6 @@ export interface ListIdentitiesResult {
   identities: Identity[];
   /** Opaque Kratos cursor; null when no further pages exist. */
   nextPageToken: string | null;
-}
-
-/** Parse a Kratos `Link` header and return the `page_token` from the rel="next" entry, or null. */
-function parseNextPageToken(linkHeader: string | undefined | null): string | null {
-  if (!linkHeader) return null;
-  // Header may contain multiple comma-separated entries, e.g.:
-  //   <URL1>; rel="next", <URL2>; rel="prev"
-  const entries = linkHeader.split(',');
-  for (const entry of entries) {
-    if (!entry.includes('rel="next"')) continue;
-    const urlMatch = entry.match(/<([^>]+)>/);
-    if (!urlMatch) continue;
-    try {
-      const url = new URL(urlMatch[1]);
-      const token = url.searchParams.get('page_token');
-      if (token) return token;
-    } catch {
-      // malformed URL — skip
-    }
-  }
-  return null;
 }
 
 /** Translate an Axios-style error status to its HTTP status code, or undefined. */

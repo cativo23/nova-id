@@ -10,6 +10,13 @@ import type {
   OAuth2Client,
 } from '@ory/hydra-client';
 import { HYDRA_OAUTH2_API } from './ory.constants';
+import { parseNextPageToken } from '../common/pagination';
+
+export interface ListClientsResult {
+  clients: OAuth2Client[];
+  /** Opaque Hydra cursor; null when no further pages exist. */
+  nextPageToken: string | null;
+}
 
 /**
  * Hydra's acceptOAuth2LoginRequest accepts a `session.id_token` payload on the wire,
@@ -64,9 +71,18 @@ export class HydraService {
     return data;
   }
 
-  async listClients(): Promise<OAuth2Client[]> {
-    const { data } = await this.oauth2Api.listOAuth2Clients({});
-    return data;
+  // `listOAuth2Clients({})` with no pageSize/pageToken silently truncates at
+  // Hydra's default page size, so a growing client list would go missing past
+  // the first page. Mirror the users-list pagination (Link header rel="next").
+  async listClients(opts: { pageSize?: number; pageToken?: string } = {}): Promise<ListClientsResult> {
+    const response = await this.oauth2Api.listOAuth2Clients({
+      pageSize: opts.pageSize ?? 100,
+      pageToken: opts.pageToken,
+    });
+    const clients: OAuth2Client[] = response.data;
+    const linkHeader: string | undefined = response.headers?.['link'] ?? response.headers?.['Link'];
+    const nextPageToken = parseNextPageToken(linkHeader);
+    return { clients, nextPageToken };
   }
 
   async getClient(id: string): Promise<OAuth2Client> {
