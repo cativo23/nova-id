@@ -28,15 +28,7 @@
             :key="node.attributes?.name || node.id"
             class="space-y-2"
           >
-            <!-- Hide role field; it defaults to "platform_user" -->
-            <template v-if="getNodeName(node) === 'traits.role'">
-              <input
-                type="hidden"
-                :name="getNodeName(node)"
-                :value="getFieldValue(node) || 'platform_user'"
-              />
-            </template>
-            <template v-else-if="getNodeType(node) === 'select' || node.attributes?.type === 'select'">
+            <template v-if="getNodeType(node) === 'select' || node.attributes?.type === 'select'">
               <label
                 :for="getNodeName(node)"
                 class="block text-sm font-medium text-cyber-light"
@@ -314,11 +306,6 @@ const checkPasswordMatch = () => {
     passwordMismatch.value = false
   }
 }
-
-const roleOptions = [
-  { value: 'platform_user', label: 'Platform User' },
-  { value: 'platform_admin', label: 'Platform Admin' }
-]
 
 const preservedQuery = computed<LocationQuery>(() => {
   const q: LocationQuery = {}
