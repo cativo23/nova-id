@@ -63,6 +63,7 @@ import AppHeader from './components/AppHeader.vue'
 import AppErrorBoundary from './components/AppErrorBoundary.vue'
 import { globalError, clearGlobalError } from './state/errorState'
 import { checkSession, logout } from './composables/useAuth'
+import { clearPermissionsCache } from './composables/usePermissions'
 
 const router = useRouter()
 const route = useRoute()
@@ -91,6 +92,9 @@ onMounted(async () => {
 })
 
 const handleLogout = async () => {
+  // Drop the cached /me/permissions response so a subsequent login (possibly
+  // as a different user in the same tab) never reads a stale permission set.
+  clearPermissionsCache()
   try {
     const data = await logout()
     if (data?.logout_url) {

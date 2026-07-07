@@ -59,8 +59,12 @@ router.beforeEach(async (to, _from, next) => {
 
       if (to.meta.requiresAdminAccess) {
         const { canAccessAdmin } = await import('./composables/usePermissions')
+        // Force a fresh /me/permissions check on every navigation into an admin
+        // route rather than trusting the module-level cache — a server-side
+        // revocation (role change, permission removal) must take effect on the
+        // very next route change, not just after the cache's TTL or a reload.
         const hasAccess = await withTimeout(
-          canAccessAdmin(session.identity?.id),
+          canAccessAdmin(session.identity?.id, true),
           GUARD_CHECK_TIMEOUT_MS,
           'Admin access check',
         )

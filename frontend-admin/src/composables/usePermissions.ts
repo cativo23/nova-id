@@ -18,32 +18,50 @@ import { meControllerPermissions } from '@nova-id/api-client'
 import type { PermissionsResponseDto } from '@nova-id/api-client'
 import { logger, errMessage } from '../utils/logger'
 
-// Module-level memoized promise for the raw /me/permissions response.
+// Module-level memoized promise for the raw /me/permissions response, plus the
+// time it was fetched. Without a TTL a server-side permission revocation (e.g.
+// an admin demoted mid-session) would never take effect until a full page
+// reload, since every call site shared the same never-expiring promise.
+// 30s matches the TanStack Query staleTime configured in main.ts so both
+// caching layers agree on freshness.
+const PERMS_CACHE_TTL_MS = 30_000
 let _cachedPermsPromise: Promise<PermissionsResponseDto> | null = null
+let _cachedPermsFetchedAt = 0
 
 async function fetchMyPermissions(forceRefresh = false): Promise<PermissionsResponseDto> {
-  if (forceRefresh) {
+  const isStale = Date.now() - _cachedPermsFetchedAt > PERMS_CACHE_TTL_MS
+  if (forceRefresh || isStale) {
     _cachedPermsPromise = null
   }
   if (!_cachedPermsPromise) {
     // Store the promise before it resolves so concurrent callers share one fetch.
     // On rejection we null out the cache so the next call retries (avoids permanent
     // negative-caching after transient network errors or 401s).
+    _cachedPermsFetchedAt = Date.now()
     _cachedPermsPromise = meControllerPermissions().catch((e) => {
       _cachedPermsPromise = null
+      _cachedPermsFetchedAt = 0
       throw e
     })
   }
   return _cachedPermsPromise
 }
 
+// Clear the memoized permissions response outright (e.g. on logout) so the
+// next login — possibly as a different user in the same tab — never reads a
+// stale/foreign permission set.
+export function clearPermissionsCache(): void {
+  _cachedPermsPromise = null
+  _cachedPermsFetchedAt = 0
+}
+
 // canAccessAdmin: true if the current user has the Platform:nova#administer permit.
 // Called by main.ts route guard and Home.vue with the session userId.
 // The BFF returns canAccessAdmin keyed off the session, so userId is accepted
 // for API compatibility but the BFF ignores it (uses the id_token subject).
-export async function canAccessAdmin(_userId?: string): Promise<boolean> {
+export async function canAccessAdmin(_userId?: string, forceRefresh = false): Promise<boolean> {
   try {
-    const perms = await fetchMyPermissions()
+    const perms = await fetchMyPermissions(forceRefresh)
     return perms.canAccessAdmin === true
   } catch (error) {
     logger.error('canAccessAdmin failed:', errMessage(error))
