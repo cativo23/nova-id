@@ -38,7 +38,10 @@ import { AuthenticatedGuard } from './guards/authenticated.guard';
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     // 2️⃣  Auth runs second — rejects unauthenticated requests with 401
     //     (after rate-limit headers have already been applied by guard #1).
-    { provide: APP_GUARD, useClass: AuthenticatedGuard },
+    //     useExisting (not useClass) reuses the single AuthenticatedGuard
+    //     instance provided by AuthModule, avoiding a second instance with
+    //     its own JwksClient cache/rate-limiter.
+    { provide: APP_GUARD, useExisting: AuthenticatedGuard },
   ],
 })
 export class AppModule {}
