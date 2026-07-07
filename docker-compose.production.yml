@@ -59,6 +59,11 @@ services:
       HYDRA_DB_PASSWORD: ${HYDRA_DB_PASSWORD}
       KETO_DB_PASSWORD: ${KETO_DB_PASSWORD}
       DEMO_DB_PASSWORD: ${DEMO_DB_PASSWORD}
+      # Audit least-privilege roles — create-users.sh runs under `set -e` (no -u),
+      # so omitting these created nova_audit_app/nova_audit_migrator with EMPTY
+      # passwords, breaking the api/api-migrate audit connections (see issue #77).
+      AUDIT_APP_PASSWORD: ${AUDIT_APP_PASSWORD}
+      AUDIT_MIGRATOR_PASSWORD: ${AUDIT_MIGRATOR_PASSWORD}
     command: >
       sh -c "
         until pg_isready -h postgres -U postgres; do sleep 1; done &&
