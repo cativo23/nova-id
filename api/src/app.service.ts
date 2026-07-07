@@ -109,16 +109,20 @@ export class AppService {
       const isMember = clientId ? await this.keto.checkApp(user.userId, clientId) : false;
       if (!isMember) {
         this.logger.warn(`Consent DENIED: ${user.userId} is not a member of app ${clientId}`);
+        // Record AFTER rejectConsent resolves (mirrors rejectHydraConsent):
+        // if the reject call itself throws, the append-only audit log must
+        // not contain a deny that never actually happened.
+        const result = await this.hydra.rejectConsent(consentChallenge, {
+          error: 'access_denied',
+          error_description: 'You are not authorized to access this application.',
+        });
         await this.audit.record({
           actorId: user.userId,
           action: 'consent.deny',
           appId: clientId ?? null,
           targetType: 'app',
         });
-        return await this.hydra.rejectConsent(consentChallenge, {
-          error: 'access_denied',
-          error_description: 'You are not authorized to access this application.',
-        });
+        return result;
       }
 
       // Trust the audience from the consent request, NOT the browser body.

@@ -108,6 +108,25 @@ describe('AppService.acceptHydraConsent', () => {
     expect(out.redirect_to).toBe('http://denied');
   });
 
+  it('consent.deny: does NOT record the deny audit entry if rejectConsent itself fails (never log a deny that never happened)', async () => {
+    const hydra = makeHydra();
+    hydra.getConsentRequest.mockResolvedValue({
+      client: { client_id: 'nova-id-test-app' },
+      requested_access_token_audience: ['aud1'],
+      requested_scope: ['openid'],
+    });
+    hydra.rejectConsent.mockRejectedValue(new Error('hydra unreachable'));
+    const keto = makeKeto();
+    keto.checkApp.mockResolvedValue(false);
+    const audit = makeAudit();
+    const svc = new AppService(hydra as any, keto as any, audit as any);
+
+    await expect(
+      svc.acceptHydraConsent(user, { consent_challenge: 'cc', grant_scope: ['openid'] }),
+    ).rejects.toThrow();
+    expect(audit.record).not.toHaveBeenCalled();
+  });
+
   it('consent.deny: emits audit record with action=consent.deny, actorId, appId, targetType=app', async () => {
     const hydra = makeHydra();
     hydra.getConsentRequest.mockResolvedValue({
