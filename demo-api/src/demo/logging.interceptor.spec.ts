@@ -138,4 +138,32 @@ describe("LoggingInterceptor — identity extraction (M-2)", () => {
 
     expect(logsService.logAccess).not.toHaveBeenCalled();
   });
+
+  it("does not throw when the handler resolves undefined (#107)", async () => {
+    const logsService = makeLogsService();
+    const interceptor = new LoggingInterceptor(
+      makeReflector(true),
+      logsService,
+    );
+
+    const req = { method: "DELETE", url: "/void", headers: {} };
+
+    let caught: unknown;
+    await new Promise<void>((resolve) => {
+      interceptor
+        .intercept(makeContext(req), { handle: () => of(undefined) })
+        .subscribe({
+          error: (err) => {
+            caught = err;
+            resolve();
+          },
+          complete: resolve,
+        });
+    });
+
+    expect(caught).toBeUndefined();
+    expect(logsService.logAccess).toHaveBeenCalledTimes(1);
+    const entry = logsService.logAccess.mock.calls[0][0];
+    expect(entry.responseSize).toBe(0);
+  });
 });

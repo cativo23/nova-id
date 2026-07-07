@@ -58,7 +58,7 @@ export class LoggingInterceptor implements NestInterceptor {
               id: userId,
               role: userRole,
             },
-            responseSize: JSON.stringify(data).length,
+            responseSize: this.safeLength(data),
           };
 
           // Log to console
@@ -95,6 +95,23 @@ export class LoggingInterceptor implements NestInterceptor {
         },
       }),
     );
+  }
+
+  /**
+   * JSON.stringify(data).length throws when data is undefined (e.g. a
+   * 204/void handler) and returns undefined for non-serializable values
+   * (functions, symbols) — either would crash the response-success log
+   * path (#107). Guard both cases and fall back to 0.
+   */
+  private safeLength(data: unknown): number {
+    if (data === undefined) {
+      return 0;
+    }
+    try {
+      return JSON.stringify(data)?.length ?? 0;
+    } catch {
+      return 0;
+    }
   }
 
   private extractFrontendSource(headers: any, request: any): string {
