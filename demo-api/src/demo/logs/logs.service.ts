@@ -16,8 +16,11 @@ export interface AccessLogEntry {
   authMethod?: string;
   clientId?: string;
   user: {
+    // Opaque Kratos identity UUID — never the raw email (#106). This entry
+    // is persisted to logs/access.log indefinitely and exposed via
+    // GET /logs* to any app_admin, a low-trust role; retaining cleartext
+    // emails there is a PII leak.
     id: string;
-    email: string;
     role: string;
   };
   responseSize?: number;
