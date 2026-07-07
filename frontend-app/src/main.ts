@@ -8,6 +8,7 @@ import Callback from './views/Callback.vue'
 import About from './views/About.vue'
 import Architecture from './views/Architecture.vue'
 import { getApiTestBaseUrl } from './composables/useApiTest'
+import { getStoredAccessToken } from './composables/useHydraOAuth'
 import type { MeResponse, DemoUser } from './types'
 
 const routes: RouteRecordRaw[] = [
@@ -33,7 +34,17 @@ router.beforeEach(async (to, _from, next) => {
   }
 
   try {
-    const res = await fetch(`${getApiTestBaseUrl()}/me`, { credentials: 'include' })
+    // /api-test is gated by oauth2_introspection (ADR-0007) — it accepts only a
+    // Bearer access token, never the browser cookie. No token means no access.
+    const token = getStoredAccessToken()
+    if (!token) {
+      next({ path: '/' })
+      return
+    }
+
+    const res = await fetch(`${getApiTestBaseUrl()}/me`, {
+      headers: { Authorization: 'Bearer ' + token },
+    })
     if (res.ok) {
       const me = await res.json() as MeResponse
       const user: DemoUser = me.user ?? (me as unknown as DemoUser)
