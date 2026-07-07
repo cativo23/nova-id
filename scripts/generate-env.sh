@@ -48,6 +48,10 @@ KETO_DB_PASSWORD=$(generate_secret)
 AUDIT_APP_PASSWORD=$(generate_secret)
 AUDIT_MIGRATOR_PASSWORD=$(generate_secret)
 
+# Demo App DB Configuration (BFF → demo_app Postgres)
+# demo_user is a least-privilege role created by postgres-init (no access to IdP DBs).
+DEMO_DB_PASSWORD=$(generate_secret)
+
 # Kratos Secrets
 # cookie:  ≥16 chars — signs session cookies
 # cipher:  EXACTLY 32 chars — xchacha20-poly1305 data encryption
