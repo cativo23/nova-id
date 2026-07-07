@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsArray, IsIn, IsOptional, IsString, IsUrl, MinLength } from 'class-validator';
+import { ArrayNotEmpty, IsArray, IsIn, IsOptional, IsString, IsUrl, MinLength } from 'class-validator';
 
 export class CreateOauth2ClientDto {
   @ApiProperty({ description: 'Human-readable name for the OAuth2 client' })
@@ -12,6 +12,7 @@ export class CreateOauth2ClientDto {
     description: 'Allowed redirect URIs for authorization code / implicit flows',
   })
   @IsArray()
+  @ArrayNotEmpty()
   @IsUrl({ require_tld: false, protocols: ['http', 'https'] }, { each: true })
   redirect_uris!: string[];
 
