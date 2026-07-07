@@ -337,15 +337,21 @@ const alreadyVerified = computed(() => {
   return !!(hasSuccess && hasContinueLink && noFormInputs)
 })
 
-/** URL to continue to when already verified (from flow.ui.action or continue link) */
+/**
+ * URL to continue to when already verified (from flow.ui.action or continue link).
+ * This is the only redirect surface in this SPA that renders straight into an
+ * `<a :href>` without going through safeRedirect() first — wrap it here too
+ * (H-6: open-redirect prevention) since it ultimately comes from Kratos' flow
+ * payload rather than a same-origin constant.
+ */
 const continueUrl = computed(() => {
   const f = flow.value
   if (!f?.ui) return DEFAULT_AFTER_VERIFICATION
-  if (f.ui.action && typeof f.ui.action === 'string') return f.ui.action
+  if (f.ui.action && typeof f.ui.action === 'string') return safeRedirect(f.ui.action, DEFAULT_AFTER_VERIFICATION)
   const continueNode = f.ui.nodes?.find(
     n => n.type === 'a' && (n.attributes?.id === 'continue' || n.attributes?.href)
   )
-  return (continueNode?.attributes?.href as string) || DEFAULT_AFTER_VERIFICATION
+  return safeRedirect(continueNode?.attributes?.href as string | undefined, DEFAULT_AFTER_VERIFICATION)
 })
 
 function nodeKey(node: UiNodeLike, index: number): string {
