@@ -6,6 +6,7 @@ import {
   Delete,
   Body,
   Param,
+  ParseUUIDPipe,
   UseGuards,
   UseInterceptors,
 } from "@nestjs/common";
@@ -85,7 +86,7 @@ export class RolesController {
 
   @Get("user/:userId")
   @UseGuards(AppAdminGuard)
-  async getUserRole(@Param("userId") userId: string) {
+  async getUserRole(@Param("userId", ParseUUIDPipe) userId: string) {
     const userRole = await this.rolesService.getUserRole(userId);
     if (!userRole) {
       return {
@@ -100,7 +101,7 @@ export class RolesController {
   @Post("user/:userId")
   @UseGuards(AppAdminGuard)
   async setUserRole(
-    @Param("userId") userId: string,
+    @Param("userId", ParseUUIDPipe) userId: string,
     @Body() dto: SetUserRoleDto,
     @GetUser() user: AuthenticatedUser,
   ) {
@@ -122,7 +123,7 @@ export class RolesController {
   @Put("user/:userId")
   @UseGuards(AppAdminGuard)
   async updateUserRole(
-    @Param("userId") userId: string,
+    @Param("userId", ParseUUIDPipe) userId: string,
     @Body() dto: SetUserRoleDto,
     @GetUser() user: AuthenticatedUser,
   ) {
@@ -144,7 +145,7 @@ export class RolesController {
   @Delete("user/:userId")
   @UseGuards(AppAdminGuard)
   async deleteUserRole(
-    @Param("userId") userId: string,
+    @Param("userId", ParseUUIDPipe) userId: string,
     @GetUser() user: AuthenticatedUser,
   ) {
     await this.rolesService.deleteUserRole(userId);

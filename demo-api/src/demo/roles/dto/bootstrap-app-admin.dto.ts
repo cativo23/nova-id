@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from "@nestjs/swagger";
-import { IsOptional, IsString } from "class-validator";
+import { IsOptional, IsUUID } from "class-validator";
 
 /**
  * Body for POST /roles/bootstrap/app-admin.
@@ -13,6 +13,9 @@ export class BootstrapAppAdminDto {
     example: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
   })
   @IsOptional()
-  @IsString()
+  // Real Kratos identity IDs are UUIDs. @IsString() alone let any string
+  // through — e.g. "not-a-real-id" — creating an orphaned user_roles row
+  // that surfaces as a phantom app_admin (#108).
+  @IsUUID()
   userId?: string;
 }
