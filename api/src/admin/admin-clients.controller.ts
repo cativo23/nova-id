@@ -77,7 +77,12 @@ export class AdminClientsController {
   }
 
   @Put(':id')
-  @ApiOperation({ summary: 'Replace an OAuth2 client (full update)' })
+  @ApiOperation({
+    summary: 'Partially update an OAuth2 client',
+    description:
+      'Hydra treats PUT as a full-replace; the service reads the current client and ' +
+      'merges this partial body onto it first, so any field omitted here is preserved.',
+  })
   @ApiOkResponse({ description: 'OAuth2 client updated' })
   @ApiResponse({ status: 401, description: 'Missing or invalid Bearer id_token' })
   @ApiResponse({ status: 403, description: 'Caller lacks Platform:nova#administer in Keto' })
@@ -88,7 +93,7 @@ export class AdminClientsController {
     @Param('id') id: string,
     @Body() dto: UpdateOauth2ClientDto,
   ): Promise<OAuth2Client> {
-    const result = await this.hydra.updateClient(id, dto as OAuth2Client);
+    const result = await this.hydra.updateClient(id, dto as Partial<OAuth2Client>);
     await this.audit.record({
       actorId: actor.userId,
       actorEmail: actor.email,

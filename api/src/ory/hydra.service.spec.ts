@@ -64,6 +64,56 @@ describe('getConsentRequest', () => {
   });
 });
 
+describe('updateClient', () => {
+  it('fetches the current client and merges the partial body so omitted fields survive Hydra\'s full-replace PUT', async () => {
+    const current = {
+      client_id: 'app-1',
+      client_name: 'Old Name',
+      redirect_uris: ['https://app.example/callback'],
+      grant_types: ['authorization_code'],
+      scope: 'openid profile',
+    };
+    const api = {
+      getOAuth2Client: jest.fn().mockResolvedValue({ data: current }),
+      setOAuth2Client: jest.fn().mockResolvedValue({ data: { ...current, client_name: 'New Name' } }),
+    };
+    const svc = new HydraService(api as any);
+
+    const out = await svc.updateClient('app-1', { client_name: 'New Name' });
+
+    expect(api.getOAuth2Client).toHaveBeenCalledWith({ id: 'app-1' });
+    expect(api.setOAuth2Client).toHaveBeenCalledWith({
+      id: 'app-1',
+      oAuth2Client: expect.objectContaining({
+        client_name: 'New Name',
+        redirect_uris: ['https://app.example/callback'],
+        grant_types: ['authorization_code'],
+        scope: 'openid profile',
+      }),
+    });
+    expect(out.client_name).toBe('New Name');
+  });
+
+  it('replaces (not merges) an array field when the patch supplies a new array', async () => {
+    const current = {
+      client_id: 'app-2',
+      redirect_uris: ['https://old.example/callback'],
+      grant_types: ['authorization_code'],
+    };
+    const api = {
+      getOAuth2Client: jest.fn().mockResolvedValue({ data: current }),
+      setOAuth2Client: jest.fn().mockResolvedValue({ data: current }),
+    };
+    const svc = new HydraService(api as any);
+
+    await svc.updateClient('app-2', { redirect_uris: ['https://new.example/callback'] });
+
+    const merged = api.setOAuth2Client.mock.calls[0][0].oAuth2Client;
+    expect(merged.redirect_uris).toEqual(['https://new.example/callback']);
+    expect(merged.grant_types).toEqual(['authorization_code']);
+  });
+});
+
 describe('rejectConsent', () => {
   it('delegates to OAuth2Api.rejectOAuth2ConsentRequest with the error body', async () => {
     const api = { rejectOAuth2ConsentRequest: jest.fn().mockResolvedValue({ data: { redirect_to: 'http://denied' } }) };

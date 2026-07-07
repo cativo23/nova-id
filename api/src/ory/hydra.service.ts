@@ -79,12 +79,43 @@ export class HydraService {
     return data;
   }
 
-  async updateClient(id: string, body: OAuth2Client): Promise<OAuth2Client> {
-    const { data } = await this.oauth2Api.setOAuth2Client({ id, oAuth2Client: body });
+  // Hydra's setOAuth2Client is a full-replace PUT: any field omitted from the
+  // request body is wiped (reset to blank/default), not left untouched. Admin
+  // PATCH-style partial updates must therefore read the current client and
+  // merge the patch onto it before writing, or every field the caller didn't
+  // mention (redirect_uris, grant_types, scope, ...) silently disappears.
+  async updateClient(id: string, patch: Partial<OAuth2Client>): Promise<OAuth2Client> {
+    const current = await this.getClient(id);
+    const merged = deepMergeClient(current, patch);
+    const { data } = await this.oauth2Api.setOAuth2Client({ id, oAuth2Client: merged });
     return data;
   }
 
   async deleteClient(id: string): Promise<void> {
     await this.oauth2Api.deleteOAuth2Client({ id });
   }
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Recursively merge `patch` onto `base`. Plain-object values are merged
+ * key-by-key (so e.g. a partial `metadata` patch doesn't wipe unrelated
+ * metadata keys); arrays and primitives in `patch` fully replace the
+ * corresponding value in `base` (e.g. supplying `redirect_uris` replaces the
+ * whole list, it does not append to it).
+ */
+function deepMergeClient(base: OAuth2Client, patch: Partial<OAuth2Client>): OAuth2Client {
+  const merged: Record<string, unknown> = { ...base };
+  for (const [key, value] of Object.entries(patch)) {
+    if (value === undefined) continue;
+    const baseValue = (base as Record<string, unknown>)[key];
+    merged[key] =
+      isPlainObject(value) && isPlainObject(baseValue)
+        ? deepMergeClient(baseValue as OAuth2Client, value as Partial<OAuth2Client>)
+        : value;
+  }
+  return merged as OAuth2Client;
 }
