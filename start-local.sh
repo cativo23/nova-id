@@ -3,7 +3,7 @@
 # Script to start Nova ID stack in local development mode
 # Sets up local domains and starts all services
 
-set -e
+set -euo pipefail
 
 # Colors for output
 GREEN='\033[0;32m'
@@ -49,8 +49,11 @@ fi
 echo -e "${GREEN}✅ Local domains configured${NC}"
 echo ""
 
-# Load environment variables
-export $(cat .env | grep -v '^#' | xargs)
+# Load environment variables. `source` (not `export $(cat ... | xargs)`) avoids
+# word-splitting/glob-expanding values — e.g. a `?` in an SMTP connection URI.
+set -a
+source .env
+set +a
 export ENVIRONMENT=local
 
 # Start services
