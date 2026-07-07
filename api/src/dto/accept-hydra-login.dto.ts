@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString } from 'class-validator';
+import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
 
 export class AcceptHydraLoginDto {
   @ApiProperty({
@@ -8,5 +8,6 @@ export class AcceptHydraLoginDto {
   })
   @IsString()
   @IsNotEmpty()
+  @MaxLength(4096)
   login_challenge!: string;
 }
