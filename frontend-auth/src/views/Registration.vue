@@ -334,11 +334,7 @@ onMounted(async () => {
         const nodeType = getNodeType(node)
         const nodeValue = getNodeValue(node, null)
 
-        if (nodeName === 'traits.role') {
-          const roleValue = (nodeValue as string) || 'platform_user'
-          fieldValues.value[nodeName] = roleValue
-          if (node.attributes) node.attributes.value = roleValue
-        } else if (nodeName && nodeType !== 'hidden' && nodeType !== 'submit' && nodeType !== 'password' && nodeValue) {
+        if (nodeName && nodeType !== 'hidden' && nodeType !== 'submit' && nodeType !== 'password' && nodeValue) {
           // Only store non-hidden, non-submit, non-password fields with actual values
           fieldValues.value[nodeName] = String(nodeValue)
         }
