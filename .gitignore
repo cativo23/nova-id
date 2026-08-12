@@ -56,6 +56,9 @@ config/oathkeeper/id_token.jwks.json
 # Local planning scratch (superpowers plans + generated specs) — never commit
 docs/superpowers/
 
+# Local security-scanner run artifacts — never commit
+strix_runs/
+
 # Local-only compose override (dev routing: --dev, oathkeeper :80, frontend /api) — never commit
 docker-compose.override.yml
 
