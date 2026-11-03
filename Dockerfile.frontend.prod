@@ -77,8 +77,9 @@ RUN pnpm --filter "./${SPA}" run build
 # ── Stage 2: runtime ─────────────────────────────────────────────────────────
 FROM nginx:alpine AS runtime
 ARG SPA
-# Patch OS-level CVEs: libexpat CVE-2026-45186, openssl/libcrypto3/libssl3 CVE-2026-45447
-RUN apk update && apk upgrade --no-cache libexpat openssl libcrypto3 libssl3
+# Patch OS-level CVEs: libexpat CVE-2026-45186, openssl/libcrypto3/libssl3 CVE-2026-45447,
+# brotli-libs CVE-2026-111497, curl CVE-2026-92392
+RUN apk update && apk upgrade --no-cache libexpat openssl libcrypto3 libssl3 brotli-libs curl
 
 COPY config/nginx/spa.conf.template /etc/nginx/conf.d/default.conf
 COPY --from=builder /workspace/${SPA}/dist /usr/share/nginx/html
