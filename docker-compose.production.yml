@@ -48,6 +48,12 @@ services:
       - ory-internal
       - apps
     restart: unless-stopped
+    # >=2x the 7-day peak measured on polaris2 (49.5 MiB) — see tcg-vault's
+    # server-hygiene memory for the measurement.
+    deploy:
+      resources:
+        limits:
+          memory: 128M
 
   postgres-init:
     image: postgres:15-alpine
@@ -134,6 +140,11 @@ services:
       kratos-migrate:
         condition: service_completed_successfully
     restart: unless-stopped
+    # >=2x the 7-day peak (62.7 MiB), plus headroom for the courier worker.
+    deploy:
+      resources:
+        limits:
+          memory: 192M
 
   # ── Hydra ────────────────────────────────────────────────────────────────────
 
@@ -190,6 +201,11 @@ services:
       hydra-migrate:
         condition: service_completed_successfully
     restart: unless-stopped
+    # >=2x the 7-day peak measured on polaris2 (39.2 MiB).
+    deploy:
+      resources:
+        limits:
+          memory: 128M
 
   # ── Keto ─────────────────────────────────────────────────────────────────────
 
@@ -241,6 +257,11 @@ services:
       keto-migrate:
         condition: service_completed_successfully
     restart: unless-stopped
+    # >=2x the 7-day peak measured on polaris2 (36.2 MiB).
+    deploy:
+      resources:
+        limits:
+          memory: 128M
 
   # ── Oathkeeper (gateway / PEP) ────────────────────────────────────────────────
   # Oathkeeper is the single public entry point. Traefik routes id.cativo.dev to
@@ -287,6 +308,12 @@ services:
       hydra:
         condition: service_healthy
     restart: unless-stopped
+    # >=2x the 7-day peak measured on polaris2 (132.6 MiB — oathkeeper spikes
+    # higher than the other Ory services under real traffic).
+    deploy:
+      resources:
+        limits:
+          memory: 384M
 
   # ── NestJS API ────────────────────────────────────────────────────────────────
   # Built from the production multi-stage Dockerfile (api/Dockerfile).
@@ -328,6 +355,11 @@ services:
       postgres:
         condition: service_healthy
     restart: unless-stopped
+    # >=2x the 7-day peak measured on polaris2 (29.7 MiB).
+    deploy:
+      resources:
+        limits:
+          memory: 128M
 
   # ── Audit DB migrator (one-shot, profile-gated) ───────────────────────────────
   # Applies audit migrations as the privileged nova_audit_migrator role. NOT
@@ -397,6 +429,11 @@ services:
       postgres:
         condition: service_healthy
     restart: unless-stopped
+    # >=2x the 7-day peak measured on polaris2 (59.7 MiB).
+    deploy:
+      resources:
+        limits:
+          memory: 128M
 
   # ── Frontend SPAs (nginx) ─────────────────────────────────────────────────────
   # Each SPA is a pre-built nginx:alpine image produced by Dockerfile.frontend.prod.
@@ -429,6 +466,11 @@ services:
       oathkeeper:
         condition: service_healthy
     restart: unless-stopped
+    # >=2x the 7-day peak measured on polaris2 (7.3 MiB) — static nginx, floor at 64M.
+    deploy:
+      resources:
+        limits:
+          memory: 64M
 
   frontend-admin:
     # Image pulled by deploy-prod.sh; IMAGE_TAG exported before `docker compose up`.
@@ -449,6 +491,11 @@ services:
       oathkeeper:
         condition: service_healthy
     restart: unless-stopped
+    # >=2x the 7-day peak measured on polaris2 (7.5 MiB) — static nginx, floor at 64M.
+    deploy:
+      resources:
+        limits:
+          memory: 64M
 
   # Demo relying-party — the living proof of the IdP. A full OAuth2/OIDC client
   # (public + PKCE) that runs "Login with Nova ID" against id.cativo.dev and calls
@@ -473,6 +520,11 @@ services:
       oathkeeper:
         condition: service_healthy
     restart: unless-stopped
+    # >=2x the 7-day peak measured on polaris2 (9.0 MiB) — static nginx, floor at 64M.
+    deploy:
+      resources:
+        limits:
+          memory: 64M
 
 # ── Volumes ───────────────────────────────────────────────────────────────────
 
