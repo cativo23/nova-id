@@ -241,10 +241,10 @@
                   <button
                     v-if="permissions.canChangePerms"
                     type="button"
-                    @click="viewPermissions(user)"
+                    @click="viewSessionPermissions()"
                     class="action-btn action-btn--icon action-btn--secondary"
-                    title="View your permissions"
-                    aria-label="View your permissions"
+                    title="View your own session permissions (per-user lookup not available yet)"
+                    aria-label="View your own session permissions (per-user lookup not available yet)"
                   >
                     <svg class="action-btn__icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
@@ -534,9 +534,9 @@
 
           <!-- Permissions Modal -->
           <div
-            v-if="viewingPermissions"
+            v-if="showSessionPermissions"
             class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
-            @click.self="viewingPermissions = null"
+            @click.self="showSessionPermissions = false"
           >
             <div class="card mx-4 w-full max-w-md p-6 shadow-modal">
               <!-- TODO(A1-plan-2): per-user permission lookup needs a BFF endpoint.
@@ -558,11 +558,11 @@
                   <span class="text-cyber-light">{{ permission }}</span>
                 </div>
                 <p v-if="userPermissionsList.length === 0" class="text-cyber-light/70">
-                  No permissions assigned to this user.
+                  You have no permissions assigned.
                 </p>
               </div>
               <div class="mt-6 flex justify-end">
-                <button type="button" @click="viewingPermissions = null" class="btn-primary">
+                <button type="button" @click="showSessionPermissions = false" class="btn-primary">
                   Close
                 </button>
               </div>
@@ -596,7 +596,7 @@ const qc = useQueryClient()
 const error = ref<string | null>(null)
 const success = ref<string | null>(null)
 const editingUser = ref<UserResponseDto | null>(null)
-const viewingPermissions = ref<UserResponseDto | null>(null)
+const showSessionPermissions = ref(false)
 const saving = ref(false)
 const deleting = ref(false)
 const currentUser = ref<Identity | null>(null)
@@ -1039,14 +1039,17 @@ const verifyEmail = async (user: UserResponseDto) => {
   }
 }
 
-const viewPermissions = async (user: UserResponseDto) => {
-  viewingPermissions.value = user
+// NOTE: `/me/permissions` derives identity from the session cookie, so this is the CURRENT ADMIN's
+// permission set — never the selected row's. Takes no user argument on purpose: passing one would
+// imply a per-user lookup that does not exist yet (getCachedUserPermissions ignores its id).
+const viewSessionPermissions = async () => {
+  showSessionPermissions.value = true
   loadingUserPermissions.value = true
   userPermissionsList.value = []
 
   try {
     const { getCachedUserPermissions } = await import('../composables/usePermissionCache')
-    userPermissionsList.value = await getCachedUserPermissions(user.id)
+    userPermissionsList.value = await getCachedUserPermissions()
   } catch (err) {
     logger.error('Error loading user permissions', String((err as { response?: { status?: number } })?.response?.status ?? ''))
     userPermissionsList.value = []

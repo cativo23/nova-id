@@ -1,4 +1,11 @@
-import { Inject, Injectable } from '@nestjs/common';
+import {
+  ConflictException,
+  Inject,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import type {
   OAuth2Api,
   AcceptOAuth2LoginRequest,
@@ -10,6 +17,14 @@ import type {
   OAuth2Client,
 } from '@ory/hydra-client';
 import { HYDRA_OAUTH2_API } from './ory.constants';
+import { parseNextPageToken } from '../common/pagination';
+import { httpStatus } from '../common/http-status';
+
+export interface ListClientsResult {
+  clients: OAuth2Client[];
+  /** Opaque Hydra cursor; null when no further pages exist. */
+  nextPageToken: string | null;
+}
 
 /**
  * Hydra's acceptOAuth2LoginRequest accepts a `session.id_token` payload on the wire,
@@ -22,6 +37,8 @@ export type AcceptOAuth2LoginRequestWithSession = AcceptOAuth2LoginRequest & {
 
 @Injectable()
 export class HydraService {
+  private readonly logger = new Logger(HydraService.name);
+
   constructor(@Inject(HYDRA_OAUTH2_API) private readonly oauth2Api: OAuth2Api) {}
 
   async acceptLogin(
@@ -64,27 +81,107 @@ export class HydraService {
     return data;
   }
 
-  async listClients(): Promise<OAuth2Client[]> {
-    const { data } = await this.oauth2Api.listOAuth2Clients({});
-    return data;
+  // `listOAuth2Clients({})` with no pageSize/pageToken silently truncates at
+  // Hydra's default page size, so a growing client list would go missing past
+  // the first page. Mirror the users-list pagination (Link header rel="next").
+  async listClients(opts: { pageSize?: number; pageToken?: string } = {}): Promise<ListClientsResult> {
+    const response = await this.oauth2Api.listOAuth2Clients({
+      pageSize: opts.pageSize ?? 100,
+      pageToken: opts.pageToken,
+    });
+    const clients: OAuth2Client[] = response.data;
+    const linkHeader: string | undefined = response.headers?.['link'] ?? response.headers?.['Link'];
+    const nextPageToken = parseNextPageToken(linkHeader);
+    return { clients, nextPageToken };
   }
 
+  // Unlike KratosAdminService, these client CRUD calls previously let raw
+  // AxiosErrors propagate — Nest's default filter turns any uncaught error
+  // into a bare `500 Internal server error`, so a 404 (unknown client id) or
+  // 409 (duplicate client_id) never reached the caller, breaking the
+  // @ApiResponse(404) contract on the admin controller. Classify the same
+  // way KratosAdminService does.
   async getClient(id: string): Promise<OAuth2Client> {
-    const { data } = await this.oauth2Api.getOAuth2Client({ id });
-    return data;
+    try {
+      const { data } = await this.oauth2Api.getOAuth2Client({ id });
+      return data;
+    } catch (err) {
+      const status = httpStatus(err);
+      if (status === 404) throw new NotFoundException(`OAuth2 client ${id} not found`);
+      this.logger.error(`Hydra getClient failed for ${id}: ${(err as Error).message}`);
+      throw new InternalServerErrorException('Hydra getClient failed');
+    }
   }
 
   async createClient(body: OAuth2Client): Promise<OAuth2Client> {
-    const { data } = await this.oauth2Api.createOAuth2Client({ oAuth2Client: body });
-    return data;
+    try {
+      const { data } = await this.oauth2Api.createOAuth2Client({ oAuth2Client: body });
+      return data;
+    } catch (err) {
+      const status = httpStatus(err);
+      if (status === 409 || status === 400) {
+        throw new ConflictException('An OAuth2 client with this id already exists');
+      }
+      this.logger.error(`Hydra createClient failed: ${(err as Error).message}`);
+      throw new InternalServerErrorException('Hydra createClient failed');
+    }
   }
 
-  async updateClient(id: string, body: OAuth2Client): Promise<OAuth2Client> {
-    const { data } = await this.oauth2Api.setOAuth2Client({ id, oAuth2Client: body });
-    return data;
+  // Hydra's setOAuth2Client is a full-replace PUT: any field omitted from the
+  // request body is wiped (reset to blank/default), not left untouched. Admin
+  // PATCH-style partial updates must therefore read the current client and
+  // merge the patch onto it before writing, or every field the caller didn't
+  // mention (redirect_uris, grant_types, scope, ...) silently disappears.
+  async updateClient(id: string, patch: Partial<OAuth2Client>): Promise<OAuth2Client> {
+    // getClient already maps 404 → NotFoundException
+    const current = await this.getClient(id);
+    const merged = deepMergeClient(current, patch);
+    try {
+      const { data } = await this.oauth2Api.setOAuth2Client({ id, oAuth2Client: merged });
+      return data;
+    } catch (err) {
+      const status = httpStatus(err);
+      if (status === 404) throw new NotFoundException(`OAuth2 client ${id} not found`);
+      if (status === 409 || status === 400) {
+        throw new ConflictException('OAuth2 client update conflicts with an existing client');
+      }
+      this.logger.error(`Hydra updateClient failed for ${id}: ${(err as Error).message}`);
+      throw new InternalServerErrorException('Hydra updateClient failed');
+    }
   }
 
   async deleteClient(id: string): Promise<void> {
-    await this.oauth2Api.deleteOAuth2Client({ id });
+    try {
+      await this.oauth2Api.deleteOAuth2Client({ id });
+    } catch (err) {
+      const status = httpStatus(err);
+      if (status === 404) throw new NotFoundException(`OAuth2 client ${id} not found`);
+      this.logger.error(`Hydra deleteClient failed for ${id}: ${(err as Error).message}`);
+      throw new InternalServerErrorException('Hydra deleteClient failed');
+    }
   }
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Recursively merge `patch` onto `base`. Plain-object values are merged
+ * key-by-key (so e.g. a partial `metadata` patch doesn't wipe unrelated
+ * metadata keys); arrays and primitives in `patch` fully replace the
+ * corresponding value in `base` (e.g. supplying `redirect_uris` replaces the
+ * whole list, it does not append to it).
+ */
+function deepMergeClient(base: OAuth2Client, patch: Partial<OAuth2Client>): OAuth2Client {
+  const merged: Record<string, unknown> = { ...base };
+  for (const [key, value] of Object.entries(patch)) {
+    if (value === undefined) continue;
+    const baseValue = (base as Record<string, unknown>)[key];
+    merged[key] =
+      isPlainObject(value) && isPlainObject(baseValue)
+        ? deepMergeClient(baseValue as OAuth2Client, value as Partial<OAuth2Client>)
+        : value;
+  }
+  return merged as OAuth2Client;
 }

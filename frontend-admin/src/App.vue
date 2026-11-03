@@ -56,17 +56,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, provide } from 'vue'
+import { computed, onMounted, provide } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import AppSidebar from './components/AppSidebar.vue'
 import AppHeader from './components/AppHeader.vue'
 import AppErrorBoundary from './components/AppErrorBoundary.vue'
 import { globalError, clearGlobalError } from './state/errorState'
 import { checkSession, logout } from './composables/useAuth'
+import { clearPermissionsCache } from './composables/usePermissions'
 
 const router = useRouter()
 const route = useRoute()
-const isAuthenticated = ref(false)
 
 const showNav = computed(() => route.path !== '/')
 
@@ -75,12 +75,13 @@ function reload () {
   window.location.reload()
 }
 
+// Router guard (see main.ts) is the single source of truth for auth state;
+// this only re-warms checkSession's cache so guards see fresh data.
 const refreshAuth = async () => {
   try {
-    const session = await checkSession()
-    isAuthenticated.value = !!session
+    await checkSession()
   } catch (error) {
-    isAuthenticated.value = false
+    // Ignore — the router guard handles redirecting unauthenticated users.
   }
 }
 
@@ -91,6 +92,9 @@ onMounted(async () => {
 })
 
 const handleLogout = async () => {
+  // Drop the cached /me/permissions response so a subsequent login (possibly
+  // as a different user in the same tab) never reads a stale permission set.
+  clearPermissionsCache()
   try {
     const data = await logout()
     if (data?.logout_url) {

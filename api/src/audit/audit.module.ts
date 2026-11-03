@@ -2,7 +2,9 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuditLog } from './audit-log.entity';
 import { AuditService } from './audit.service';
+import { LoginChallengeBinding } from '../login-binding/login-challenge-binding.entity';
 import { CreateAuditLogs1781750293893 } from './migrations/1781750293893-CreateAuditLogs';
+import { CreateLoginChallengeBindings1781750293894 } from './migrations/1781750293894-CreateLoginChallengeBindings';
 
 /**
  * AuditModule — registers a NAMED 'audit' TypeORM connection backed by
@@ -36,8 +38,8 @@ import { CreateAuditLogs1781750293893 } from './migrations/1781750293893-CreateA
       username: process.env.AUDIT_DB_USER,
       password: process.env.AUDIT_DB_PASSWORD,
       database: process.env.AUDIT_DB_NAME,
-      entities: [AuditLog],
-      migrations: [CreateAuditLogs1781750293893],
+      entities: [AuditLog, LoginChallengeBinding],
+      migrations: [CreateAuditLogs1781750293893, CreateLoginChallengeBindings1781750293894],
       synchronize: false,
       migrationsRun: false,
     }),

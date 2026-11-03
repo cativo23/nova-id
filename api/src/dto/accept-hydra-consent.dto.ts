@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsArray, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class AcceptHydraConsentDto {
   @ApiProperty({
@@ -8,6 +8,7 @@ export class AcceptHydraConsentDto {
   })
   @IsString()
   @IsNotEmpty()
+  @MaxLength(4096)
   consent_challenge!: string;
 
   @ApiPropertyOptional({

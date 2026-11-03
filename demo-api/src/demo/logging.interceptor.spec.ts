@@ -50,8 +50,9 @@ describe("LoggingInterceptor — identity extraction (M-2)", () => {
     expect(logsService.logAccess).toHaveBeenCalledTimes(1);
     const entry = logsService.logAccess.mock.calls[0][0];
     expect(entry.user.id).toBe("real-uid");
-    expect(entry.user.email).toBe("real@example.com");
     expect(entry.user.role).toBe("app_user");
+    // Raw email must never be persisted to access.log / exposed via GET /logs (#106).
+    expect(entry.user).not.toHaveProperty("email");
   });
 
   it('falls back to "anonymous" for ALL identity fields when request.user is absent', async () => {
@@ -83,12 +84,13 @@ describe("LoggingInterceptor — identity extraction (M-2)", () => {
 
     const entry = logsService.logAccess.mock.calls[0][0];
     expect(entry.user.id).toBe("anonymous");
-    expect(entry.user.email).toBe("anonymous");
     expect(entry.user.role).toBe("anonymous");
     // Confirm the spoofed values were NOT used
     expect(entry.user.id).not.toBe("spoofed-uid");
     expect(entry.user.role).not.toBe("platform_admin");
     expect(entry.user.role).not.toBe("platform_user");
+    // Raw email must never be persisted to access.log / exposed via GET /logs (#106).
+    expect(entry.user).not.toHaveProperty("email");
   });
 
   it('logs "anonymous" on error path when request.user is absent', async () => {
@@ -135,5 +137,33 @@ describe("LoggingInterceptor — identity extraction (M-2)", () => {
     });
 
     expect(logsService.logAccess).not.toHaveBeenCalled();
+  });
+
+  it("does not throw when the handler resolves undefined (#107)", async () => {
+    const logsService = makeLogsService();
+    const interceptor = new LoggingInterceptor(
+      makeReflector(true),
+      logsService,
+    );
+
+    const req = { method: "DELETE", url: "/void", headers: {} };
+
+    let caught: unknown;
+    await new Promise<void>((resolve) => {
+      interceptor
+        .intercept(makeContext(req), { handle: () => of(undefined) })
+        .subscribe({
+          error: (err) => {
+            caught = err;
+            resolve();
+          },
+          complete: resolve,
+        });
+    });
+
+    expect(caught).toBeUndefined();
+    expect(logsService.logAccess).toHaveBeenCalledTimes(1);
+    const entry = logsService.logAccess.mock.calls[0][0];
+    expect(entry.responseSize).toBe(0);
   });
 });

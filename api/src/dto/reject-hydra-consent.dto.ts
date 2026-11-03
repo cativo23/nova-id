@@ -5,6 +5,7 @@ export class RejectHydraConsentDto {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
+  @MaxLength(4096)
   consent_challenge!: string;
 
   @ApiProperty({ required: false })

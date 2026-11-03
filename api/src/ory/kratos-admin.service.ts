@@ -5,9 +5,12 @@ import {
   InternalServerErrorException,
   Logger,
   NotFoundException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import type { IdentityApi, Identity } from '@ory/client';
 import { KRATOS_IDENTITY_API } from './ory.constants';
+import { parseNextPageToken } from '../common/pagination';
+import { httpStatus } from '../common/http-status';
 
 export type PlatformRole = 'platform_admin' | 'platform_user';
 
@@ -30,30 +33,16 @@ export interface ListIdentitiesResult {
   nextPageToken: string | null;
 }
 
-/** Parse a Kratos `Link` header and return the `page_token` from the rel="next" entry, or null. */
-function parseNextPageToken(linkHeader: string | undefined | null): string | null {
-  if (!linkHeader) return null;
-  // Header may contain multiple comma-separated entries, e.g.:
-  //   <URL1>; rel="next", <URL2>; rel="prev"
-  const entries = linkHeader.split(',');
-  for (const entry of entries) {
-    if (!entry.includes('rel="next"')) continue;
-    const urlMatch = entry.match(/<([^>]+)>/);
-    if (!urlMatch) continue;
-    try {
-      const url = new URL(urlMatch[1]);
-      const token = url.searchParams.get('page_token');
-      if (token) return token;
-    } catch {
-      // malformed URL — skip
-    }
-  }
-  return null;
-}
-
-/** Translate an Axios-style error status to its HTTP status code, or undefined. */
-function httpStatus(err: unknown): number | undefined {
-  return (err as any)?.response?.status as number | undefined;
+/**
+ * Extract a client-safe validation message from a Kratos error response.
+ * Kratos's own error/UI messages are already written to be shown to end
+ * users (no stack traces or internal paths), so it is safe to forward them
+ * as-is — unlike a bare stack trace or DB error, which must never reach the
+ * client.
+ */
+function kratosErrorMessage(err: unknown): string | undefined {
+  const data = (err as any)?.response?.data;
+  return data?.error?.message ?? data?.error?.reason ?? data?.message;
 }
 
 @Injectable()
@@ -105,14 +94,40 @@ export class KratosAdminService {
       return data;
     } catch (err) {
       const status = httpStatus(err);
-      if (status === 409 || status === 400) {
+      if (status === 409) {
         throw new ConflictException('Email already registered');
+      }
+      if (status === 400) {
+        // Kratos returns 400 for BOTH a duplicate identifier AND unrelated
+        // schema/password-policy violations. Blindly mapping every 400 to
+        // "Email already registered" hid the real reason (e.g. a weak
+        // password) behind a misleading message. Inspect the upstream
+        // message: only a genuine duplicate-identifier signal maps to
+        // Conflict; anything else surfaces as 422 with Kratos's own
+        // (already user-safe) validation text.
+        const reason = kratosErrorMessage(err);
+        if (
+          reason &&
+          /duplicate|already (exists|registered|taken|in use)|exists already|identifier.*(exists|taken)/i.test(reason)
+        ) {
+          throw new ConflictException('Email already registered');
+        }
+        throw new UnprocessableEntityException(reason ?? 'The provided identity data is invalid.');
       }
       this.logger.error(`Kratos createIdentity failed: ${(err as Error).message}`);
       throw new InternalServerErrorException('Kratos createIdentity failed');
     }
   }
 
+  // WARNING — lost-update race: this is a read-then-full-PUT (getIdentity,
+  // then updateIdentity with the whole identity body). Kratos's admin
+  // updateIdentity endpoint has no optimistic-concurrency parameter (no
+  // ETag/If-Match, no version field on UpdateIdentityBody) to guard the gap
+  // between the two calls, so two concurrent admin edits to the same
+  // identity can race: the second write's PUT silently overwrites whatever
+  // fields the first write changed that it didn't itself resend. Given the
+  // low concurrent-admin-edit likelihood and Kratos's current API surface,
+  // this is accepted as a known limitation rather than worked around.
   async updateIdentity(id: string, input: UpdateIdentityInput): Promise<Identity> {
     // getIdentity already maps 404 → NotFoundException
     const current = await this.getIdentity(id);
@@ -144,6 +159,8 @@ export class KratosAdminService {
     }
   }
 
+  // WARNING — same read-then-full-PUT lost-update window as updateIdentity
+  // above: no version guard exists on Kratos's admin updateIdentity endpoint.
   async setIdentityState(id: string, state: 'active' | 'inactive'): Promise<Identity> {
     // getIdentity already maps 404 → NotFoundException
     const current = await this.getIdentity(id);

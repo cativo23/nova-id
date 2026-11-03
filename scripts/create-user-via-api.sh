@@ -2,13 +2,27 @@
 # Script to create a user via Kratos Admin API
 # This requires authentication - use the admin dashboard UI or run from browser console
 
-set -e
+set -euo pipefail
 
 OATHKEEPER_URL="${OATHKEEPER_URL:-http://localhost:4455}"
-EMAIL="${1:-cativo23.kt@gmail.com}"
-FULL_NAME="${2:-Carlos Cativo}"
+EMAIL="${1:-}"
+FULL_NAME="${2:-Nova User}"
 ROLE="${3:-platform_admin}"
-PASSWORD="${4:-Cacpac2323$}"
+# Password: never hard-code a real credential (this repo is public). Require it as an
+# argument, or auto-generate a high-entropy one and print it ONCE below.
+PASSWORD="${4:-}"
+
+if [ -z "$EMAIL" ]; then
+  echo "Usage: $0 <email> [full_name] [role] [password]" >&2
+  echo "  email is required; password is auto-generated if omitted." >&2
+  exit 1
+fi
+
+GENERATED_PASSWORD=false
+if [ -z "$PASSWORD" ]; then
+  PASSWORD="$(openssl rand -base64 24 | tr -dc 'A-Za-z0-9' | head -c 24)"
+  GENERATED_PASSWORD=true
+fi
 
 echo "Creating user with the following details:"
 echo "  Email: $EMAIL"
@@ -90,4 +104,8 @@ echo "✓ User creation complete!"
 echo ""
 echo "Login credentials:"
 echo "  Email: $EMAIL"
-echo "  Password: $PASSWORD"
+if [ "$GENERATED_PASSWORD" = true ]; then
+  echo "  Password (auto-generated — shown ONCE, store it now): $PASSWORD"
+else
+  echo "  Password: (the value you supplied)"
+fi

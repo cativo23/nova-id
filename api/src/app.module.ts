@@ -5,6 +5,7 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuditModule } from './audit/audit.module';
+import { LoginBindingModule } from './login-binding/login-binding.module';
 import { AuthModule } from './auth/auth.module';
 import { OryModule } from './ory/ory.module';
 import { AdminModule } from './admin/admin.module';
@@ -26,6 +27,7 @@ import { AuthenticatedGuard } from './guards/authenticated.guard';
     ConfigModule.forRoot({ isGlobal: true }),
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
     AuditModule,
+    LoginBindingModule,
     AuthModule,
     OryModule,
     AdminModule,
@@ -38,7 +40,10 @@ import { AuthenticatedGuard } from './guards/authenticated.guard';
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     // 2️⃣  Auth runs second — rejects unauthenticated requests with 401
     //     (after rate-limit headers have already been applied by guard #1).
-    { provide: APP_GUARD, useClass: AuthenticatedGuard },
+    //     useExisting (not useClass) reuses the single AuthenticatedGuard
+    //     instance provided by AuthModule, avoiding a second instance with
+    //     its own JwksClient cache/rate-limiter.
+    { provide: APP_GUARD, useExisting: AuthenticatedGuard },
   ],
 })
 export class AppModule {}

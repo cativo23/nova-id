@@ -7,6 +7,7 @@ import {
   Param,
   Post,
   Put,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -24,6 +25,8 @@ import { GetUser } from '../decorators/get-user.decorator';
 import { AuthenticatedUser } from '../common/types/authenticated-user';
 import { CreateOauth2ClientDto } from './dto/create-oauth2-client.dto';
 import { UpdateOauth2ClientDto } from './dto/update-oauth2-client.dto';
+import { ListClientsQueryDto } from './dto/list-clients-query.dto';
+import { PaginatedClientsDto } from './dto/paginated-clients.dto';
 import type { OAuth2Client } from '@ory/hydra-client';
 
 @ApiTags('admin')
@@ -37,12 +40,16 @@ export class AdminClientsController {
   ) {}
 
   @Get()
-  @ApiOperation({ summary: 'List all OAuth2 clients' })
-  @ApiOkResponse({ description: 'Array of OAuth2 clients' })
+  @ApiOperation({ summary: 'List all OAuth2 clients (cursor-paginated)' })
+  @ApiOkResponse({ type: PaginatedClientsDto, description: 'Page of OAuth2 clients + optional next-page cursor' })
   @ApiResponse({ status: 401, description: 'Missing or invalid Bearer id_token' })
   @ApiResponse({ status: 403, description: 'Caller lacks Platform:nova#administer in Keto' })
-  async list(): Promise<OAuth2Client[]> {
-    return this.hydra.listClients();
+  async list(@Query() query: ListClientsQueryDto): Promise<PaginatedClientsDto> {
+    const { clients, nextPageToken } = await this.hydra.listClients({
+      pageSize: query.pageSize,
+      pageToken: query.pageToken,
+    });
+    return { data: clients, nextPageToken };
   }
 
   @Get(':id')
@@ -60,6 +67,7 @@ export class AdminClientsController {
   @ApiResponse({ status: 201, description: 'OAuth2 client created' })
   @ApiResponse({ status: 401, description: 'Missing or invalid Bearer id_token' })
   @ApiResponse({ status: 403, description: 'Caller lacks Platform:nova#administer in Keto' })
+  @ApiResponse({ status: 409, description: 'A client with this id already exists' })
   @ApiResponse({ status: 422, description: 'Validation failed' })
   async create(
     @GetUser() actor: AuthenticatedUser,
@@ -77,7 +85,12 @@ export class AdminClientsController {
   }
 
   @Put(':id')
-  @ApiOperation({ summary: 'Replace an OAuth2 client (full update)' })
+  @ApiOperation({
+    summary: 'Partially update an OAuth2 client',
+    description:
+      'Hydra treats PUT as a full-replace; the service reads the current client and ' +
+      'merges this partial body onto it first, so any field omitted here is preserved.',
+  })
   @ApiOkResponse({ description: 'OAuth2 client updated' })
   @ApiResponse({ status: 401, description: 'Missing or invalid Bearer id_token' })
   @ApiResponse({ status: 403, description: 'Caller lacks Platform:nova#administer in Keto' })
@@ -88,7 +101,7 @@ export class AdminClientsController {
     @Param('id') id: string,
     @Body() dto: UpdateOauth2ClientDto,
   ): Promise<OAuth2Client> {
-    const result = await this.hydra.updateClient(id, dto as OAuth2Client);
+    const result = await this.hydra.updateClient(id, dto as Partial<OAuth2Client>);
     await this.audit.record({
       actorId: actor.userId,
       actorEmail: actor.email,

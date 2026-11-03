@@ -28,15 +28,7 @@
             :key="node.attributes?.name || node.id"
             class="space-y-2"
           >
-            <!-- Hide role field; it defaults to "platform_user" -->
-            <template v-if="getNodeName(node) === 'traits.role'">
-              <input
-                type="hidden"
-                :name="getNodeName(node)"
-                :value="getFieldValue(node) || 'platform_user'"
-              />
-            </template>
-            <template v-else-if="getNodeType(node) === 'select' || node.attributes?.type === 'select'">
+            <template v-if="getNodeType(node) === 'select' || node.attributes?.type === 'select'">
               <label
                 :for="getNodeName(node)"
                 class="block text-sm font-medium text-cyber-light"
@@ -225,6 +217,7 @@ import type { FlowLike, HttpErrorLike, ContinueWithLike } from '../types/flow'
 import type { UiNodeLike } from '../utils/uiNodes'
 import { logger, errMessage } from '../utils/logger'
 import { safeRedirect } from '../utils/safeRedirect'
+import { DEFAULT_RETURN_URL } from '../utils/defaultReturnUrl'
 import {
   getNodeValue,
   getNodeName,
@@ -314,11 +307,6 @@ const checkPasswordMatch = () => {
   }
 }
 
-const roleOptions = [
-  { value: 'platform_user', label: 'Platform User' },
-  { value: 'platform_admin', label: 'Platform Admin' }
-]
-
 const preservedQuery = computed<LocationQuery>(() => {
   const q: LocationQuery = {}
   if (route.query.return_to) q.return_to = route.query.return_to
@@ -346,11 +334,7 @@ onMounted(async () => {
         const nodeType = getNodeType(node)
         const nodeValue = getNodeValue(node, null)
 
-        if (nodeName === 'traits.role') {
-          const roleValue = (nodeValue as string) || 'platform_user'
-          fieldValues.value[nodeName] = roleValue
-          if (node.attributes) node.attributes.value = roleValue
-        } else if (nodeName && nodeType !== 'hidden' && nodeType !== 'submit' && nodeType !== 'password' && nodeValue) {
+        if (nodeName && nodeType !== 'hidden' && nodeType !== 'submit' && nodeType !== 'password' && nodeValue) {
           // Only store non-hidden, non-submit, non-password fields with actual values
           fieldValues.value[nodeName] = String(nodeValue)
         }
@@ -453,12 +437,11 @@ const handleSubmit = async (event: Event) => {
     }
 
     const redirectAfter = () => {
-      const destination = safeRedirect(returnTo.value ? decodeURIComponent(returnTo.value) : null, '/dashboard')
-      if (destination.startsWith('/')) {
-        router.push(destination)
-      } else {
-        window.location.href = destination
-      }
+      // '/dashboard' is not a SPA route here — it's the external app surface, so
+      // the fallback must be the absolute DEFAULT_RETURN_URL and navigation must
+      // be a full browser redirect, never router.push (which would 404 in-SPA).
+      const destination = safeRedirect(returnTo.value ? decodeURIComponent(returnTo.value) : null, DEFAULT_RETURN_URL)
+      window.location.href = destination
     }
 
     // Check if registration completed successfully

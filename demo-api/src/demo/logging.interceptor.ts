@@ -37,7 +37,6 @@ export class LoggingInterceptor implements NestInterceptor {
     // Never fall back to X-User-* headers — they are spoofable (M-2).
     // When request.user is absent (unauthenticated / Public decorator), use 'anonymous'.
     const userId = request.user?.userId ?? "anonymous";
-    const userEmail = request.user?.email ?? "anonymous";
     const userRole = request.user?.role ?? "anonymous";
     const authMethod = request.user?.authMethod || "session";
     const clientId = request.user?.clientId || null;
@@ -57,15 +56,14 @@ export class LoggingInterceptor implements NestInterceptor {
             clientId,
             user: {
               id: userId,
-              email: userEmail,
               role: userRole,
             },
-            responseSize: JSON.stringify(data).length,
+            responseSize: this.safeLength(data),
           };
 
           // Log to console
           this.logger.log(
-            `[${frontendSource}] ${method} ${url} - ${duration}ms - User: ${userEmail} (${userRole})`,
+            `[${frontendSource}] ${method} ${url} - ${duration}ms - User: ${userId} (${userRole})`,
           );
 
           // Save to database/file
@@ -84,20 +82,36 @@ export class LoggingInterceptor implements NestInterceptor {
             clientId,
             user: {
               id: userId,
-              email: userEmail,
               role: userRole,
             },
             error: error.message,
           };
 
           this.logger.error(
-            `[${frontendSource}] ${method} ${url} - ${duration}ms - Error: ${error.message} - User: ${userEmail} (${userRole})`,
+            `[${frontendSource}] ${method} ${url} - ${duration}ms - Error: ${error.message} - User: ${userId} (${userRole})`,
           );
 
           this.logsService.logAccess(logEntry);
         },
       }),
     );
+  }
+
+  /**
+   * JSON.stringify(data).length throws when data is undefined (e.g. a
+   * 204/void handler) and returns undefined for non-serializable values
+   * (functions, symbols) — either would crash the response-success log
+   * path (#107). Guard both cases and fall back to 0.
+   */
+  private safeLength(data: unknown): number {
+    if (data === undefined) {
+      return 0;
+    }
+    try {
+      return JSON.stringify(data)?.length ?? 0;
+    } catch {
+      return 0;
+    }
   }
 
   private extractFrontendSource(headers: any, request: any): string {

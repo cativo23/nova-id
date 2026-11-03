@@ -33,6 +33,31 @@
         ]
       }
     },
+    "/v1/hydra-login-init": {
+      "post": {
+        "operationId": "registerHydraLoginBinding",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptHydraLoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Bind a Hydra login challenge to the signed-in user (VULN-0002) before accepting it",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/v1/hydra-accept-consent": {
       "post": {
         "operationId": "acceptHydraConsent",
@@ -467,10 +492,38 @@
     "/v1/admin/clients": {
       "get": {
         "operationId": "AdminClientsController_list",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 500,
+              "default": 100,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageToken",
+            "required": false,
+            "in": "query",
+            "description": "Opaque Hydra pagination token",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
-            "description": "Array of OAuth2 clients"
+            "description": "Page of OAuth2 clients + optional next-page cursor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedClientsDto"
+                }
+              }
+            }
           },
           "401": {
             "description": "Missing or invalid Bearer id_token"
@@ -484,7 +537,7 @@
             "oathkeeper-id-token": []
           }
         ],
-        "summary": "List all OAuth2 clients",
+        "summary": "List all OAuth2 clients (cursor-paginated)",
         "tags": [
           "admin"
         ]
@@ -511,6 +564,9 @@
           },
           "403": {
             "description": "Caller lacks Platform:nova#administer in Keto"
+          },
+          "409": {
+            "description": "A client with this id already exists"
           },
           "422": {
             "description": "Validation failed"
@@ -565,6 +621,7 @@
         ]
       },
       "put": {
+        "description": "Hydra treats PUT as a full-replace; the service reads the current client and merges this partial body onto it first, so any field omitted here is preserved.",
         "operationId": "AdminClientsController_update",
         "parameters": [
           {
@@ -608,7 +665,7 @@
             "oathkeeper-id-token": []
           }
         ],
-        "summary": "Replace an OAuth2 client (full update)",
+        "summary": "Partially update an OAuth2 client",
         "tags": [
           "admin"
         ]
@@ -942,6 +999,26 @@
           "recovery_link"
         ]
       },
+      "PaginatedClientsDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "description": "Page of OAuth2 client records",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "nextPageToken": {
+            "type": "string",
+            "description": "Opaque Hydra cursor for the next page; null when there are no further pages.",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
       "CreateOauth2ClientDto": {
         "type": "object",
         "properties": {
@@ -950,7 +1027,7 @@
             "description": "Human-readable name for the OAuth2 client"
           },
           "redirect_uris": {
-            "description": "Allowed redirect URIs for authorization code / implicit flows",
+            "description": "Allowed redirect URIs for authorization code / implicit flows. Must be https:// except for the RFC 8252 native-app loopback exception (http://localhost|127.0.0.1|[::1]).",
             "type": "array",
             "items": {
               "type": "string"
@@ -1005,7 +1082,7 @@
             "description": "Human-readable name for the OAuth2 client"
           },
           "redirect_uris": {
-            "description": "Allowed redirect URIs for authorization code / implicit flows",
+            "description": "Allowed redirect URIs for authorization code / implicit flows. Must be https:// except for the RFC 8252 native-app loopback exception (http://localhost|127.0.0.1|[::1]).",
             "type": "array",
             "items": {
               "type": "string"

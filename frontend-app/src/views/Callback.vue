@@ -59,21 +59,28 @@
 import { ref, onMounted, inject } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { handleOAuthCallback, clearStoredAccessToken } from '../composables/useHydraOAuth'
+import { logger } from '../utils/logger'
 
 const router = useRouter()
 const route = useRoute()
 const error = ref<string | null>(null)
 const refreshAuth = inject<(() => Promise<void>) | null>('refreshAuth', null)
 
-/** OAuth/OIDC: code and consent verifier are single-use. If user hit Back and landed here with "already used", treat as already signed in. */
+/**
+ * OAuth/OIDC: code and consent verifier are single-use. If user hit Back and landed here with
+ * "already used", treat as already signed in.
+ *
+ * Deliberately matches the single-use phrasing ONLY — a bare `invalid_grant` also covers expired
+ * codes, redirect_uri mismatch and PKCE verifier mismatch, which are genuine failures (possibly an
+ * attack) and must surface instead of silently redirecting home.
+ */
 function isAlreadyUsedError(msg: string | null | undefined) {
   if (!msg || typeof msg !== 'string') return false
   const lower = msg.toLowerCase()
   return (
     lower.includes('already been used') ||
     lower.includes('consent verifier') ||
-    lower.includes('authorization code has been used') ||
-    lower.includes('invalid_grant')
+    lower.includes('authorization code has been used')
   )
 }
 
@@ -88,6 +95,7 @@ onMounted(async () => {
       ? decodeURIComponent(String(oauthErrorDesc).replace(/\+/g, ' '))
       : (oauthError ? String(oauthError) : 'OAuth error')
     if (isAlreadyUsedError(msg)) {
+      logger.warn('OAuth callback: swallowed single-use error, redirecting home:', msg)
       router.replace({ path: '/', query: {} })
       return
     }
@@ -108,6 +116,7 @@ onMounted(async () => {
   } catch (err) {
     const errMsg = (err instanceof Error ? err.message : '') || 'OAuth callback failed'
     if (isAlreadyUsedError(errMsg)) {
+      logger.warn('OAuth callback: swallowed single-use error, redirecting home:', errMsg)
       router.replace({ path: '/', query: {} })
       return
     }

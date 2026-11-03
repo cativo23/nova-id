@@ -263,6 +263,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getApiTestBaseUrl } from '../composables/useApiTest'
+import { getStoredAccessToken } from '../composables/useHydraOAuth'
 import type { LogEntry, LogStats, MeResponse, DemoUser } from '../types'
 import { logger, errMessage } from '../utils/logger'
 
@@ -353,7 +354,18 @@ function formatTime(ts: string) {
 
 async function ensureAllowed() {
   try {
-    const res = await fetch(`${getApiTestBaseUrl()}/me`, { credentials: 'include' })
+    // /api-test is gated by oauth2_introspection (ADR-0007) — it accepts only a
+    // Bearer access token, never the browser cookie. No token means no access.
+    const token = getStoredAccessToken()
+    if (!token) {
+      allowed.value = false
+      router.replace('/')
+      return
+    }
+
+    const res = await fetch(`${getApiTestBaseUrl()}/me`, {
+      headers: { Authorization: 'Bearer ' + token },
+    })
     if (res.ok) {
       const me = await res.json() as MeResponse
       const user: DemoUser = me.user ?? (me as unknown as DemoUser)
@@ -380,9 +392,13 @@ async function loadLogs() {
     if (methodFilter.value) params.set('method', methodFilter.value)
     if (statusFilter.value) params.set('status', statusFilter.value)
     const logUrl = `${baseUrl}/logs?${params.toString()}`
+    const token = getStoredAccessToken()
     const opts: RequestInit = {
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json', 'X-Frontend-Source': 'frontend-app' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Frontend-Source': 'frontend-app',
+        ...(token ? { Authorization: 'Bearer ' + token } : {}),
+      },
     }
     const [logsRes, statsRes] = await Promise.all([
       fetch(logUrl, opts),

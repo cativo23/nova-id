@@ -3,7 +3,7 @@
 # Script to start Nova ID stack in production mode
 # Connects to existing Traefik network
 
-set -e
+set -euo pipefail
 
 # Colors for output
 GREEN='\033[0;32m'
@@ -44,8 +44,12 @@ echo ""
 read -p "Press Enter to continue or Ctrl+C to cancel..."
 echo ""
 
-# Load environment variables from .env.production
-export $(cat .env.production | grep -v '^#' | xargs)
+# Load environment variables from .env.production. `source` (not
+# `export $(cat ... | xargs)`) avoids word-splitting/glob-expanding values
+# — e.g. a `?` in an SMTP connection URI.
+set -a
+source .env.production
+set +a
 export ENVIRONMENT=production
 
 # Start services. --env-file makes Compose interpolate ${VAR} in the YAML from

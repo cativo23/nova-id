@@ -40,7 +40,7 @@ test-email-real: ## Test email sending with a real user
 	./scripts/test-email-with-real-user.sh
 
 setup-permissions: ## Setup RBAC permissions (platform_admin / platform_user)
-	./scripts/setup-all-permissions.sh
+	./scripts/seed-permissions.sh
 
 clear-permissions: ## Clear all permissions (for testing/resetting)
 	./scripts/clear-all-permissions.sh

@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { DataSource } from 'typeorm';
 import { AuditLog } from './audit-log.entity';
+import { LoginChallengeBinding } from '../login-binding/login-challenge-binding.entity';
 
 /**
  * Runtime DataSource — compiled to dist/audit/audit.datasource.runtime.js.
@@ -28,7 +29,7 @@ const AuditRuntimeDataSource = new DataSource({
   username: process.env.AUDIT_DB_USER,
   password: process.env.AUDIT_DB_PASSWORD,
   database: process.env.AUDIT_DB_NAME,
-  entities: [AuditLog],
+  entities: [AuditLog, LoginChallengeBinding],
   migrations: ['dist/audit/migrations/*.js'],
   synchronize: false,
 });

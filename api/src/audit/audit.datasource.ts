@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { DataSource } from 'typeorm';
 import { AuditLog } from './audit-log.entity';
+import { LoginChallengeBinding } from '../login-binding/login-challenge-binding.entity';
 
 /**
  * Standalone DataSource used exclusively by the TypeORM CLI (migration:generate,
@@ -20,7 +21,7 @@ const AuditDataSource = new DataSource({
   username: process.env.AUDIT_DB_USER,
   password: process.env.AUDIT_DB_PASSWORD,
   database: process.env.AUDIT_DB_NAME,
-  entities: [AuditLog],
+  entities: [AuditLog, LoginChallengeBinding],
   migrations: ['src/audit/migrations/*.ts'],
   /**
    * synchronize MUST be false here. This DataSource is for migrations only;

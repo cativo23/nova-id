@@ -1,13 +1,18 @@
-import { ConflictException, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  InternalServerErrorException,
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { KratosAdminService } from './kratos-admin.service';
 
 function makeService(identityApiMock: any): KratosAdminService {
   return new KratosAdminService(identityApiMock);
 }
 
-function axiosErr(status: number): Error {
+function axiosErr(status: number, data?: unknown): Error {
   const e: any = new Error(`HTTP ${status}`);
-  e.response = { status };
+  e.response = { status, data };
   return e;
 }
 
@@ -106,12 +111,39 @@ describe('KratosAdminService', () => {
       ).rejects.toBeInstanceOf(ConflictException);
     });
 
-    it('createIdentity 400 (duplicate credentials) → ConflictException', async () => {
-      const api = { createIdentity: jest.fn().mockRejectedValue(axiosErr(400)) };
+    it('createIdentity 400 with a duplicate-identifier message → ConflictException', async () => {
+      const api = {
+        createIdentity: jest.fn().mockRejectedValue(
+          axiosErr(400, { error: { message: 'An account with the same identifier (email) exists already.' } }),
+        ),
+      };
       const svc = makeService(api);
       await expect(
         svc.createIdentity({ email: 'dup@b.c', fullName: 'D', password: 'Pw123456$' }),
       ).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('createIdentity 400 with a password-policy violation → UnprocessableEntityException carrying the real reason', async () => {
+      const api = {
+        createIdentity: jest.fn().mockRejectedValue(
+          axiosErr(400, { error: { message: 'The password does not fulfil the password policy.' } }),
+        ),
+      };
+      const svc = makeService(api);
+      await expect(
+        svc.createIdentity({ email: 'weak@b.c', fullName: 'D', password: 'weak' }),
+      ).rejects.toBeInstanceOf(UnprocessableEntityException);
+      await expect(
+        svc.createIdentity({ email: 'weak@b.c', fullName: 'D', password: 'weak' }),
+      ).rejects.toThrow('The password does not fulfil the password policy.');
+    });
+
+    it('createIdentity 400 with no recognizable reason → UnprocessableEntityException with a generic message (never defaults to Conflict)', async () => {
+      const api = { createIdentity: jest.fn().mockRejectedValue(axiosErr(400)) };
+      const svc = makeService(api);
+      await expect(
+        svc.createIdentity({ email: 'x@b.c', fullName: 'D', password: 'Pw123456$' }),
+      ).rejects.toBeInstanceOf(UnprocessableEntityException);
     });
 
     it('deleteIdentity 404 → NotFoundException', async () => {
